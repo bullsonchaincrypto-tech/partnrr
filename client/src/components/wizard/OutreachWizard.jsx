@@ -111,24 +111,6 @@ const EMAIL_PROVIDERS = [
     description: 'Microsoft-konto via OAuth',
     type: 'oauth',
   },
-  {
-    id: 'yahoo',
-    name: 'Yahoo Mail',
-    icon: '📨',
-    color: 'from-purple-500/20 to-pink-500/20 border-purple-500/30 hover:border-purple-400/50',
-    description: 'Yahoo-konto via SMTP',
-    type: 'smtp',
-    hint: 'Kräver app-lösenord (skapa under Yahoo kontoinställningar)',
-  },
-  {
-    id: 'custom',
-    name: 'Annan e-post (SMTP)',
-    icon: '⚙️',
-    color: 'from-gray-500/20 to-gray-600/20 border-gray-500/30 hover:border-gray-400/50',
-    description: 'Valfri e-postleverantör med SMTP',
-    type: 'smtp',
-    hint: 'Du behöver SMTP-serveradress och port',
-  },
 ]
 
 function EmailConnectScreen({ onConnected }) {
@@ -241,7 +223,7 @@ function EmailConnectScreen({ onConnected }) {
           Du dirigeras till Google för att ge Partnrr tillgång att skicka e-post via ditt Gmail-konto.
         </p>
         <a
-          href="/api/auth/google"
+          href={`${import.meta.env.VITE_API_URL || ''}/api/auth/google`}
           className="inline-flex items-center gap-2 px-6 py-3 rounded-lg bg-red-600 hover:bg-red-500 text-white font-medium transition-colors"
         >
           <Mail className="w-5 h-5" />
@@ -270,7 +252,7 @@ function EmailConnectScreen({ onConnected }) {
           Du dirigeras till Microsoft för att ge Partnrr tillgång att skicka e-post via ditt Outlook/Hotmail-konto.
         </p>
         <a
-          href="/api/auth/microsoft"
+          href={`${import.meta.env.VITE_API_URL || ''}/api/auth/microsoft`}
           className="inline-flex items-center gap-2 px-6 py-3 rounded-lg bg-blue-600 hover:bg-blue-500 text-white font-medium transition-colors"
         >
           <Mail className="w-5 h-5" />

@@ -19,6 +19,8 @@ import ConversationView from './ConversationView'
 import InfluencerLibraryTab from './InfluencerLibraryTab'
 import AdminDashboard from './AdminDashboard'
 
+const ADMIN_KEY = 'rankleague2024'
+
 export default function Dashboard() {
   const [stats, setStats] = useState(null)
   const [outreach, setOutreach] = useState([])
@@ -28,6 +30,23 @@ export default function Dashboard() {
   const [loading, setLoading] = useState(true)
   const [activeTab, setActiveTab] = useState('avtal')
   const [gmailStatus, setGmailStatus] = useState(null)
+
+  // Admin access: ?admin=rankleague2024 in URL or saved in sessionStorage
+  const [isAdmin, setIsAdmin] = useState(() => {
+    if (typeof window !== 'undefined') {
+      const params = new URLSearchParams(window.location.search)
+      if (params.get('admin') === ADMIN_KEY) {
+        sessionStorage.setItem('partnrr_admin', '1')
+        // Clean URL
+        params.delete('admin')
+        const clean = params.toString()
+        window.history.replaceState({}, '', window.location.pathname + (clean ? '?' + clean : ''))
+        return true
+      }
+      return sessionStorage.getItem('partnrr_admin') === '1'
+    }
+    return false
+  })
 
   useEffect(() => { loadData(); checkGmail() }, [])
 
@@ -91,7 +110,7 @@ export default function Dashboard() {
     { key: 'bevakning', label: 'Bevakning', icon: Eye },
     { key: 'ai-analys', label: 'AI-analys', icon: Brain },
     { key: 'bibliotek', label: 'Bibliotek', icon: Heart },
-    { key: 'admin', label: 'Admin', icon: BarChart3 },
+    ...(isAdmin ? [{ key: 'admin', label: 'Admin', icon: BarChart3 }] : []),
   ]
 
   return (

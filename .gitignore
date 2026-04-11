@@ -1,8 +1,32 @@
+# Dependencies
 node_modules/
-dist/
+
+# Environment
 .env
-*.lock
+server/.env
+
+# Database (lokal SQLite-data)
+server/*.db
+server/*.db.bak
+server/*.db.bak2
+server/*.db.corrupt*
+
+# Build
+client/dist/
+
+# OS
+.DS_Store
+Thumbs.db
+
+# IDE
+.vscode/
+.idea/
+
+# Temp
+server/tmp/
+*.log
+
+# OpenClaw
+openclaw.json
 .git2/
 rankleague-outreach-tool/
-*.env
-openclaw.json

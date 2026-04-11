@@ -16,7 +16,7 @@ router.get('/status', async (req, res) => {
 
 // ─── Gmail OAuth flow ────────────────────────────────────────
 router.get('/google', async (req, res) => {
-  const url = getAuthUrl();
+  const url = await getAuthUrl();
   res.redirect(url);
 });
 
@@ -197,7 +197,7 @@ router.get('/debug-scopes', async (req, res) => {
 
 router.get('/force-reauth', async (req, res) => {
   await removeEmailConfig();
-  const url = getAuthUrl();
+  const url = await getAuthUrl();
   res.redirect(url);
 });
 

@@ -1,0 +1,20 @@
+{
+  "name": "rankleague-outreach-tool",
+  "version": "1.0.0",
+  "description": "RankLeague Influencer Outreach & CRM Tool",
+  "scripts": {
+    "dev": "concurrently \"npm run server\" \"npm run client\"",
+    "server": "cd server && node index.js",
+    "client": "cd client && npm run dev",
+    "install:all": "npm install && cd server && npm install && cd ../client && npm install",
+    "build": "cd client && npm run build"
+  },
+  "devDependencies": {
+    "@tailwindcss/vite": "^4.2.2",
+    "concurrently": "^8.2.2",
+    "lucide-react": "^1.7.0",
+    "react-router-dom": "^7.14.0",
+    "recharts": "^3.8.1",
+    "tailwindcss": "^4.2.2"
+  }
+}

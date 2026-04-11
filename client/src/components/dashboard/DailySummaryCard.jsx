@@ -43,10 +43,10 @@ export default function DailySummaryCard() {
   const hasActions = summary.actionItems?.length > 0
 
   return (
-    <div className={`rounded-xl border p-5 mb-6 ${
+    <div className={`rounded-xl border p-3 sm:p-5 mb-4 sm:mb-6 ${
       hasActions ? 'bg-yellow-500/5 border-yellow-500/20' : 'bg-green-500/5 border-green-500/20'
     }`}>
-      <div className="flex items-center justify-between mb-4">
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 mb-4">
         <div className="flex items-center gap-2">
           <Sun className={`w-5 h-5 ${hasActions ? 'text-yellow-400' : 'text-green-400'}`} />
           <h3 className="text-sm font-semibold text-white">Idag — {new Date().toLocaleDateString('sv-SE', { weekday: 'long', day: 'numeric', month: 'long' })}</h3>
@@ -54,7 +54,7 @@ export default function DailySummaryCard() {
         <div className="flex items-center gap-2">
           <button onClick={() => setShowEmailForm(!showEmailForm)}
             className="text-xs text-gray-500 hover:text-gray-300 flex items-center gap-1 px-2 py-1 rounded border border-gray-700/50 transition-colors">
-            <Mail className="w-3 h-3" /> Skicka sammanfattning
+            <Mail className="w-3 h-3" /> <span className="hidden sm:inline">Skicka sammanfattning</span><span className="sm:hidden">Mejla</span>
           </button>
           <button onClick={loadSummary} className="text-gray-600 hover:text-gray-400 transition-colors">
             <RefreshCw className="w-3.5 h-3.5" />
@@ -84,25 +84,25 @@ export default function DailySummaryCard() {
       )}
 
       {/* Quick stats */}
-      <div className="grid grid-cols-5 gap-3 mb-4">
+      <div className="grid grid-cols-3 sm:grid-cols-5 gap-2 sm:gap-3 mb-4">
         <div className="text-center">
-          <div className="text-lg font-bold text-white">{summary.stats.awaitingReply}</div>
+          <div className="text-base sm:text-lg font-bold text-white">{summary.stats.awaitingReply}</div>
           <div className="text-[10px] text-gray-500">Väntar svar</div>
         </div>
         <div className="text-center">
-          <div className="text-lg font-bold text-purple-400">{summary.stats.followupsDue}</div>
+          <div className="text-base sm:text-lg font-bold text-purple-400">{summary.stats.followupsDue}</div>
           <div className="text-[10px] text-gray-500">Uppföljningar</div>
         </div>
         <div className="text-center">
-          <div className="text-lg font-bold text-green-400">{summary.stats.newReplies}</div>
+          <div className="text-base sm:text-lg font-bold text-green-400">{summary.stats.newReplies}</div>
           <div className="text-[10px] text-gray-500">Nya svar</div>
         </div>
         <div className="text-center">
-          <div className="text-lg font-bold text-yellow-400">{summary.stats.expiringContracts}</div>
+          <div className="text-base sm:text-lg font-bold text-yellow-400">{summary.stats.expiringContracts}</div>
           <div className="text-[10px] text-gray-500">Avtal utgår</div>
         </div>
         <div className="text-center">
-          <div className="text-lg font-bold text-blue-400">{summary.stats.responseRate}%</div>
+          <div className="text-base sm:text-lg font-bold text-blue-400">{summary.stats.responseRate}%</div>
           <div className="text-[10px] text-gray-500">Svarsfrekvens</div>
         </div>
       </div>

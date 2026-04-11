@@ -101,3 +101,25 @@ html.light .animate-pulse {
 button, a {
   transition-duration: 0.2s;
 }
+
+/* ===== HIDE SCROLLBAR (for horizontal tab scroll on mobile) ===== */
+.scrollbar-hide {
+  -ms-overflow-style: none;
+  scrollbar-width: none;
+}
+.scrollbar-hide::-webkit-scrollbar {
+  display: none;
+}
+
+/* ===== MOBILE IMPROVEMENTS ===== */
+@media (max-width: 640px) {
+  /* Prevent horizontal page overflow */
+  html, body {
+    overflow-x: hidden;
+  }
+  /* Tighter padding on mobile */
+  .mobile-compact {
+    padding-left: 0.75rem;
+    padding-right: 0.75rem;
+  }
+}

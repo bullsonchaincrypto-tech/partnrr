@@ -13,7 +13,7 @@ export default function EkonomiTab() {
       <div className="flex gap-1 bg-gray-800/50 rounded-lg p-1">
         <button
           onClick={() => setSubTab('intakter')}
-          className={`flex-1 flex items-center justify-center gap-2 px-3 py-1.5 rounded text-xs font-medium transition-colors ${
+          className={`flex-1 flex items-center justify-center gap-1.5 sm:gap-2 px-2 sm:px-3 py-1.5 rounded text-xs font-medium transition-colors whitespace-nowrap ${
             subTab === 'intakter' ? 'bg-green-600/80 text-white' : 'text-gray-400 hover:text-white hover:bg-gray-700/50'
           }`}
         >
@@ -21,15 +21,15 @@ export default function EkonomiTab() {
         </button>
         <button
           onClick={() => setSubTab('utbetalningar')}
-          className={`flex-1 flex items-center justify-center gap-2 px-3 py-1.5 rounded text-xs font-medium transition-colors ${
+          className={`flex-1 flex items-center justify-center gap-1.5 sm:gap-2 px-2 sm:px-3 py-1.5 rounded text-xs font-medium transition-colors whitespace-nowrap ${
             subTab === 'utbetalningar' ? 'bg-purple-600/80 text-white' : 'text-gray-400 hover:text-white hover:bg-gray-700/50'
           }`}
         >
-          <TrendingDown className="w-3.5 h-3.5" /> Utbetalningar
+          <TrendingDown className="w-3.5 h-3.5" /> <span className="hidden sm:inline">Utbetalningar</span><span className="sm:hidden">Utbet.</span>
         </button>
         <button
           onClick={() => setSubTab('fakturering')}
-          className={`flex-1 flex items-center justify-center gap-2 px-3 py-1.5 rounded text-xs font-medium transition-colors ${
+          className={`flex-1 flex items-center justify-center gap-1.5 sm:gap-2 px-2 sm:px-3 py-1.5 rounded text-xs font-medium transition-colors whitespace-nowrap ${
             subTab === 'fakturering' ? 'bg-purple-600/80 text-white' : 'text-gray-400 hover:text-white hover:bg-gray-700/50'
           }`}
         >

@@ -368,22 +368,22 @@ function ContractCard({ contract: k, onStatusChange, onSendForSigning, onDelete,
   }
 
   return (
-    <div className="bg-gray-800/50 rounded-xl p-4 border border-gray-700/50">
+    <div className="bg-gray-800/50 rounded-xl p-3 sm:p-4 border border-gray-700/50">
       {/* Top row */}
-      <div className="flex items-start justify-between gap-4">
-        <div className="flex-1">
-          <div className="flex items-center gap-2 mb-1">
+      <div className="flex flex-col sm:flex-row sm:items-start justify-between gap-2 sm:gap-4">
+        <div className="flex-1 min-w-0">
+          <div className="flex items-center gap-2 mb-1 flex-wrap">
             <span className="text-white font-medium">{k.influencer_namn}</span>
-            <span className="text-gray-600">•</span>
+            <span className="text-gray-600 hidden sm:inline">•</span>
             <span className="text-sm text-gray-500">@{k.kanalnamn}</span>
           </div>
-          <div className="text-sm text-gray-400">
+          <div className="text-xs sm:text-sm text-gray-400">
             {k.foretag_namn} • Skapad {createdDate}
             {k.signed_at && ` • Signerad ${new Date(k.signed_at).toLocaleDateString('sv-SE')}`}
           </div>
         </div>
 
-        <div className="flex items-center gap-2 shrink-0">
+        <div className="flex items-center gap-2 shrink-0 flex-wrap">
           {daysLeft !== null && k.status === 'aktivt' && (
             <span className={`text-xs px-2 py-1 rounded ${
               daysLeft <= 0 ? 'bg-red-500/20 text-red-400' :
@@ -435,12 +435,12 @@ function ContractCard({ contract: k, onStatusChange, onSendForSigning, onDelete,
           {showContract && (
             <div className="mt-2 p-4 bg-gray-900 rounded-lg border border-gray-700 relative">
               {/* Kontrakts-header med status-badge */}
-              <div className="flex items-center justify-between mb-3 pb-3 border-b border-gray-700">
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 mb-3 pb-3 border-b border-gray-700">
                 <div className="flex items-center gap-2">
                   <FileText className="w-4 h-4 text-purple-400" />
                   <span className="text-sm font-medium text-gray-300">Kontraktsvillkor</span>
                 </div>
-                <div className="flex items-center gap-2">
+                <div className="flex items-center gap-2 flex-wrap">
                   {k.signed_at && (
                     <span className="text-xs bg-green-500/20 text-green-400 px-2 py-0.5 rounded">
                       Signerad {new Date(k.signed_at).toLocaleDateString('sv-SE')}
@@ -502,7 +502,7 @@ function ContractCard({ contract: k, onStatusChange, onSendForSigning, onDelete,
       {/* Edit economics */}
       {isEditing && (
         <div className="mt-3 p-3 bg-gray-900/50 rounded-lg border border-gray-700/50">
-          <div className="grid grid-cols-3 gap-3">
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
             <div>
               <label className="text-xs text-gray-500">Videos levererade</label>
               <input type="number" value={editForm.videos_delivered}

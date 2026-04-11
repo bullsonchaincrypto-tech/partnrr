@@ -354,7 +354,7 @@ export default function ConversationView() {
   )
 
   return (
-    <div className="rounded-2xl overflow-hidden relative" style={{ height: '680px' }}>
+    <div className="rounded-2xl overflow-hidden relative" style={{ height: 'min(680px, calc(100vh - 200px))' }}>
       {/* Futuristic background gradient */}
       <div className="absolute inset-0 bg-gradient-to-br from-gray-950 via-gray-900 to-gray-950" />
       <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_top_right,rgba(139,92,246,0.08),transparent_50%)]" />

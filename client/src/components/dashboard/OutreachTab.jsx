@@ -45,31 +45,31 @@ export default function OutreachTab({ outreach, trackingStats, stats, followUps,
     <div className="space-y-4">
       {/* E-poststatus */}
       {emailStatus && (
-        <div className={`rounded-lg border px-4 py-3 flex items-center justify-between ${
+        <div className={`rounded-lg border px-3 sm:px-4 py-3 flex flex-col sm:flex-row sm:items-center justify-between gap-2 ${
           emailStatus.authenticated
             ? 'border-green-700/50 bg-green-900/10'
             : 'border-amber-700/50 bg-amber-900/10'
         }`}>
-          <div className="flex items-center gap-3">
-            <div className={`w-8 h-8 rounded-lg flex items-center justify-center ${
+          <div className="flex items-center gap-3 min-w-0">
+            <div className={`w-8 h-8 rounded-lg flex items-center justify-center shrink-0 ${
               emailStatus.authenticated ? 'bg-green-500/10' : 'bg-amber-500/10'
             }`}>
               <Mail className={`w-4 h-4 ${emailStatus.authenticated ? 'text-green-400' : 'text-amber-400'}`} />
             </div>
             {emailStatus.authenticated ? (
-              <div>
-                <div className="flex items-center gap-2">
+              <div className="min-w-0">
+                <div className="flex items-center gap-2 flex-wrap">
                   <span className="text-sm font-medium text-green-300">E-post anslutet</span>
                   {emailStatus.provider && <span className="text-[10px] text-green-500 bg-green-500/10 px-1.5 py-0.5 rounded-full capitalize">{emailStatus.provider}</span>}
                   <span className="flex items-center gap-1 text-[10px] text-green-500 bg-green-500/10 px-1.5 py-0.5 rounded-full">
                     <Wifi className="w-2.5 h-2.5" /> Aktiv
                   </span>
                 </div>
-                <span className="text-xs text-gray-400">{emailStatus.email}</span>
+                <span className="text-xs text-gray-400 truncate block">{emailStatus.email}</span>
               </div>
             ) : (
-              <div>
-                <div className="flex items-center gap-2">
+              <div className="min-w-0">
+                <div className="flex items-center gap-2 flex-wrap">
                   <span className="text-sm font-medium text-amber-300">E-post ej anslutet</span>
                   <span className="flex items-center gap-1 text-[10px] text-amber-500 bg-amber-500/10 px-1.5 py-0.5 rounded-full">
                     <WifiOff className="w-2.5 h-2.5" /> Offline
@@ -81,7 +81,7 @@ export default function OutreachTab({ outreach, trackingStats, stats, followUps,
           </div>
           {emailStatus.authenticated && (
             <button onClick={async () => { await api.disconnectAuth(); checkEmailStatus() }}
-              className="text-xs text-gray-500 hover:text-red-400 px-2 py-1 rounded transition-colors">
+              className="text-xs text-gray-500 hover:text-red-400 px-2 py-1 rounded transition-colors shrink-0">
               Koppla från
             </button>
           )}
@@ -89,43 +89,45 @@ export default function OutreachTab({ outreach, trackingStats, stats, followUps,
       )}
 
       {/* Sub-navigation */}
-      <div className="flex gap-1 bg-gray-800/50 rounded-lg p-1">
-        <button onClick={() => setSubTab('outreach')}
-          className={`flex-1 flex items-center justify-center gap-2 px-3 py-1.5 rounded text-xs font-medium transition-colors ${
-            subTab === 'outreach' ? 'bg-purple-600/80 text-white' : 'text-gray-400 hover:text-white hover:bg-gray-700/50'
-          }`}>
-          <Mail className="w-3.5 h-3.5" /> Utskickstabell
-        </button>
-        <button onClick={() => setSubTab('tracking')}
-          className={`flex-1 flex items-center justify-center gap-2 px-3 py-1.5 rounded text-xs font-medium transition-colors ${
-            subTab === 'tracking' ? 'bg-purple-600/80 text-white' : 'text-gray-400 hover:text-white hover:bg-gray-700/50'
-          }`}>
-          <Eye className="w-3.5 h-3.5" /> E-postspårning
-        </button>
-        <button onClick={() => setSubTab('followup')}
-          className={`flex-1 flex items-center justify-center gap-2 px-3 py-1.5 rounded text-xs font-medium transition-colors ${
-            subTab === 'followup' ? 'bg-purple-600/80 text-white' : 'text-gray-400 hover:text-white hover:bg-gray-700/50'
-          }`}>
-          <Zap className="w-3.5 h-3.5" /> Auto-uppföljning
-        </button>
-        <button onClick={() => setSubTab('statistik')}
-          className={`flex-1 flex items-center justify-center gap-2 px-3 py-1.5 rounded text-xs font-medium transition-colors ${
-            subTab === 'statistik' ? 'bg-purple-600/80 text-white' : 'text-gray-400 hover:text-white hover:bg-gray-700/50'
-          }`}>
-          <BarChart3 className="w-3.5 h-3.5" /> Statistik
-        </button>
-        <button onClick={() => setSubTab('kampanjer')}
-          className={`flex-1 flex items-center justify-center gap-2 px-3 py-1.5 rounded text-xs font-medium transition-colors ${
-            subTab === 'kampanjer' ? 'bg-purple-600/80 text-white' : 'text-gray-400 hover:text-white hover:bg-gray-700/50'
-          }`}>
-          <Megaphone className="w-3.5 h-3.5" /> Kampanjer
-        </button>
-        <button onClick={() => setSubTab('ab-test')}
-          className={`flex-1 flex items-center justify-center gap-2 px-3 py-1.5 rounded text-xs font-medium transition-colors ${
-            subTab === 'ab-test' ? 'bg-purple-600/80 text-white' : 'text-gray-400 hover:text-white hover:bg-gray-700/50'
-          }`}>
-          <FlaskConical className="w-3.5 h-3.5" /> A/B-test
-        </button>
+      <div className="overflow-x-auto -mx-3 px-3 sm:mx-0 sm:px-0 scrollbar-hide">
+        <div className="flex gap-1 bg-gray-800/50 rounded-lg p-1 min-w-max sm:min-w-0">
+          <button onClick={() => setSubTab('outreach')}
+            className={`sm:flex-1 flex items-center justify-center gap-1.5 px-3 py-1.5 rounded text-xs font-medium transition-colors whitespace-nowrap ${
+              subTab === 'outreach' ? 'bg-purple-600/80 text-white' : 'text-gray-400 hover:text-white hover:bg-gray-700/50'
+            }`}>
+            <Mail className="w-3.5 h-3.5" /> Utskick
+          </button>
+          <button onClick={() => setSubTab('tracking')}
+            className={`sm:flex-1 flex items-center justify-center gap-1.5 px-3 py-1.5 rounded text-xs font-medium transition-colors whitespace-nowrap ${
+              subTab === 'tracking' ? 'bg-purple-600/80 text-white' : 'text-gray-400 hover:text-white hover:bg-gray-700/50'
+            }`}>
+            <Eye className="w-3.5 h-3.5" /> Spårning
+          </button>
+          <button onClick={() => setSubTab('followup')}
+            className={`sm:flex-1 flex items-center justify-center gap-1.5 px-3 py-1.5 rounded text-xs font-medium transition-colors whitespace-nowrap ${
+              subTab === 'followup' ? 'bg-purple-600/80 text-white' : 'text-gray-400 hover:text-white hover:bg-gray-700/50'
+            }`}>
+            <Zap className="w-3.5 h-3.5" /> Uppföljning
+          </button>
+          <button onClick={() => setSubTab('statistik')}
+            className={`sm:flex-1 flex items-center justify-center gap-1.5 px-3 py-1.5 rounded text-xs font-medium transition-colors whitespace-nowrap ${
+              subTab === 'statistik' ? 'bg-purple-600/80 text-white' : 'text-gray-400 hover:text-white hover:bg-gray-700/50'
+            }`}>
+            <BarChart3 className="w-3.5 h-3.5" /> Statistik
+          </button>
+          <button onClick={() => setSubTab('kampanjer')}
+            className={`sm:flex-1 flex items-center justify-center gap-1.5 px-3 py-1.5 rounded text-xs font-medium transition-colors whitespace-nowrap ${
+              subTab === 'kampanjer' ? 'bg-purple-600/80 text-white' : 'text-gray-400 hover:text-white hover:bg-gray-700/50'
+            }`}>
+            <Megaphone className="w-3.5 h-3.5" /> Kampanjer
+          </button>
+          <button onClick={() => setSubTab('ab-test')}
+            className={`sm:flex-1 flex items-center justify-center gap-1.5 px-3 py-1.5 rounded text-xs font-medium transition-colors whitespace-nowrap ${
+              subTab === 'ab-test' ? 'bg-purple-600/80 text-white' : 'text-gray-400 hover:text-white hover:bg-gray-700/50'
+            }`}>
+            <FlaskConical className="w-3.5 h-3.5" /> A/B-test
+          </button>
+        </div>
       </div>
 
       {/* ============ UTSKICKSTABELL ============ */}
@@ -245,18 +247,18 @@ export default function OutreachTab({ outreach, trackingStats, stats, followUps,
       {/* ============ E-POSTSPÅRNING ============ */}
       {subTab === 'tracking' && (
         <div className="space-y-6">
-          <div className="grid grid-cols-3 gap-4">
-            <div className="bg-gray-900 rounded-lg border border-gray-800 p-4 text-center">
-              <div className="text-3xl font-bold text-cyan-400">{trackingStats?.totalTracked || 0}</div>
-              <div className="text-sm text-gray-400">Spårade e-post</div>
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 sm:gap-4">
+            <div className="bg-gray-900 rounded-lg border border-gray-800 p-3 sm:p-4 text-center">
+              <div className="text-2xl sm:text-3xl font-bold text-cyan-400">{trackingStats?.totalTracked || 0}</div>
+              <div className="text-xs sm:text-sm text-gray-400">Spårade e-post</div>
             </div>
-            <div className="bg-gray-900 rounded-lg border border-gray-800 p-4 text-center">
-              <div className="text-3xl font-bold text-green-400">{trackingStats?.totalOpened || 0}</div>
-              <div className="text-sm text-gray-400">Öppnade</div>
+            <div className="bg-gray-900 rounded-lg border border-gray-800 p-3 sm:p-4 text-center">
+              <div className="text-2xl sm:text-3xl font-bold text-green-400">{trackingStats?.totalOpened || 0}</div>
+              <div className="text-xs sm:text-sm text-gray-400">Öppnade</div>
             </div>
-            <div className="bg-gray-900 rounded-lg border border-gray-800 p-4 text-center">
-              <div className="text-3xl font-bold text-yellow-400">{trackingStats?.openRate || 0}%</div>
-              <div className="text-sm text-gray-400">Öppningsfrekvens</div>
+            <div className="bg-gray-900 rounded-lg border border-gray-800 p-3 sm:p-4 text-center">
+              <div className="text-2xl sm:text-3xl font-bold text-yellow-400">{trackingStats?.openRate || 0}%</div>
+              <div className="text-xs sm:text-sm text-gray-400">Öppningsfrekvens</div>
             </div>
           </div>
 

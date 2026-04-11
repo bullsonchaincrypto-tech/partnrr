@@ -1,0 +1,21 @@
+{
+  "name": "rankleague-server",
+  "version": "1.0.0",
+  "type": "module",
+  "scripts": {
+    "start": "node index.js",
+    "dev": "node --watch index.js"
+  },
+  "dependencies": {
+    "@anthropic-ai/sdk": "^0.85.0",
+    "cors": "^2.8.5",
+    "dotenv": "^16.4.5",
+    "express": "^4.21.0",
+    "googleapis": "^140.0.1",
+    "node-fetch": "^3.3.2",
+    "nodemailer": "^8.0.5",
+    "pdfkit": "^0.15.2",
+    "pg": "^8.20.0",
+    "uuid": "^10.0.0"
+  }
+}

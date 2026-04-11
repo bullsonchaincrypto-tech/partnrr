@@ -1,0 +1,103 @@
+@import "tailwindcss";
+
+/* ===== LIGHT THEME OVERRIDES ===== */
+html.light body {
+  background-color: #f8fafc;
+  color: #1e293b;
+}
+html.light .bg-gray-950 { background-color: #f8fafc; }
+html.light .bg-gray-900 { background-color: #ffffff; }
+html.light .bg-gray-800 { background-color: #f1f5f9; }
+html.light .bg-gray-800\/50 { background-color: rgba(241,245,249,0.5); }
+html.light .bg-gray-800\/30 { background-color: rgba(241,245,249,0.3); }
+html.light .border-gray-800 { border-color: #e2e8f0; }
+html.light .border-gray-700 { border-color: #cbd5e1; }
+html.light .border-gray-600 { border-color: #94a3b8; }
+html.light .text-white { color: #0f172a; }
+html.light .text-gray-100 { color: #1e293b; }
+html.light .text-gray-300 { color: #475569; }
+html.light .text-gray-400 { color: #64748b; }
+html.light .text-gray-500 { color: #94a3b8; }
+html.light .text-gray-600 { color: #475569; }
+html.light .placeholder-gray-500::placeholder { color: #94a3b8; }
+
+html.light input, html.light select, html.light textarea {
+  background-color: #f1f5f9;
+  border-color: #cbd5e1;
+  color: #0f172a;
+}
+html.light input:focus, html.light select:focus, html.light textarea:focus {
+  border-color: #a855f7;
+}
+
+/* ===== WIZARD STEP ANIMATIONS ===== */
+@keyframes slideInRight {
+  from { opacity: 0; transform: translateX(40px); }
+  to { opacity: 1; transform: translateX(0); }
+}
+@keyframes slideInLeft {
+  from { opacity: 0; transform: translateX(-40px); }
+  to { opacity: 1; transform: translateX(0); }
+}
+@keyframes fadeIn {
+  from { opacity: 0; transform: translateY(8px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+@keyframes fadeOut {
+  from { opacity: 1; transform: translateY(0); }
+  to { opacity: 0; transform: translateY(-8px); }
+}
+
+.step-enter-right {
+  animation: slideInRight 0.35s cubic-bezier(0.16, 1, 0.3, 1);
+}
+.step-enter-left {
+  animation: slideInLeft 0.35s cubic-bezier(0.16, 1, 0.3, 1);
+}
+.step-fade-in {
+  animation: fadeIn 0.3s ease-out;
+}
+
+/* ===== DRAG & DROP ===== */
+.drag-item {
+  transition: transform 0.15s ease, box-shadow 0.15s ease;
+  cursor: grab;
+}
+.drag-item:active {
+  cursor: grabbing;
+}
+.drag-item.dragging {
+  opacity: 0.5;
+  transform: scale(0.98);
+  box-shadow: 0 0 0 2px rgba(168, 85, 247, 0.5);
+}
+.drag-over {
+  border-color: rgba(168, 85, 247, 0.5) !important;
+  background-color: rgba(168, 85, 247, 0.05) !important;
+}
+
+/* ===== SKELETON PULSE ===== */
+@keyframes shimmer {
+  0% { background-position: -200% 0; }
+  100% { background-position: 200% 0; }
+}
+.animate-pulse {
+  background: linear-gradient(90deg, #1f2937 25%, #374151 50%, #1f2937 75%);
+  background-size: 200% 100%;
+  animation: shimmer 1.5s ease-in-out infinite;
+}
+html.light .animate-pulse {
+  background: linear-gradient(90deg, #e2e8f0 25%, #cbd5e1 50%, #e2e8f0 75%);
+  background-size: 200% 100%;
+  animation: shimmer 1.5s ease-in-out infinite;
+}
+
+/* ===== SMOOTH TRANSITIONS ===== */
+* {
+  transition-property: color, background-color, border-color;
+  transition-timing-function: ease;
+  transition-duration: 0.15s;
+}
+button, a {
+  transition-duration: 0.2s;
+}

@@ -1,0 +1,18 @@
+{
+  "name": "rankleague-outreach-tool",
+  "version": "1.0.0",
+  "description": "RankLeague Influencer Outreach & CRM Tool",
+  "scripts": {
+    "dev": "concurrently \"npm run server\" \"npm run client\"",
+    "server": "cd server && node index.js",
+    "client": "cd client && npm run dev",
+    "install:all": "npm install && cd server && npm install && cd ../client && npm install",
+    "build": "cd client && npm run build"
+  },
+  "devDependencies": {
+    "concurrently": "^8.2.2"
+  },
+  "dependencies": {
+    "pdfkit": "^0.18.0"
+  }
+}

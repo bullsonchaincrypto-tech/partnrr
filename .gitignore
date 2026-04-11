@@ -1,0 +1,8 @@
+node_modules/
+dist/
+.env
+*.lock
+.git2/
+rankleague-outreach-tool/
+*.env
+openclaw.json

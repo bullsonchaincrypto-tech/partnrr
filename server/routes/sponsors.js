@@ -70,6 +70,46 @@ router.put('/prospects/:foretagId/select-all', async (req, res) => {
   res.json(rows);
 });
 
+// POST /api/sponsors/prospects/bulk-save — spara AI-sökta sponsors till DB
+router.post('/prospects/bulk-save', async (req, res) => {
+  try {
+    const { foretag_id, prospects } = req.body;
+    if (!foretag_id || !prospects?.length) {
+      return res.status(400).json({ error: 'foretag_id och prospects krävs' });
+    }
+
+    // Ta bort gamla prospects för detta företag
+    await runSql('DELETE FROM sponsor_prospects WHERE foretag_id = ?', [foretag_id]);
+
+    for (const p of prospects) {
+      await runSql(
+        `INSERT INTO sponsor_prospects (foretag_id, namn, kontaktperson, epost, bransch, instagram_handle, hemsida, telefon, betyg, kalla, vald)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+        [
+          foretag_id,
+          p.namn || '',
+          p.kontaktperson || null,
+          p.kontakt_epost || p.epost || null,
+          p.bransch || p.nisch || null,
+          p.instagram_handle || p.kanalnamn || null,
+          p.hemsida || null,
+          p.telefon || null,
+          p.betyg || null,
+          p.kalla || 'ai',
+          p.vald ? 1 : 0,
+        ]
+      );
+    }
+
+    const dbRows = await queryAll('SELECT * FROM sponsor_prospects WHERE foretag_id = ? ORDER BY id ASC', [foretag_id]);
+    console.log(`[Sponsors] Sparade ${dbRows.length} AI-sponsors till DB (${dbRows.filter(r => r.vald).length} valda)`);
+    res.json(dbRows);
+  } catch (error) {
+    console.error('Sponsor bulk save error:', error);
+    res.status(500).json({ error: error.message });
+  }
+});
+
 // Generate sponsor pitches
 router.post('/outreach/generate', async (req, res) => {
   try {

@@ -832,21 +832,33 @@ export default function Step2HittaInfluencers({ foretag, outreachType, influence
           {selectedCount > 0 && (
             <button
               onClick={async () => {
-                // Om AI-resultat: spara till DB först så att Steg 3 kan hitta dem
-                // VIKTIGT: Sponsors sparas redan i sponsor_prospects-tabellen av backend,
-                // så vi ska INTE anropa bulkSaveInfluencers för dem
-                if (!isSponsor && isAiResults && foretag?.id) {
+                // Om AI-resultat: spara till DB först så att Steg 4 (outreach-generering) kan hitta dem
+                if (isAiResults && foretag?.id) {
                   try {
-                    const dbRows = await api.bulkSaveInfluencers(foretag.id, influencers)
-                    // Uppdatera state med riktiga DB-ids
-                    setInfluencers(dbRows.map(row => ({
-                      ...row,
-                      foljare_exakt: parseInt(row.foljare) || 0,
-                      match_score: influencers.find(i => i.kanalnamn === row.kanalnamn)?.match_score || 0,
-                      profil_beskrivning: influencers.find(i => i.kanalnamn === row.kanalnamn)?.profil_beskrivning || row.kontakt_info || '',
-                    })))
+                    if (isSponsor) {
+                      // Spara sponsor-prospects till DB
+                      const dbRows = await api.bulkSaveSponsorProspects(foretag.id, influencers)
+                      setInfluencers(dbRows.map(row => ({
+                        ...row,
+                        kontakt_epost: row.epost || row.kontakt_epost,
+                        nisch: row.bransch || row.nisch,
+                        kanalnamn: row.instagram_handle || row.kanalnamn,
+                        foljare_exakt: parseInt(row.foljare) || influencers.find(i => (i.namn || '') === (row.namn || ''))?.foljare_exakt || 0,
+                        match_score: influencers.find(i => (i.namn || '') === (row.namn || ''))?.match_score || 0,
+                        profil_beskrivning: influencers.find(i => (i.namn || '') === (row.namn || ''))?.profil_beskrivning || '',
+                      })))
+                    } else {
+                      // Spara influencers till DB
+                      const dbRows = await api.bulkSaveInfluencers(foretag.id, influencers)
+                      setInfluencers(dbRows.map(row => ({
+                        ...row,
+                        foljare_exakt: parseInt(row.foljare) || 0,
+                        match_score: influencers.find(i => i.kanalnamn === row.kanalnamn)?.match_score || 0,
+                        profil_beskrivning: influencers.find(i => i.kanalnamn === row.kanalnamn)?.profil_beskrivning || row.kontakt_info || '',
+                      })))
+                    }
                   } catch (e) {
-                    console.error('Kunde inte spara influencers:', e.message)
+                    console.error('Kunde inte spara till DB:', e.message)
                   }
                 }
                 // Rensa gamla meddelanden och brief så att "Generera utskick" börjar om

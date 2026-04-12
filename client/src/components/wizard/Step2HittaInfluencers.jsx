@@ -230,7 +230,14 @@ export default function Step2HittaInfluencers({ foretag, outreachType, influence
               vald: inf.vald || 0,
             }))
             results.sort((a, b) => (b.match_score || 0) - (a.match_score || 0))
-            setInfluencers(results)
+            // Append till befintliga resultat istället för att ersätta
+            setInfluencers(prev => {
+              if (prev.length === 0) return results
+              const existingKeys = new Set(prev.map(i => `${(i.kanalnamn || i.namn || '').toLowerCase()}_${(i.plattform || '').toLowerCase()}`))
+              const newResults = results.filter(r => !existingKeys.has(`${(r.kanalnamn || r.namn || '').toLowerCase()}_${(r.plattform || '').toLowerCase()}`))
+              if (newResults.length === 0) return prev
+              return [...prev, ...newResults]
+            })
             const isAIPowered = !!(searchResult.sources?.ai_web_search)
             setSearchMeta({
               sources: searchResult.sources || {},
@@ -507,6 +514,21 @@ export default function Step2HittaInfluencers({ foretag, outreachType, influence
               </p>
             </div>
           </div>
+
+          {/* Hitta fler-knapp */}
+          {!loading && (
+            <button
+              onClick={handleFind}
+              className={`w-full flex items-center justify-center gap-2 py-2.5 rounded-lg border text-sm font-medium transition-all ${
+                isSponsor
+                  ? 'border-blue-500/40 text-blue-400 hover:bg-blue-500/10'
+                  : 'border-purple-500/40 text-purple-400 hover:bg-purple-500/10'
+              }`}
+            >
+              <Search className="w-4 h-4" />
+              Hitta fler {isSponsor ? 'företag' : 'influencers'}
+            </button>
+          )}
 
           {/* Sortering + filter + välj alla */}
           <div className="flex items-center justify-between gap-3 flex-wrap mb-2">

@@ -659,7 +659,10 @@ ${beskrivning_text ? `Användarens beskrivning av företaget (OBS: detta är rå
 
 Din uppgift: Formulera EN professionell mening som presenterar företaget. Basera dig på informationen ovan men skriv om den till korrekt, professionell svenska. Kopiera INTE användarens text ordagrant — förbättra den.
 Skriv ALDRIG ord som "lag", "team", "app", "plattform", "community" om företaget om det inte tydligt framgår av beskrivningen.
-Om ingen beskrivning finns, skriv bara: "Vi på ${foretag.namn} söker influencers för ett betalt samarbete."`;
+Om ingen beskrivning finns, skriv bara: "Vi på ${foretag.namn} söker influencers för ett betalt samarbete."
+
+VIKTIG REGEL — GISSA ALDRIG OM INFLUENCERNS CONTENT:
+Du har INGEN information om vad influencern faktiskt publicerar. Hitta INTE PÅ detaljer som "dina träningsvideos", "dina podcastavsnitt", "ditt tekniska innehåll" etc. Skriv istället en generell hälsning som nämner kanalnamnet utan att gissa på specifikt content.`;
 
   let erbjudandeBlock = '';
   if (brief?.erbjudande) {
@@ -695,13 +698,14 @@ ${ctaBlock}
 ${extraBlock}
 
 KRAV — följ dessa EXAKT:
-1. Börja med en kort personlig kommentar om influencerns kanal (max 1 mening)
+1. Börja med en kort hälsning som nämner influencerns kanalnamn (max 1 mening). VIKTIGT: Hitta INTE PÅ specifika detaljer om deras content — du vet INTE vad de gör på sin kanal. Skriv ALDRIG saker som "dina träningsvideos", "dina podcastavsnitt", "ditt tekniska innehåll" etc. om det inte TYDLIGT framgår av deras kanalnamn. Skriv istället något generellt som "Vi har hittat din kanal X och tror att det finns potential för ett samarbete."
 2. Presentera företaget professionellt baserat på informationen i systempromten (formulera själv, kopiera INTE användarens text)
 3. Förklara KONKRET vad vi vill att influencern gör (se CTA ovan)
 4. Skriv ut ersättningen TYDLIGT med siffror
 5. Avsluta med ett tydligt nästa steg
 6. Signatur: Mvh, ${kontakt}, ${foretag.namn}, ${foretag.epost || ''}
 7. Max 150 ord totalt
+8. GISSA ALDRIG — om du inte vet något säkert, utelämna det. Det är bättre att vara generell än att hitta på fel information.
 
 Returnera BARA meddelandet formaterat så här:
 ÄMNE: [ämnesrad]

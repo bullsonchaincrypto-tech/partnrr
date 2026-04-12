@@ -712,7 +712,7 @@ KRAV — följ dessa EXAKT:
 3. Förklara KONKRET vad vi vill att influencern gör (se CTA ovan)
 4. Skriv ut ersättningen TYDLIGT med siffror
 5. Avsluta med ett tydligt nästa steg
-6. Signatur: Mvh, ${kontakt}, ${foretag.namn}, ${foretag.epost || ''}
+6. Avsluta brödtexten med "Låter detta intressant? Svara gärna så skickar jag mer information!" eller liknande — INKLUDERA INTE signatur/avsändare, den läggs till automatiskt
 7. Max 150 ord totalt
 8. GISSA ALDRIG — om du inte vet något säkert, utelämna det. Det är bättre att vara generell än att hitta på fel information.
 
@@ -722,7 +722,16 @@ Returnera BARA meddelandet formaterat så här:
 [brödtext]`;
 
   const raw = await callClaude(systemPrompt, userMessage, 1000);
-  return raw.trim();
+
+  // Bygg signatur programmatiskt — ALDRIG AI-genererad
+  const signaturDelar = ['Mvh,', kontakt];
+  if (foretag.namn) signaturDelar.push(foretag.namn);
+  if (foretag.epost) signaturDelar.push(foretag.epost);
+  const signatur = signaturDelar.join('\n');
+
+  // Ta bort eventuell AI-genererad signatur och ersätt med den riktiga
+  const cleaned = raw.trim().replace(/\n*(Mvh|Med vänlig hälsning|Vänligen|Hälsningar),?\n[\s\S]*$/i, '');
+  return cleaned.trimEnd() + '\n\n' + signatur;
 }
 
 export async function generateSubject({ influencer, foretag, outreachType }) {

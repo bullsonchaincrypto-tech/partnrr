@@ -553,8 +553,9 @@ export default function OutreachWizard({ onNavigate }) {
             {gmailStatus?.provider && <span className="text-green-500/60 capitalize">({gmailStatus.provider})</span>}
             <button
               onClick={async (e) => { e.stopPropagation(); await api.disconnectAuth(); checkGmail() }}
-              className="ml-1.5 text-gray-500 hover:text-red-400 transition-colors" title="Koppla från e-post">
+              className="ml-1.5 flex items-center gap-1 text-gray-500 hover:text-red-400 transition-colors" title="Koppla från e-post">
               <Unplug className="w-3 h-3" />
+              <span className="text-[10px]">Koppla från</span>
             </button>
           </div>
         </div>

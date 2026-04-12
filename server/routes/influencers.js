@@ -5,6 +5,7 @@ import { getLockedSearchQueries, NISCH_GROUPS, generateInfluencerSuggestions } f
 import { searchYouTubeChannels } from '../services/youtube.js';
 import { findEmailForChannel, findEmailsForChannels } from '../services/email-finder.js';
 import { enrichSingleProfile, isApifyConfigured } from '../services/social-enrichment.js';
+import { findEmailAI } from '../services/ai-search.js';
 
 const router = Router();
 
@@ -781,6 +782,37 @@ router.post('/search-direct', async (req, res) => {
     }
 
     console.log(`[Search] Totalt: ${results.length} → ${deduped.length} efter dedup för "${cleanQuery}"`);
+
+    // 5. Sök e-post för alla profiler utan e-post (max 5 parallellt)
+    const needEmail = deduped.filter(r => !r.kontakt_epost);
+    if (needEmail.length > 0) {
+      console.log(`[Search] Söker e-post för ${needEmail.length} profiler...`);
+      try {
+        const emailResults = await Promise.all(
+          needEmail.slice(0, 8).map(r =>
+            findEmailAI({
+              namn: r.namn || r.kanalnamn,
+              kanalnamn: r.kanalnamn,
+              plattform: r.plattform,
+            }).catch(() => ({ email: null }))
+          )
+        );
+        let emailsFound = 0;
+        for (let i = 0; i < needEmail.length && i < emailResults.length; i++) {
+          if (emailResults[i]?.email && emailResults[i]?.confidence !== 'none') {
+            const idx = deduped.indexOf(needEmail[i]);
+            if (idx >= 0) {
+              deduped[idx].kontakt_epost = emailResults[i].email;
+              emailsFound++;
+            }
+          }
+        }
+        console.log(`[Search] E-post hittade: ${emailsFound}/${needEmail.length}`);
+      } catch (emailErr) {
+        console.warn(`[Search] E-postsökning misslyckades: ${emailErr.message}`);
+      }
+    }
+
     res.json(deduped);
   } catch (error) {
     console.error('[Search] Direct search error:', error);

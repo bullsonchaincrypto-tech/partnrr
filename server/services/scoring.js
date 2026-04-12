@@ -251,7 +251,7 @@ export async function generateMatchMotivation(influencer, companyProfile, scoreR
  */
 export async function scoreAndRankInfluencers(influencers, companyProfile, { generateMotivations = true, topN = 5 } = {}) {
   // 1. Filter
-  const filtered = filterInfluencers(influencers, companyProfile);
+  const filtered = await filterInfluencers(influencers, companyProfile);
 
   // 2. Score alla
   const scored = filtered.map(inf => {

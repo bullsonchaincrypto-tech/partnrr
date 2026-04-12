@@ -324,6 +324,8 @@ function buildSearchQueries({ companyName, beskrivning, nischer, platforms }) {
   if (beskrivning) {
     const kw = beskrivning.toLowerCase();
     // Bred nisch-mappning — matchar beskrivning → söktermer
+    // OBS: Termerna matchas med kw.includes() så delord fungerar:
+    // "kryddor" matchar "krydd", "ekologiska" matchar "ekolog"
     const nischMap = [
       { terms: ['fantasy', 'fotboll', 'allsvenskan'], keywords: 'fantasy fotboll sport tips' },
       { terms: ['gaming', 'spel', 'gamer', 'esport'], keywords: 'gaming spel esport' },
@@ -331,18 +333,22 @@ function buildSearchQueries({ companyName, beskrivning, nischer, platforms }) {
       { terms: ['fitness', 'träning', 'gym', 'styrketräning'], keywords: 'fitness träning gym' },
       { terms: ['kost', 'kosttillskott', 'protein', 'supplement'], keywords: 'fitness kosttillskott protein' },
       { terms: ['hälsa', 'wellness', 'välmående'], keywords: 'hälsa wellness' },
-      { terms: ['mat', 'recept', 'matlagning', 'food'], keywords: 'mat recept matlagning' },
-      { terms: ['tech', 'teknik', 'teknologi', 'ai', 'programmering'], keywords: 'tech teknik' },
-      { terms: ['mode', 'fashion', 'kläder'], keywords: 'mode fashion stil' },
-      { terms: ['skönhet', 'beauty', 'smink', 'hudvård'], keywords: 'skönhet beauty' },
-      { terms: ['resor', 'resa', 'travel'], keywords: 'resor travel äventyr' },
-      { terms: ['musik', 'music', 'artist'], keywords: 'musik artist' },
+      { terms: ['mat', 'recept', 'matlagning', 'food', 'krydd', 'sås', 'marinad', 'livsmedel', 'restaurang', 'kök', 'bageri', 'bak', 'dryck', 'kaffe', 'te ', 'choklad', 'godis', 'snack'], keywords: 'mat recept matlagning foodie kök' },
+      { terms: ['ekolog', 'hållbar', 'miljö', 'klimat', 'vegan', 'vegetar', 'natur', 'organic'], keywords: 'ekologisk hållbar mat miljö' },
+      { terms: ['tech', 'teknik', 'teknologi', 'ai', 'programmering', 'saas', 'startup', 'app '], keywords: 'tech teknik startup' },
+      { terms: ['mode', 'fashion', 'kläder', 'outfit', 'stil'], keywords: 'mode fashion stil' },
+      { terms: ['skönhet', 'beauty', 'smink', 'hudvård', 'makeup', 'nagel', 'hår'], keywords: 'skönhet beauty' },
+      { terms: ['resor', 'resa', 'travel', 'hotell', 'semester'], keywords: 'resor travel äventyr' },
+      { terms: ['musik', 'music', 'artist', 'sångar', 'producer', 'dj'], keywords: 'musik artist' },
       { terms: ['humor', 'komedi', 'underhållning'], keywords: 'humor underhållning' },
-      { terms: ['finans', 'ekonomi', 'aktier', 'investering'], keywords: 'finans ekonomi' },
-      { terms: ['bil', 'motor', 'bilar'], keywords: 'bil motor' },
-      { terms: ['familj', 'barn', 'förälder'], keywords: 'familj förälder' },
-      { terms: ['djur', 'husdjur', 'hund', 'katt'], keywords: 'djur husdjur' },
+      { terms: ['finans', 'ekonomi', 'aktier', 'investering', 'sparand', 'pengar', 'bank', 'försäkring'], keywords: 'finans ekonomi' },
+      { terms: ['bil', 'motor', 'bilar', 'fordon', 'mc '], keywords: 'bil motor' },
+      { terms: ['familj', 'barn', 'förälder', 'mamma', 'pappa', 'baby'], keywords: 'familj förälder' },
+      { terms: ['djur', 'husdjur', 'hund', 'katt', 'häst'], keywords: 'djur husdjur' },
       { terms: ['energidryck', 'energy'], keywords: 'energidryck lifestyle' },
+      { terms: ['inredning', 'hem', 'möbler', 'design', 'trädgård'], keywords: 'inredning hemma design' },
+      { terms: ['bygg', 'renovering', 'hantverk', 'snickeri'], keywords: 'bygg renovering hantverkare' },
+      { terms: ['sport', 'idrott', 'löpning', 'cykel', 'simning', 'padel', 'tennis', 'golf'], keywords: 'sport idrott träning' },
     ];
 
     const matchedKeywords = [];
@@ -428,13 +434,15 @@ Returnera ENBART en JSON-array — ingen annan text.
 
 STRIKT MATCHNINGSKRAV:
 - Matcha influencers som är relevanta för EXAKT det företaget erbjuder
+- Om företaget säljer kryddor/mat → hitta matbloggare, foodie-influencers, kock-profiler
 - Om företaget handlar om fantasy fotboll → hitta fotbollsanalytiker, fantasy sports-kreatörer, tipsters
-- SKIPPA generella gaming/esport-profiler som inte matchar det specifika erbjudandet
+- Om företaget säljer kläder → hitta mode-influencers, stilbloggare
+- SKIPPA profiler som inte matchar det specifika erbjudandet — en fitness-influencer passar INTE ett matföretag
 - Short Videos-resultaten ger KANALNAMN och PLATTFORM direkt — använd dessa!
 - Inkludera BARA profiler du hittar bevis för i sökresultaten
 - Ange BARA kanalnamn som nämns i resultaten — hitta ALDRIG PÅ kanalnamn
 - Följarantal: ange BARA om det nämns, annars null
-- Hellre 10 träffsäkra resultat än 20 dåliga
+- Hellre 5 träffsäkra resultat än 20 dåliga — NISCH-MATCHNING ÄR VIKTIGARE ÄN KVANTITET
 
 Svara med ENBART en JSON-array, inget annat.`;
 
@@ -482,9 +490,10 @@ ENBART JSON. Inga kommentarer.`;
 
 STRIKT MATCHNINGSKRAV:
 - Matcha influencers som är relevanta för EXAKT det företaget erbjuder
-- Om företaget handlar om fantasy fotboll → hitta fotbollsanalytiker, fantasy sports-kreatörer, tipsters
-- SKIPPA generella gaming/esport-profiler som inte matchar
-- Hellre 10 träffsäkra resultat än 20 dåliga
+- Om företaget säljer mat/kryddor → hitta matbloggare, foodie-influencers, kock-profiler
+- Om företaget handlar om fantasy fotboll → hitta fotbollsanalytiker, tipsters
+- SKIPPA profiler som inte matchar nischen — en fitness-influencer passar INTE ett matföretag
+- Hellre 5 träffsäkra resultat än 20 dåliga — NISCH-MATCHNING ÄR VIKTIGAST
 
 Svara med ENBART en JSON-array — ingen annan text.`;
 

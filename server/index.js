@@ -117,4 +117,13 @@ async function start() {
   });
 }
 
+// Fånga oförutsedda fel så att Railway-loggar visar orsaken
+process.on('unhandledRejection', (reason, promise) => {
+  console.error('[FATAL] Unhandled Rejection:', reason);
+});
+process.on('uncaughtException', (err) => {
+  console.error('[FATAL] Uncaught Exception:', err);
+  process.exit(1);
+});
+
 start().catch(console.error);

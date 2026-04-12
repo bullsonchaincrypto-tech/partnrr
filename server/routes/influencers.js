@@ -5,7 +5,16 @@ import { getLockedSearchQueries, NISCH_GROUPS, generateInfluencerSuggestions } f
 import { searchYouTubeChannels } from '../services/youtube.js';
 import { findEmailForChannel, findEmailsForChannels } from '../services/email-finder.js';
 import { enrichSingleProfile, isApifyConfigured } from '../services/social-enrichment.js';
-import { findEmailAI } from '../services/ai-search.js';
+
+// Lazy-load findEmailAI to avoid heavy module graph at startup
+let _findEmailAI = null;
+async function getFindEmailAI() {
+  if (!_findEmailAI) {
+    const mod = await import('../services/ai-search.js');
+    _findEmailAI = mod.findEmailAI;
+  }
+  return _findEmailAI;
+}
 
 const router = Router();
 
@@ -788,6 +797,7 @@ router.post('/search-direct', async (req, res) => {
     if (needEmail.length > 0) {
       console.log(`[Search] Söker e-post för ${needEmail.length} profiler...`);
       try {
+        const findEmailAI = await getFindEmailAI();
         const emailResults = await Promise.all(
           needEmail.slice(0, 8).map(r =>
             findEmailAI({

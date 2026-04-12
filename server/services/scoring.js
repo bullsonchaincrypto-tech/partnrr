@@ -25,7 +25,7 @@ const NICHE_GROUPS = [
   ['fantasy', 'fantasy sport', 'fantasy fotboll', 'fpl', 'allsvenskan fantasy', 'premier league fantasy', 'tips', 'tippning'],
   ['fotboll', 'allsvenskan', 'premier league', 'champions league', 'uefa', 'fifa', 'soccer', 'football'],
   ['sport', 'idrott', 'sporttips', 'betting', 'odds', 'sportanalys'],
-  ['tech', 'teknik', 'teknologi', 'ai', 'it', 'programmering', 'data', 'saas', 'startup', 'devops', 'software', 'mjukvara', 'developer', 'utvecklare', 'kod', 'cloud', 'moln', 'cybersäkerhet', 'kodgranskning'],
+  ['tech', 'teknik', 'teknologi', 'ai', 'it', 'programmering', 'data', 'saas', 'startup', 'devops', 'software', 'mjukvara', 'developer', 'utvecklare', 'kod', 'cloud', 'moln', 'cybersäkerhet', 'kodgranskning', 'elektronik', 'hemelektronik', 'gadget', 'gadgets', 'prylar', 'smart hem', 'smarta hem', 'unboxing', 'recension', 'review', 'smartklocka', 'hörlurar', 'högtalare', 'wearable'],
   ['fitness', 'träning', 'gym', 'hälsa', 'wellness', 'kost'],
   ['mode', 'fashion', 'stil', 'kläder', 'beauty', 'skönhet'],
   ['musik', 'music', 'artist', 'sångare', 'producer'],

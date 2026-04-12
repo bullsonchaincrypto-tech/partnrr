@@ -500,7 +500,9 @@ function getNischLabels(bransch, beskrivning) {
       { terms: ['mat', 'food', 'recept', 'matlagning', 'restaurang'], label: 'mat recept' },
       { terms: ['kaffe', 'te', 'dryck', 'brygg'], label: 'mat dryck' },
       { terms: ['energidryck', 'energy drink'], label: 'energidryck' },
-      // Tech & digital
+      // Tech & digital & elektronik
+      { terms: ['hemelektronik', 'smart hem', 'smarta hem', 'smart home', 'iot', 'hemautomation'], label: 'tech hemelektronik gadgets' },
+      { terms: ['elektronik', 'gadget', 'pryl', 'tillbehör', 'hörlurar', 'högtalare', 'smartklocka', 'wearable', 'smart produkt', 'smarta produkt'], label: 'tech elektronik gadgets unboxing' },
       { terms: ['tech', 'teknik', 'teknologi', 'it', 'ai'], label: 'tech teknik' },
       { terms: ['programmering', 'kod', 'utveckling', 'software'], label: 'tech programmering' },
       { terms: ['app', 'saas', 'startup'], label: 'tech startup' },

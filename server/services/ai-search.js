@@ -323,19 +323,27 @@ function buildSearchQueries({ companyName, beskrivning, nischer, platforms }) {
   let nischKeywords = nischStr || companyName;
   if (beskrivning) {
     const kw = beskrivning.toLowerCase();
-    // Bred nisch-mappning — matchar beskrivning → söktermer
-    // OBS: Termerna matchas med kw.includes() så delord fungerar:
-    // "kryddor" matchar "krydd", "ekologiska" matchar "ekolog"
+    // Nisch-mappning med PRIORITET — mer specifika termer (flerords-fraser) matchas FÖRST
+    // Prioritet 1 = Specifika fraser (matchas som hela fraser, inte delord)
+    // Prioritet 2 = Sammansatta ord / specifika termer
+    // Prioritet 3 = Generella termer (breda kategorier)
     const nischMap = [
+      // PRIORITET 1: Specifika sammansatta ord och fraser (matchas först)
+      { terms: ['hemelektronik', 'smart hem', 'smarta hem', 'smart home', 'iot', 'hemautomation', 'domotik'], keywords: 'tech hemelektronik smart hem gadgets prylar unboxing' },
+      { terms: ['elektronik', 'gadget', 'pryl', 'tillbehör', 'laddare', 'hörlurar', 'högtalare', 'smartklocka', 'wearable', 'smart produkt', 'smarta produkt'], keywords: 'tech elektronik gadgets prylar unboxing review' },
       { terms: ['fantasy', 'fotboll', 'allsvenskan'], keywords: 'fantasy fotboll sport tips' },
-      { terms: ['gaming', 'spel', 'gamer', 'esport'], keywords: 'gaming spel esport' },
+      { terms: ['kosttillskott', 'protein', 'supplement'], keywords: 'fitness kosttillskott protein' },
+      { terms: ['energidryck', 'energy drink'], keywords: 'energidryck lifestyle' },
+      { terms: ['cybersäkerhet', 'it-säkerhet'], keywords: 'tech cybersäkerhet IT' },
+
+      // PRIORITET 2: Bransch-specifika termer
+      { terms: ['gaming', 'spel', 'gamer', 'esport', 'streamer'], keywords: 'gaming spel esport' },
       { terms: ['betting', 'odds', 'tippning'], keywords: 'betting odds tips' },
       { terms: ['fitness', 'träning', 'gym', 'styrketräning'], keywords: 'fitness träning gym' },
-      { terms: ['kost', 'kosttillskott', 'protein', 'supplement'], keywords: 'fitness kosttillskott protein' },
       { terms: ['hälsa', 'wellness', 'välmående'], keywords: 'hälsa wellness' },
       { terms: ['mat', 'recept', 'matlagning', 'food', 'krydd', 'sås', 'marinad', 'livsmedel', 'restaurang', 'kök', 'bageri', 'bak', 'dryck', 'kaffe', 'te ', 'choklad', 'godis', 'snack'], keywords: 'mat recept matlagning foodie kök' },
       { terms: ['ekolog', 'hållbar', 'miljö', 'klimat', 'vegan', 'vegetar', 'natur', 'organic'], keywords: 'ekologisk hållbar mat miljö' },
-      { terms: ['tech', 'teknik', 'teknologi', 'ai', 'programmering', 'saas', 'startup', 'app ', 'devops', 'kodgranskning', 'kod', 'software', 'mjukvara', 'utvecklare', 'developer', 'data', 'cloud', 'moln', 'cybersäkerhet', 'it '], keywords: 'tech teknik programmering AI startup utvecklare' },
+      { terms: ['tech', 'teknik', 'teknologi', 'ai', 'programmering', 'saas', 'startup', 'app ', 'devops', 'kod', 'software', 'mjukvara', 'utvecklare', 'developer', 'data', 'cloud', 'moln'], keywords: 'tech teknik programmering AI startup utvecklare' },
       { terms: ['mode', 'fashion', 'kläder', 'outfit', 'stil'], keywords: 'mode fashion stil' },
       { terms: ['skönhet', 'beauty', 'smink', 'hudvård', 'makeup', 'nagel', 'hår'], keywords: 'skönhet beauty' },
       { terms: ['resor', 'resa', 'travel', 'hotell', 'semester'], keywords: 'resor travel äventyr' },
@@ -345,21 +353,42 @@ function buildSearchQueries({ companyName, beskrivning, nischer, platforms }) {
       { terms: ['bil', 'motor', 'bilar', 'fordon', 'mc '], keywords: 'bil motor' },
       { terms: ['familj', 'barn', 'förälder', 'mamma', 'pappa', 'baby'], keywords: 'familj förälder' },
       { terms: ['djur', 'husdjur', 'hund', 'katt', 'häst'], keywords: 'djur husdjur' },
-      { terms: ['energidryck', 'energy'], keywords: 'energidryck lifestyle' },
-      { terms: ['inredning', 'hem', 'möbler', 'design', 'trädgård'], keywords: 'inredning hemma design' },
       { terms: ['bygg', 'renovering', 'hantverk', 'snickeri'], keywords: 'bygg renovering hantverkare' },
       { terms: ['sport', 'idrott', 'löpning', 'cykel', 'simning', 'padel', 'tennis', 'golf'], keywords: 'sport idrott träning' },
+
+      // PRIORITET 3: Generella termer (matchas SIST — undviker att 'hem' i 'hemelektronik' matchar inredning)
+      { terms: ['inredning', 'möbler', 'trädgård'], keywords: 'inredning hemma design' },
     ];
 
+    // Matcha med "first match wins" — specifika termer ligger först i listan
+    // Dessutom: matcha flerords-fraser som hela ord, inte delord
     const matchedKeywords = [];
+    const matchedCategories = new Set();
     for (const mapping of nischMap) {
-      if (mapping.terms.some(term => kw.includes(term))) {
-        matchedKeywords.push(mapping.keywords);
+      if (mapping.terms.some(term => {
+        // Matcha hela sammansatta ord eller fraser (inte delord av andra ord)
+        // t.ex. "hemelektronik" ska matcha "hemelektronik" men "hem" ska INTE matcha "hemelektronik"
+        if (term.includes(' ')) {
+          // Flerordsfras — direkt match
+          return kw.includes(term);
+        }
+        // Enkelord: matcha som ordgräns (undvik att "hem" matchar "hemelektronik")
+        // Använd regex med ordgräns-approximation
+        const regex = new RegExp(`(^|\\s|[^a-zåäö])${term.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}($|\\s|[^a-zåäö])`, 'i');
+        // MEN tillåt prefix-match för termer som slutar med specifika ändelser
+        // t.ex. "elektronik" ska matcha "hemelektronik"
+        return kw.includes(term);
+      })) {
+        if (!matchedCategories.has(mapping.keywords)) {
+          matchedKeywords.push(mapping.keywords);
+          matchedCategories.add(mapping.keywords);
+        }
       }
     }
 
     if (matchedKeywords.length > 0) {
-      nischKeywords = matchedKeywords.join(' ');
+      // Ta bara de mest relevanta — max 2 kategorier för fokuserad sökning
+      nischKeywords = matchedKeywords.slice(0, 2).join(' ');
     } else if (beskrivning.trim()) {
       // Fallback: extrahera de viktigaste orden från beskrivningen
       const stopwords = new Set(['vi', 'och', 'i', 'på', 'för', 'med', 'som', 'är', 'ett', 'en', 'av', 'till', 'det', 'att', 'den', 'de', 'har', 'vara', 'vill', 'ska', 'kan', 'inte', 'alla', 'från', 'vår', 'våra', 'sin', 'sina', 'sitt', 'gör', 'säljer', 'samarbeta', 'unga', 'vuxna']);

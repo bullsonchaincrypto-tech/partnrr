@@ -206,9 +206,15 @@ router.post('/influencers', async (req, res) => {
     // ============================================================
     // FAS 5: Filtrera bort irrelevanta resultat (under 70% matchning)
     // ============================================================
-    const MIN_SCORE = 70;
+    const MIN_SCORE = 20;
     let finalResults = scored.filter(r => (r.match_score || 0) >= MIN_SCORE);
     console.log(`[Search] Score-filter: ${scored.length} → ${finalResults.length} (≥${MIN_SCORE}%)`);
+
+    // Fallback: om inga resultat klarar tröskeln, returnera topp 20 sorterade efter score
+    if (finalResults.length === 0 && scored.length > 0) {
+      finalResults = scored.slice(0, 20);
+      console.log(`[Search] Fallback: returnerar topp ${finalResults.length} resultat utan tröskel`);
+    }
 
     if (filters) {
       if (filters.min_engagement) {

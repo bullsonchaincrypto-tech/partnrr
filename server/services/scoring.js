@@ -291,7 +291,13 @@ BEDÖMNINGSKRITERIER:
 - Nisch-relevans (viktigast): Matchar influencerns innehåll företagets bransch och AI-identifierade nischer?
 - Plattforms-passform: Rätt plattform för företagets målgrupp?
 - Autenticitet: Har profilen riktig data (followers, bio) eller bara AI-uppskattning?
-- Storlek: Lagom stora profiler (10K-500K) är ofta bättre för konvertering
+- Storlek — bedöm utifrån kategori (alla storlekar kan vara värdefulla):
+    Nano (1K–10K): Hög engagemang, nischad publik, billigt — bra för konvertering i smal nisch
+    Mikro (10K–50K): Bra balans mellan räckvidd och engagemang — ofta bäst ROI
+    Mellanstor (50K–200K): Bred räckvidd med bibehållen relevans
+    Stor (200K–500K): Hög räckvidd, bra för varumärkeskännedom
+    Mega (500K+): Massiv räckvidd men lägre engagemang — bäst för breda kampanjer
+    Under 1K: Troligen ny eller inaktiv — sänk score om nisch inte är extremt träffsäker
 - Svenska profiler som riktar sig till svensk publik → bonus
 
 SCORING-GUIDE:

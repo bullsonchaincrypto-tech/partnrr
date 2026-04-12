@@ -691,6 +691,13 @@ export default function Step2HittaInfluencers({ foretag, outreachType, influence
                     {inf.beskrivning && (
                       <p className="text-xs text-gray-500/80 mt-0.5 line-clamp-2 leading-relaxed max-w-xl">{inf.beskrivning}</p>
                     )}
+                    {/* AI-motivering — visas direkt */}
+                    {inf.ai_motivation && (
+                      <p className="text-xs text-purple-400/70 mt-1 line-clamp-1 max-w-xl">
+                        <span className="text-purple-400/50 mr-1">✨</span>
+                        {inf.ai_motivation}
+                      </p>
+                    )}
                   </div>
 
                   {/* AI Match Score */}

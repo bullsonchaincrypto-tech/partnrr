@@ -319,16 +319,46 @@ function buildSearchQueries({ companyName, beskrivning, nischer, platforms }) {
   const nischStr = (nischer || []).join(' ');
   const platformList = (platforms || ['instagram']).map(p => p.toLowerCase());
 
-  // Nischspecifika nyckelord
+  // Extrahera nyckelord dynamiskt från beskrivningen
   let nischKeywords = nischStr || companyName;
   if (beskrivning) {
     const kw = beskrivning.toLowerCase();
-    if (kw.includes('fantasy') || kw.includes('fotboll') || kw.includes('sport')) {
-      nischKeywords = 'fantasy fotboll sport tips';
-    } else if (kw.includes('gaming') || kw.includes('spel')) {
-      nischKeywords = 'gaming spel';
-    } else if (kw.includes('betting') || kw.includes('odds')) {
-      nischKeywords = 'betting odds tips';
+    // Bred nisch-mappning — matchar beskrivning → söktermer
+    const nischMap = [
+      { terms: ['fantasy', 'fotboll', 'allsvenskan'], keywords: 'fantasy fotboll sport tips' },
+      { terms: ['gaming', 'spel', 'gamer', 'esport'], keywords: 'gaming spel esport' },
+      { terms: ['betting', 'odds', 'tippning'], keywords: 'betting odds tips' },
+      { terms: ['fitness', 'träning', 'gym', 'styrketräning'], keywords: 'fitness träning gym' },
+      { terms: ['kost', 'kosttillskott', 'protein', 'supplement'], keywords: 'fitness kosttillskott protein' },
+      { terms: ['hälsa', 'wellness', 'välmående'], keywords: 'hälsa wellness' },
+      { terms: ['mat', 'recept', 'matlagning', 'food'], keywords: 'mat recept matlagning' },
+      { terms: ['tech', 'teknik', 'teknologi', 'ai', 'programmering'], keywords: 'tech teknik' },
+      { terms: ['mode', 'fashion', 'kläder'], keywords: 'mode fashion stil' },
+      { terms: ['skönhet', 'beauty', 'smink', 'hudvård'], keywords: 'skönhet beauty' },
+      { terms: ['resor', 'resa', 'travel'], keywords: 'resor travel äventyr' },
+      { terms: ['musik', 'music', 'artist'], keywords: 'musik artist' },
+      { terms: ['humor', 'komedi', 'underhållning'], keywords: 'humor underhållning' },
+      { terms: ['finans', 'ekonomi', 'aktier', 'investering'], keywords: 'finans ekonomi' },
+      { terms: ['bil', 'motor', 'bilar'], keywords: 'bil motor' },
+      { terms: ['familj', 'barn', 'förälder'], keywords: 'familj förälder' },
+      { terms: ['djur', 'husdjur', 'hund', 'katt'], keywords: 'djur husdjur' },
+      { terms: ['energidryck', 'energy'], keywords: 'energidryck lifestyle' },
+    ];
+
+    const matchedKeywords = [];
+    for (const mapping of nischMap) {
+      if (mapping.terms.some(term => kw.includes(term))) {
+        matchedKeywords.push(mapping.keywords);
+      }
+    }
+
+    if (matchedKeywords.length > 0) {
+      nischKeywords = matchedKeywords.join(' ');
+    } else if (beskrivning.trim()) {
+      // Fallback: extrahera de viktigaste orden från beskrivningen
+      const stopwords = new Set(['vi', 'och', 'i', 'på', 'för', 'med', 'som', 'är', 'ett', 'en', 'av', 'till', 'det', 'att', 'den', 'de', 'har', 'vara', 'vill', 'ska', 'kan', 'inte', 'alla', 'från', 'vår', 'våra', 'sin', 'sina', 'sitt', 'gör', 'säljer', 'samarbeta', 'unga', 'vuxna']);
+      const words = kw.replace(/[^a-zåäö\s-]/g, '').split(/\s+/).filter(w => w.length > 3 && !stopwords.has(w));
+      if (words.length > 0) nischKeywords = words.slice(0, 5).join(' ');
     }
   }
 

@@ -253,16 +253,16 @@ export async function scoreAndRankInfluencers(influencers, companyProfile, { gen
   // 1. Filter
   const filtered = await filterInfluencers(influencers, companyProfile);
 
-  // 2. Score alla
-  const scored = filtered.map(inf => {
-    const result = scoreInfluencer(inf, companyProfile);
+  // 2. Score alla (scoreInfluencer är async — måste awaitas)
+  const scored = await Promise.all(filtered.map(async inf => {
+    const result = await scoreInfluencer(inf, companyProfile);
     return {
       ...inf,
       match_score: result.total_score,
       score_details: result.component_scores,
       score_breakdown: result.details,
     };
-  });
+  }));
 
   // 3. Sortera
   scored.sort((a, b) => b.match_score - a.match_score);

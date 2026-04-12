@@ -482,16 +482,66 @@ function getNischLabels(bransch, beskrivning) {
   // Om inga nisch-labels hittades, extrahera nyckelord från beskrivningen
   if (labels.length === 0 && beskrivning) {
     const desc = beskrivning.toLowerCase();
-    // Prioritera specifika termer från beskrivningen
+    // Bred mappning av nyckelord → söktermer
+    const keywordMap = [
+      { terms: ['fantasy', 'allsvenskan'], label: 'fantasy fotboll' },
+      { terms: ['fotboll', 'soccer', 'football'], label: 'fotboll' },
+      { terms: ['sport', 'idrott'], label: 'sport' },
+      { terms: ['esport', 'e-sport'], label: 'esport' },
+      { terms: ['gaming', 'spel', 'gamer'], label: 'gaming' },
+      { terms: ['tävling', 'competition'], label: 'tävling' },
+      { terms: ['tips', 'analys'], label: 'tips' },
+      // Fitness & hälsa
+      { terms: ['fitness', 'träning', 'gym', 'styrketräning', 'workout'], label: 'fitness träning' },
+      { terms: ['kost', 'kosttillskott', 'protein', 'supplement'], label: 'kosttillskott fitness' },
+      { terms: ['hälsa', 'wellness', 'välmående'], label: 'hälsa wellness' },
+      { terms: ['yoga', 'meditation', 'mindfulness'], label: 'yoga wellness' },
+      // Mat & dryck
+      { terms: ['mat', 'food', 'recept', 'matlagning', 'restaurang'], label: 'mat recept' },
+      { terms: ['kaffe', 'te', 'dryck', 'brygg'], label: 'mat dryck' },
+      { terms: ['energidryck', 'energy drink'], label: 'energidryck' },
+      // Tech & digital
+      { terms: ['tech', 'teknik', 'teknologi', 'it', 'ai'], label: 'tech teknik' },
+      { terms: ['programmering', 'kod', 'utveckling', 'software'], label: 'tech programmering' },
+      { terms: ['app', 'saas', 'startup'], label: 'tech startup' },
+      // Mode & skönhet
+      { terms: ['mode', 'fashion', 'kläder', 'stil'], label: 'mode fashion' },
+      { terms: ['skönhet', 'beauty', 'smink', 'hudvård'], label: 'skönhet beauty' },
+      // Resor & livsstil
+      { terms: ['resa', 'resor', 'travel', 'äventyr'], label: 'resor travel' },
+      { terms: ['livsstil', 'lifestyle', 'vlogg'], label: 'livsstil vlogg' },
+      // Musik & underhållning
+      { terms: ['musik', 'music', 'artist', 'låt'], label: 'musik' },
+      { terms: ['humor', 'komedi', 'comedy', 'underhållning'], label: 'humor underhållning' },
+      // Finans & ekonomi
+      { terms: ['finans', 'ekonomi', 'aktier', 'investering', 'sparande'], label: 'finans ekonomi' },
+      { terms: ['krypto', 'crypto', 'bitcoin', 'blockchain'], label: 'krypto finans' },
+      // Familj & barn
+      { terms: ['familj', 'förälder', 'barn', 'mamma', 'pappa'], label: 'familj förälder' },
+      // Djur & husdjur
+      { terms: ['djur', 'husdjur', 'hund', 'katt'], label: 'djur husdjur' },
+      // Bil & motor
+      { terms: ['bil', 'motor', 'fordon', 'bilar'], label: 'bil motor' },
+    ];
+
     const keywords = [];
-    if (desc.includes('fantasy') || desc.includes('allsvenskan')) keywords.push('fantasy fotboll');
-    if (desc.includes('fotboll') || desc.includes('soccer')) keywords.push('fotboll');
-    if (desc.includes('sport') || desc.includes('idrott')) keywords.push('sport');
-    if (desc.includes('esport') || desc.includes('e-sport')) keywords.push('esport');
-    if (desc.includes('gaming') || desc.includes('spel')) keywords.push('gaming');
-    if (desc.includes('tävling') || desc.includes('competition')) keywords.push('tävling');
-    if (desc.includes('tips') || desc.includes('analys')) keywords.push('tips');
+    for (const mapping of keywordMap) {
+      if (mapping.terms.some(term => desc.includes(term))) {
+        keywords.push(mapping.label);
+      }
+    }
     if (keywords.length > 0) return keywords;
+  }
+
+  // Om fortfarande inga labels — extrahera substantiv från beskrivningen direkt
+  if (labels.length === 0 && beskrivning) {
+    // Returnera de mest meningsfulla orden från beskrivningen
+    const stopwords = new Set(['vi', 'och', 'i', 'på', 'för', 'med', 'som', 'är', 'ett', 'en', 'av', 'till', 'det', 'att', 'den', 'de', 'har', 'vara', 'vill', 'ska', 'kan', 'inte', 'alla', 'från', 'vår', 'våra', 'sin', 'sina', 'sitt', 'mycket', 'också', 'sedan', 'under', 'efter', 'mellan', 'utan', 'bara', 'när', 'där', 'här', 'eller', 'men', 'om', 'så', 'sig', 'min', 'din', 'unga', 'vuxna', 'samarbeta', 'gör', 'säljer']);
+    const words = beskrivning.toLowerCase()
+      .replace(/[^a-zåäö\s-]/g, '')
+      .split(/\s+/)
+      .filter(w => w.length > 3 && !stopwords.has(w));
+    if (words.length > 0) return words.slice(0, 4);
   }
 
   return labels.length > 0 ? labels : ['gaming'];

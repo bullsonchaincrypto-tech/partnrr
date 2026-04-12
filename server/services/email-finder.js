@@ -637,6 +637,11 @@ function extractEmails(text) {
     'tailwindcss.com', 'react.dev',
     'iana.org', 'creativecommons.org',
     'serpapi.com',
+    // Analytics, stats & tool platforms (ej influencer-mejl)
+    'playboard.co', 'socialblade.com', 'noxinfluencer.com',
+    'hypeauditor.com', 'tubular.io', 'vidiq.com',
+    'channelcrawler.com', 'statsheep.com',
+    'recaptcha@', 'captcha@',
   ];
 
   const filtered = [...new Set(matches)].filter(email => {

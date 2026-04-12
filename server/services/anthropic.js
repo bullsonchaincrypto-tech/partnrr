@@ -407,7 +407,7 @@ KRAV — följ dessa EXAKT:
 4. Skriv ut ersättningen TYDLIGT med siffror — men BARA siffror som anges ovan. Hitta ALDRIG PÅ belopp, värden eller priser som inte finns i erbjudandet.
 5. Om erbjudandet nämner förmåner utan pris (t.ex. "gratis premium"), nämn förmånen men SKRIV INTE ett påhittat kronvärde
 6. Avsluta med ett tydligt nästa steg
-7. Signatur: Mvh, ${kontakt}, ${foretag.namn}, ${foretag.epost || ''}
+7. Avsluta brödtexten med "Låter detta intressant? Svara gärna så skickar jag mer information!" eller liknande — INKLUDERA INTE signatur/avsändare, den läggs till automatiskt
 8. Max 150 ord totalt
 
 Returnera BARA meddelandet (ämne och brödtext), formaterat så här:
@@ -415,7 +415,17 @@ Returnera BARA meddelandet (ämne och brödtext), formaterat så här:
 ---
 [brödtext]`;
 
-  return await callClaude(system, prompt);
+  const aiResponse = await callClaude(system, prompt);
+
+  // Bygg signatur programmatiskt — ALDRIG AI-genererad
+  const signaturDelar = ['Mvh,', kontakt];
+  if (foretag.namn) signaturDelar.push(foretag.namn);
+  if (foretag.epost) signaturDelar.push(foretag.epost);
+  const signatur = signaturDelar.join('\n');
+
+  // Ta bort eventuell AI-genererad signatur (Mvh, etc.) och ersätt med den riktiga
+  const cleaned = aiResponse.replace(/\n*(Mvh|Med vänlig hälsning|Vänligen|Hälsningar),?\n[\s\S]*$/i, '');
+  return cleaned.trimEnd() + '\n\n' + signatur;
 }
 
 export async function generateFollowUp(influencer, originalMessage, stepNumber = 1) {

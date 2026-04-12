@@ -292,6 +292,31 @@ router.put('/foretag/:foretagId/select-all', async (req, res) => {
   res.json(rows);
 });
 
+// PUT /api/influencers/foretag/:foretagId/sync-selection — synka vald-status från frontend till DB
+router.put('/foretag/:foretagId/sync-selection', async (req, res) => {
+  try {
+    const foretagId = Number(req.params.foretagId);
+    const { selectedIds } = req.body;
+    if (!foretagId) return res.status(400).json({ error: 'foretagId krävs' });
+
+    await runSql('UPDATE influencers SET vald = 0 WHERE foretag_id = ?', [foretagId]);
+    if (selectedIds?.length > 0) {
+      const placeholders = selectedIds.map(() => '?').join(',');
+      await runSql(
+        `UPDATE influencers SET vald = 1 WHERE foretag_id = ? AND id IN (${placeholders})`,
+        [foretagId, ...selectedIds.map(Number)]
+      );
+    }
+
+    const rows = await queryAll('SELECT * FROM influencers WHERE foretag_id = ? ORDER BY id ASC', [foretagId]);
+    console.log(`[Influencers] Sync selection: ${rows.filter(r => r.vald).length}/${rows.length} valda för företag ${foretagId}`);
+    res.json(rows);
+  } catch (error) {
+    console.error('Influencer sync selection error:', error);
+    res.status(500).json({ error: error.message });
+  }
+});
+
 // Sök e-post automatiskt för en specifik influencer
 router.post('/:id/find-email', async (req, res) => {
   try {

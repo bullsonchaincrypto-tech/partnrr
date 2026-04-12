@@ -30,6 +30,7 @@ export const selectAllInfluencers = (foretagId, selected) => request(`/influence
 export const findEmailForInfluencer = (id, beskrivning) => request(`/influencers/${id}/find-email`, { method: 'POST', body: JSON.stringify({ beskrivning }) });
 export const findAllEmails = (foretagId) => request(`/influencers/foretag/${foretagId}/find-emails`, { method: 'POST' });
 export const bulkSaveInfluencers = (foretagId, influencers) => request('/influencers/bulk-save', { method: 'POST', body: JSON.stringify({ foretag_id: foretagId, influencers }) });
+export const syncInfluencerSelection = (foretagId, selectedIds) => request(`/influencers/foretag/${foretagId}/sync-selection`, { method: 'PUT', body: JSON.stringify({ selectedIds }) });
 export const manualImportInfluencer = (data) => request('/influencers/manual-import', { method: 'POST', body: JSON.stringify(data) });
 
 // Outreach
@@ -107,6 +108,7 @@ export const findSponsorProspects = (foretagId) => request('/sponsors/prospects/
 export const toggleSponsorProspect = (id) => request(`/sponsors/prospects/${id}/toggle`, { method: 'PUT' });
 export const selectAllProspects = (foretagId, selected) => request(`/sponsors/prospects/${foretagId}/select-all`, { method: 'PUT', body: JSON.stringify({ selected }) });
 export const bulkSaveSponsorProspects = (foretagId, prospects) => request('/sponsors/prospects/bulk-save', { method: 'POST', body: JSON.stringify({ foretag_id: foretagId, prospects }) });
+export const syncSponsorSelection = (foretagId, selectedIds) => request(`/sponsors/prospects/${foretagId}/sync-selection`, { method: 'PUT', body: JSON.stringify({ selectedIds }) });
 export const generateSponsorOutreach = (foretagId, kanal, sponsorQuestions = {}) => request('/sponsors/outreach/generate', { method: 'POST', body: JSON.stringify({ foretagId, kanal, sponsorQuestions }) });
 export const getSponsorOutreach = (foretagId) => request(`/sponsors/outreach/${foretagId}`);
 export const updateSponsorOutreach = (id, data) => request(`/sponsors/outreach/${id}`, { method: 'PUT', body: JSON.stringify(data) });

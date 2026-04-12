@@ -874,6 +874,20 @@ export default function Step2HittaInfluencers({ foretag, outreachType, influence
                   } catch (e) {
                     console.error('Kunde inte spara till DB:', e.message)
                   }
+                } else if (!isAiResults && foretag?.id) {
+                  // DB-backade resultat: synka vald-status till DB som säkerhetsnät
+                  // (toggle/selectAll-anrop kan ha misslyckats tyst)
+                  try {
+                    const selectedIds = influencers.filter(i => i.vald).map(i => i.id)
+                    if (isSponsor) {
+                      await api.syncSponsorSelection(foretag.id, selectedIds)
+                    } else {
+                      await api.syncInfluencerSelection(foretag.id, selectedIds)
+                    }
+                    console.log(`[Steg2] Synkade ${selectedIds.length} valda till DB`)
+                  } catch (e) {
+                    console.error('Kunde inte synka val till DB:', e.message)
+                  }
                 }
                 // Rensa gamla meddelanden och brief så att "Generera utskick" börjar om
                 if (setMessages) setMessages([])

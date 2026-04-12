@@ -70,6 +70,34 @@ router.put('/prospects/:foretagId/select-all', async (req, res) => {
   res.json(rows);
 });
 
+// PUT /api/sponsors/prospects/:foretagId/sync-selection — synka vald-status från frontend till DB
+router.put('/prospects/:foretagId/sync-selection', async (req, res) => {
+  try {
+    const foretagId = Number(req.params.foretagId);
+    const { selectedIds } = req.body;
+    if (!foretagId) return res.status(400).json({ error: 'foretagId krävs' });
+
+    // Sätt alla till ej valda
+    await runSql('UPDATE sponsor_prospects SET vald = 0 WHERE foretag_id = ?', [foretagId]);
+
+    // Markera de valda
+    if (selectedIds?.length > 0) {
+      const placeholders = selectedIds.map(() => '?').join(',');
+      await runSql(
+        `UPDATE sponsor_prospects SET vald = 1 WHERE foretag_id = ? AND id IN (${placeholders})`,
+        [foretagId, ...selectedIds.map(Number)]
+      );
+    }
+
+    const rows = await queryAll('SELECT * FROM sponsor_prospects WHERE foretag_id = ? ORDER BY id ASC', [foretagId]);
+    console.log(`[Sponsors] Sync selection: ${rows.filter(r => r.vald).length}/${rows.length} valda för företag ${foretagId}`);
+    res.json(rows);
+  } catch (error) {
+    console.error('Sync selection error:', error);
+    res.status(500).json({ error: error.message });
+  }
+});
+
 // POST /api/sponsors/prospects/bulk-save — spara AI-sökta sponsors till DB
 router.post('/prospects/bulk-save', async (req, res) => {
   try {

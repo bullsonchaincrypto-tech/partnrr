@@ -34,11 +34,15 @@ router.post('/prospects/find', async (req, res) => {
 
     await runSql('DELETE FROM sponsor_prospects WHERE foretag_id = ?', [foretagId]);
 
-    for (const p of prospects) {
+    // Filtrera bort prospects utan namn (krävs av NOT NULL constraint)
+    const validProspects = prospects.filter(p => p.namn && p.namn.trim());
+    console.log(`[Sponsors] ${validProspects.length}/${prospects.length} prospects har giltigt namn`);
+
+    for (const p of validProspects) {
       await runSql(
         `INSERT INTO sponsor_prospects (foretag_id, namn, kontaktperson, epost, bransch, instagram_handle, hemsida, telefon, betyg, kalla)
          VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-        [foretagId, p.namn, p.kontaktperson || null, p.epost || null, p.bransch, p.instagram_handle || null, p.hemsida || null, p.telefon || null, p.betyg || null, p.kalla || 'ai']
+        [foretagId, p.namn.trim(), p.kontaktperson || null, p.epost || null, p.bransch || null, p.instagram_handle || null, p.hemsida || null, p.telefon || null, p.betyg || null, p.kalla || 'ai']
       );
     }
 
@@ -372,11 +376,16 @@ Returnera BARA JSON-arrayen, inget annat.`
     // 3. Spara i sponsor_prospects
     const saved = [];
     for (const r of results) {
+      // Hoppa över resultat utan namn
+      if (!r.namn || !r.namn.trim()) {
+        console.warn('[Sponsor Search] Hoppar över resultat utan namn');
+        continue;
+      }
       try {
         // Kolla om redan finns
         const existing = await queryOne(
           'SELECT id FROM sponsor_prospects WHERE foretag_id = ? AND LOWER(namn) = ?',
-          [foretagId, r.namn.toLowerCase()]
+          [foretagId, r.namn.toLowerCase().trim()]
         );
         if (existing) {
           saved.push({ ...r, id: existing.id });

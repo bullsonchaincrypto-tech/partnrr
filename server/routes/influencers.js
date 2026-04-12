@@ -3,6 +3,7 @@ import { queryAll, queryOne, runSql } from '../db/schema.js';
 import { getLockedSearchQueries, NISCH_GROUPS, generateInfluencerSuggestions } from '../services/anthropic.js';
 import { searchYouTubeChannels } from '../services/youtube.js';
 import { findEmailForChannel, findEmailsForChannels } from '../services/email-finder.js';
+import { enrichSingleProfile, isApifyConfigured } from '../services/social-enrichment.js';
 
 const router = Router();
 
@@ -569,87 +570,126 @@ router.post('/search-direct', async (req, res) => {
     const foretag = await queryOne('SELECT * FROM foretag WHERE id = ?', [foretagId]);
     if (!foretag) return res.status(404).json({ error: 'Företag hittades inte' });
 
-    console.log(`[Search] Direkt-sök: "${query}" för ${foretag.namn}`);
+    const cleanQuery = query.trim().replace(/^@/, '');
+    console.log(`[Search] Direkt-sök: "${cleanQuery}" för ${foretag.namn}`);
     const results = [];
 
+    // Kör ALLA sökningar parallellt: YouTube + Instagram + TikTok
+    const searchPromises = [];
+
     // 1. Sök YouTube via Data API
-    try {
-      const ytResults = await searchYouTubeChannels([query], { maxPerQuery: 5 });
-      if (ytResults?.length > 0) {
-        for (const yt of ytResults) {
-          const emailResult = await findEmailForChannel(yt.kanalnamn || yt.namn);
-          results.push({
-            id: `yt-${yt.channelId || Date.now()}-${Math.random().toString(36).slice(2, 6)}`,
-            namn: yt.namn || yt.kanalnamn,
-            kanalnamn: (yt.kanalnamn || yt.namn || '').replace(/^@/, ''),
-            plattform: 'YouTube',
-            foljare: yt.foljare || '0',
-            foljare_exakt: yt.foljare_exakt || parseInt(yt.foljare) || 0,
-            nisch: yt.nisch || '',
-            kontakt_epost: emailResult?.email || yt.kontakt_epost || '',
-            thumbnail: yt.thumbnail || null,
-            beskrivning: yt.beskrivning || '',
-            datakalla: 'youtube_api',
-            verifierad: true,
-            videoCount: yt.videoCount || 0,
-            viewCount: yt.viewCount || 0,
-            match_score: null,
-          });
-        }
-        console.log(`[Search] YouTube: ${ytResults.length} resultat`);
-      }
-    } catch (ytErr) {
-      console.warn(`[Search] YouTube-sökning misslyckades: ${ytErr.message}`);
-    }
-
-    // 2. Sök TikTok + Instagram via AI (Claude genererar sökförslag)
-    try {
-      const Anthropic = (await import('@anthropic-ai/sdk')).default;
-      const apiKey = process.env.ANTHROPIC_API_KEY;
-      if (apiKey) {
-        const client = new Anthropic({ apiKey });
-        const aiResp = await client.messages.create({
-          model: 'claude-sonnet-4-20250514',
-          max_tokens: 1000,
-          messages: [{
-            role: 'user',
-            content: `Jag söker efter "${query}" på TikTok och Instagram (svenska kreatörer).
-Returnera en JSON-array med max 5 profiler per plattform. Inkludera BARA profiler du är SÄKER finns.
-Format: [{"namn": "...", "kanalnamn": "handle_utan_@", "plattform": "TikTok" eller "Instagram", "foljare_uppskattat": 50000, "nisch": "Gaming/Underhållning", "beskrivning": "kort beskrivning"}]
-Returnera BARA JSON-arrayen, inget annat.`
-          }]
-        });
-        const text = aiResp.content[0]?.text || '[]';
-        const match = text.match(/\[[\s\S]*\]/);
-        if (match) {
-          const aiProfiles = JSON.parse(match[0]);
-          for (const p of aiProfiles) {
-            results.push({
-              id: `ai-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`,
-              namn: p.namn,
-              kanalnamn: (p.kanalnamn || '').replace(/^@/, ''),
-              plattform: p.plattform || 'TikTok',
-              foljare: formatFollowers(p.foljare_uppskattat || 0),
-              foljare_exakt: p.foljare_uppskattat || 0,
-              nisch: p.nisch || '',
-              kontakt_epost: '',
-              thumbnail: null,
-              beskrivning: p.beskrivning || '',
-              datakalla: 'ai_search',
-              verifierad: false,
-              videoCount: 0,
-              viewCount: 0,
-              match_score: null,
-            });
+    searchPromises.push(
+      (async () => {
+        try {
+          const ytResults = await searchYouTubeChannels([cleanQuery], { maxPerQuery: 5 });
+          if (ytResults?.length > 0) {
+            for (const yt of ytResults) {
+              const emailResult = await findEmailForChannel(yt.kanalnamn || yt.namn);
+              results.push({
+                id: `yt-${yt.channelId || Date.now()}-${Math.random().toString(36).slice(2, 6)}`,
+                namn: yt.namn || yt.kanalnamn,
+                kanalnamn: (yt.kanalnamn || yt.namn || '').replace(/^@/, ''),
+                plattform: 'YouTube',
+                foljare: yt.foljare || '0',
+                foljare_exakt: yt.foljare_exakt || parseInt(yt.foljare) || 0,
+                nisch: yt.nisch || '',
+                kontakt_epost: emailResult?.email || yt.kontakt_epost || '',
+                thumbnail: yt.thumbnail || null,
+                beskrivning: yt.beskrivning || '',
+                datakalla: 'youtube_api',
+                verifierad: true,
+                videoCount: yt.videoCount || 0,
+                viewCount: yt.viewCount || 0,
+                match_score: null,
+              });
+            }
+            console.log(`[Search] YouTube: ${ytResults.length} resultat`);
           }
-          console.log(`[Search] AI (TikTok/Instagram): ${aiProfiles.length} resultat`);
+        } catch (ytErr) {
+          console.warn(`[Search] YouTube-sökning misslyckades: ${ytErr.message}`);
         }
-      }
-    } catch (aiErr) {
-      console.warn(`[Search] AI-sökning misslyckades: ${aiErr.message}`);
+      })()
+    );
+
+    // 2. Sök Instagram direkt via Apify (verifiera att profilen existerar)
+    if (isApifyConfigured()) {
+      searchPromises.push(
+        (async () => {
+          try {
+            console.log(`[Search] Apify Instagram direkt-sökning: @${cleanQuery}`);
+            const igProfile = await enrichSingleProfile(cleanQuery, 'instagram');
+            if (igProfile && igProfile.username) {
+              results.push({
+                id: `ig-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`,
+                namn: igProfile.full_name || igProfile.username,
+                kanalnamn: igProfile.username,
+                plattform: 'Instagram',
+                foljare: formatFollowers(igProfile.followers || 0),
+                foljare_exakt: igProfile.followers || 0,
+                nisch: igProfile.category || '',
+                kontakt_epost: '',
+                thumbnail: igProfile.avatar_url || null,
+                beskrivning: igProfile.bio || '',
+                datakalla: 'apify_instagram',
+                verifierad: true,
+                videoCount: igProfile.posts_count || 0,
+                viewCount: 0,
+                match_score: null,
+                profile_url: igProfile.profile_url || `https://www.instagram.com/${igProfile.username}/`,
+                engagement_rate: igProfile.engagement_rate || null,
+              });
+              console.log(`[Search] Instagram Apify: ✅ @${igProfile.username} (${igProfile.followers} followers)`);
+            } else {
+              console.log(`[Search] Instagram Apify: profil @${cleanQuery} ej hittad`);
+            }
+          } catch (igErr) {
+            console.warn(`[Search] Instagram Apify-sökning misslyckades: ${igErr.message}`);
+          }
+        })()
+      );
+
+      // 3. Sök TikTok direkt via Apify
+      searchPromises.push(
+        (async () => {
+          try {
+            console.log(`[Search] Apify TikTok direkt-sökning: @${cleanQuery}`);
+            const ttProfile = await enrichSingleProfile(cleanQuery, 'tiktok');
+            if (ttProfile && ttProfile.username) {
+              results.push({
+                id: `tt-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`,
+                namn: ttProfile.full_name || ttProfile.username,
+                kanalnamn: ttProfile.username,
+                plattform: 'TikTok',
+                foljare: formatFollowers(ttProfile.followers || 0),
+                foljare_exakt: ttProfile.followers || 0,
+                nisch: '',
+                kontakt_epost: '',
+                thumbnail: ttProfile.avatar_url || null,
+                beskrivning: ttProfile.bio || '',
+                datakalla: 'apify_tiktok',
+                verifierad: true,
+                videoCount: ttProfile.posts_count || 0,
+                viewCount: 0,
+                match_score: null,
+                profile_url: ttProfile.profile_url || `https://www.tiktok.com/@${ttProfile.username}`,
+                engagement_rate: ttProfile.engagement_rate || null,
+              });
+              console.log(`[Search] TikTok Apify: ✅ @${ttProfile.username} (${ttProfile.followers} followers)`);
+            } else {
+              console.log(`[Search] TikTok Apify: profil @${cleanQuery} ej hittad`);
+            }
+          } catch (ttErr) {
+            console.warn(`[Search] TikTok Apify-sökning misslyckades: ${ttErr.message}`);
+          }
+        })()
+      );
+    } else {
+      console.log(`[Search] APIFY_API_TOKEN saknas — Instagram/TikTok direkt-sökning ej tillgänglig`);
     }
 
-    console.log(`[Search] Totalt: ${results.length} resultat för "${query}"`);
+    await Promise.all(searchPromises);
+
+    console.log(`[Search] Totalt: ${results.length} resultat för "${cleanQuery}"`);
     res.json(results);
   } catch (error) {
     console.error('[Search] Direct search error:', error);

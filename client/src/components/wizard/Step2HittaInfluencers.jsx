@@ -142,11 +142,18 @@ export default function Step2HittaInfluencers({ foretag, outreachType, influence
           setError(`Inga företag hittades för "${directSearch}"`)
         }
       } else {
-        // Influencer-sökning: sök på alla plattformar
+        // Influencer-sökning: sök på alla plattformar via Apify + YouTube
         const results = await api.searchInfluencerDirect(directSearch.trim(), foretag.id)
         if (results?.length > 0) {
-          // Direkt-sökning ersätter resultaten (inte append) för att undvika förvirring
-          setInfluencers(results.map(r => ({ ...r, vald: 0 })))
+          // Append nya resultat till befintliga (dedup på kanalnamn + plattform)
+          setInfluencers(prev => {
+            const mapped = results.map(r => ({ ...r, vald: 0 }))
+            if (prev.length === 0) return mapped
+            const existingKeys = new Set(prev.map(i => `${(i.kanalnamn || i.namn || '').toLowerCase()}_${(i.plattform || '').toLowerCase()}`))
+            const newResults = mapped.filter(r => !existingKeys.has(`${(r.kanalnamn || r.namn || '').toLowerCase()}_${(r.plattform || '').toLowerCase()}`))
+            if (newResults.length === 0) return prev
+            return [...newResults, ...prev]
+          })
         } else {
           setError(`Inga resultat för "${directSearch}"`)
         }

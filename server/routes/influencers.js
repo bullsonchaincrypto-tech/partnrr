@@ -1,4 +1,5 @@
 import { Router } from 'express';
+import fetch from 'node-fetch';
 import { queryAll, queryOne, runSql } from '../db/schema.js';
 import { getLockedSearchQueries, NISCH_GROUPS, generateInfluencerSuggestions } from '../services/anthropic.js';
 import { searchYouTubeChannels } from '../services/youtube.js';
@@ -687,10 +688,100 @@ router.post('/search-direct', async (req, res) => {
       console.log(`[Search] APIFY_API_TOKEN saknas — Instagram/TikTok direkt-sökning ej tillgänglig`);
     }
 
+    // 4. Sök via SerpAPI (Google) — hitta profiler på alla plattformar
+    searchPromises.push(
+      (async () => {
+        try {
+          const serpKey = process.env.SERPAPI_KEY;
+          if (!serpKey) return;
+
+          const serpQuery = `"${cleanQuery}" site:instagram.com OR site:tiktok.com influencer`;
+          console.log(`[Search] SerpAPI direkt-sökning: "${serpQuery}"`);
+
+          const params = new URLSearchParams({
+            api_key: serpKey,
+            engine: 'google',
+            q: serpQuery,
+            hl: 'sv',
+            gl: 'se',
+            num: '10',
+          });
+
+          const controller = new AbortController();
+          const timer = setTimeout(() => controller.abort(), 12000);
+          const serpRes = await fetch(`https://serpapi.com/search.json?${params}`, { signal: controller.signal });
+          clearTimeout(timer);
+
+          if (!serpRes.ok) {
+            console.warn(`[Search] SerpAPI ${serpRes.status}`);
+            return;
+          }
+
+          const data = await serpRes.json();
+          const organics = data.organic_results || [];
+
+          for (const item of organics.slice(0, 8)) {
+            const url = (item.link || '').toLowerCase();
+            const title = item.title || '';
+            const snippet = item.snippet || '';
+
+            let plattform = null;
+            let handle = '';
+
+            if (url.includes('instagram.com/')) {
+              plattform = 'Instagram';
+              const m = url.match(/instagram\.com\/([a-zA-Z0-9._]+)/);
+              handle = m ? m[1] : '';
+            } else if (url.includes('tiktok.com/@')) {
+              plattform = 'TikTok';
+              const m = url.match(/tiktok\.com\/@([a-zA-Z0-9._]+)/);
+              handle = m ? m[1] : '';
+            }
+
+            if (!plattform || !handle || handle === 'explore' || handle === 'p' || handle === 'reel') continue;
+
+            results.push({
+              id: `serp-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`,
+              namn: title.split(' -')[0].split(' |')[0].split('(')[0].trim() || handle,
+              kanalnamn: handle,
+              plattform,
+              foljare: '0',
+              foljare_exakt: 0,
+              nisch: '',
+              kontakt_epost: '',
+              thumbnail: null,
+              beskrivning: snippet.slice(0, 200),
+              datakalla: 'serpapi_direct',
+              verifierad: false,
+              videoCount: 0,
+              viewCount: 0,
+              match_score: null,
+              profile_url: item.link || '',
+            });
+          }
+          console.log(`[Search] SerpAPI: ${organics.length} resultat → ${results.filter(r => r.datakalla === 'serpapi_direct').length} profiler`);
+        } catch (serpErr) {
+          console.warn(`[Search] SerpAPI direkt-sökning misslyckades: ${serpErr.message}`);
+        }
+      })()
+    );
+
     await Promise.all(searchPromises);
 
-    console.log(`[Search] Totalt: ${results.length} resultat för "${cleanQuery}"`);
-    res.json(results);
+    // Dedup: Apify-verifierade profiler har prio över SerpAPI-hittade
+    const deduped = [];
+    const seen = new Set();
+    // Sortera: verifierade först
+    results.sort((a, b) => (b.verifierad ? 1 : 0) - (a.verifierad ? 1 : 0));
+    for (const r of results) {
+      const key = `${(r.kanalnamn || '').toLowerCase()}_${(r.plattform || '').toLowerCase()}`;
+      if (seen.has(key)) continue;
+      seen.add(key);
+      deduped.push(r);
+    }
+
+    console.log(`[Search] Totalt: ${results.length} → ${deduped.length} efter dedup för "${cleanQuery}"`);
+    res.json(deduped);
   } catch (error) {
     console.error('[Search] Direct search error:', error);
     res.status(500).json({ error: error.message });

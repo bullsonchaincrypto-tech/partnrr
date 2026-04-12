@@ -498,17 +498,17 @@ STRIKT MATCHNINGSKRAV:
 - Om företaget säljer kläder → hitta mode-influencers, stilbloggare
 - SKIPPA profiler som inte matchar det specifika erbjudandet — en fitness-influencer passar INTE ett matföretag
 - Short Videos-resultaten ger KANALNAMN och PLATTFORM direkt — använd dessa!
-- Apify Discovery ger RIKTIGA Instagram/TikTok-handles som är aktiva i relevanta hashtags — dessa är ofta de bästa resultaten!
+- Apify Discovery ger RIKTIGA Instagram/TikTok-handles som är aktiva i relevanta hashtags
 - Inkludera BARA profiler du hittar bevis för i sökresultaten
 - Ange BARA kanalnamn som nämns i resultaten — hitta ALDRIG PÅ kanalnamn
 - Hellre 5 träffsäkra resultat än 20 dåliga — NISCH-MATCHNING ÄR VIKTIGARE ÄN KVANTITET
 
 VIKTIGT OM DATA:
-- Följarantal: ange BARA om det EXAKT nämns i sökresultaten (Apify TikTok ger ofta followers), annars null
+- Följarantal: ange BARA om det EXAKT nämns i sökresultaten, annars null
 - profil_beskrivning: ange BARA text som DIREKT citeras i sökresultaten. HITTA ALDRIG PÅ beskrivningar.
   Om du inte har exakt text från profilen, sätt till null. Apify hämtar riktig bio senare.
 - GISSA ALDRIG innehåll — om du inte ser det i sökresultaten, sätt null
-- Apify Discovery-creators som har många posts/videos i hashtaggen är troligen mer relevanta
+- Behandla ALLA datakällor (SerpAPI, Apify) med SAMMA prioritet — bedöm varje profil på egna meriter
 
 Svara med ENBART en JSON-array, inget annat.`;
 

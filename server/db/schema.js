@@ -34,8 +34,14 @@ function convertSql(sql) {
   sql = sql.replace(/!= ""/g, "!= ''");
   sql = sql.replace(/= ""/g, "= ''");
 
+  // Convert date('now') to CURRENT_DATE (SQLite → PostgreSQL)
+  sql = sql.replace(/date\(['"]now['"]\)/gi, 'CURRENT_DATE');
+  // Convert date(expr) to (expr)::date (SQLite → PostgreSQL)
+  sql = sql.replace(/\bdate\(([^)]+)\)/gi, '($1)::date');
+
   // Convert ROUND(expr, N) to ROUND((expr)::numeric, N) for PostgreSQL
-  sql = sql.replace(/ROUND\(([^,)]+),\s*(\d+)\)/gi, 'ROUND(($1)::numeric, $2)');
+  // Use regex that handles nested function calls like SUM(...), COUNT(...), etc.
+  sql = sql.replace(/ROUND\(((?:[^,()]*|\([^)]*\))*),\s*(\d+)\)/gi, 'ROUND(($1)::numeric, $2)');
 
   // Convert placeholders ? → $1, $2, $3...
   sql = convertPlaceholders(sql);

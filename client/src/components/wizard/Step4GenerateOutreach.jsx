@@ -336,7 +336,7 @@ export default function Step4GenerateOutreach({ foretag, outreachType, outreachB
                   <h2 className="text-2xl font-bold text-white">Något extra vi bör nämna?</h2>
                 </div>
                 <p className="text-sm text-gray-400 mb-6">
-                  Valfritt — en kampanjdeadline, specifik produkt, att ni redan pratat med andra influencers, eller annan kontext.
+                  Valfritt — en kampanjdeadline, specifik produkt, att ni redan pratat med andra {isSponsor ? 'sponsorer' : 'influencers'}, eller annan kontext.
                 </p>
                 <textarea
                   autoFocus
@@ -396,7 +396,7 @@ export default function Step4GenerateOutreach({ foretag, outreachType, outreachB
           <div className="mt-8">
             <button onClick={prev}
               className="flex items-center gap-2 text-gray-400 hover:text-white text-sm transition-colors">
-              <ArrowLeft className="w-4 h-4" /> Tillbaka till influencers
+              <ArrowLeft className="w-4 h-4" /> {isSponsor ? 'Tillbaka till sponsorer' : 'Tillbaka till influencers'}
             </button>
           </div>
         )}
@@ -421,7 +421,7 @@ export default function Step4GenerateOutreach({ foretag, outreachType, outreachB
             <Loader2 className="w-5 h-5 animate-spin text-purple-400" />
             <span className="text-gray-300">AI genererar personliga meddelanden...</span>
           </div>
-          <p className="text-xs text-gray-500 ml-8">Detta kan ta 15-30 sekunder beroende på antal influencers.</p>
+          <p className="text-xs text-gray-500 ml-8">Detta kan ta 15-30 sekunder beroende på antal {isSponsor ? 'sponsorer' : 'influencers'}.</p>
         </div>
       )}
 

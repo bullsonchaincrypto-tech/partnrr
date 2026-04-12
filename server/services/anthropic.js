@@ -362,7 +362,14 @@ ${beskrivning ? `Användarens beskrivning av företaget (OBS: detta är råtext 
 
 Din uppgift: Formulera EN professionell mening som presenterar företaget. Basera dig på informationen ovan men skriv om den till korrekt, professionell svenska. Kopiera INTE användarens text ordagrant — förbättra den.
 Skriv ALDRIG ord som "lag", "team", "app", "plattform", "community" om företaget om det inte tydligt framgår av beskrivningen.
-Om ingen beskrivning finns, skriv bara: "Vi på ${foretag.namn} söker influencers för ett betalt samarbete."`;
+Om ingen beskrivning finns, skriv bara: "Vi på ${foretag.namn} söker influencers för ett betalt samarbete."
+
+KRITISKT — ANTI-FABRICERING:
+- Hitta ALDRIG PÅ siffror, priser, värden, statistik eller fakta som INTE ges explicit i prompten
+- Om ersättningen nämner "premium", "gratis tillgång" eller liknande utan pris — skriv ALDRIG ett kronbelopp/värde för det
+- Skriv BARA de siffror som faktiskt anges i erbjudandet (t.ex. "300 SEK per video")
+- Gissa ALDRIG vad något är "värt" — om inget pris anges, nämn bara förmånen utan belopp
+- Om du inte vet något — UTELÄMNA det, hitta inte på`;
 
 
   // Bygg erbjudande-sektion baserat på brief
@@ -397,10 +404,11 @@ KRAV — följ dessa EXAKT:
 1. Börja med en kort personlig kommentar om influencerns kanal (max 1 mening)
 2. Presentera företaget professionellt baserat på informationen i systempromten (formulera själv, kopiera INTE användarens text)
 3. Förklara KONKRET vad vi vill att influencern gör (se CTA ovan)
-4. Skriv ut ersättningen TYDLIGT med siffror
-5. Avsluta med ett tydligt nästa steg
-6. Signatur: Mvh, ${kontakt}, ${foretag.namn}, ${foretag.epost || ''}
-7. Max 150 ord totalt
+4. Skriv ut ersättningen TYDLIGT med siffror — men BARA siffror som anges ovan. Hitta ALDRIG PÅ belopp, värden eller priser som inte finns i erbjudandet.
+5. Om erbjudandet nämner förmåner utan pris (t.ex. "gratis premium"), nämn förmånen men SKRIV INTE ett påhittat kronvärde
+6. Avsluta med ett tydligt nästa steg
+7. Signatur: Mvh, ${kontakt}, ${foretag.namn}, ${foretag.epost || ''}
+8. Max 150 ord totalt
 
 Returnera BARA meddelandet (ämne och brödtext), formaterat så här:
 ÄMNE: [ämnesrad]

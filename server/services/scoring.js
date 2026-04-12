@@ -25,7 +25,7 @@ const NICHE_GROUPS = [
   ['fantasy', 'fantasy sport', 'fantasy fotboll', 'fpl', 'allsvenskan fantasy', 'premier league fantasy', 'tips', 'tippning'],
   ['fotboll', 'allsvenskan', 'premier league', 'champions league', 'uefa', 'fifa', 'soccer', 'football'],
   ['sport', 'idrott', 'sporttips', 'betting', 'odds', 'sportanalys'],
-  ['tech', 'teknik', 'teknologi', 'ai', 'it', 'programmering', 'data'],
+  ['tech', 'teknik', 'teknologi', 'ai', 'it', 'programmering', 'data', 'saas', 'startup', 'devops', 'software', 'mjukvara', 'developer', 'utvecklare', 'kod', 'cloud', 'moln', 'cybersäkerhet', 'kodgranskning'],
   ['fitness', 'träning', 'gym', 'hälsa', 'wellness', 'kost'],
   ['mode', 'fashion', 'stil', 'kläder', 'beauty', 'skönhet'],
   ['musik', 'music', 'artist', 'sångare', 'producer'],
@@ -176,8 +176,11 @@ function calculateNicheScore(influencer, profile) {
   if (matchRatio >= 0.2) return 65;
   if (matchCount >= 1) return 55;      // Minst en grupp matchar
 
-  // Inga grupper matchade — prova direkt ordmatchning
-  return calculateDirectWordMatch(companyText, infText);
+  // Inga grupper matchade — prova direkt ordmatchning men med lägre tak
+  // Om företaget HAR nisch-grupper men influencern inte matchar någon,
+  // är det en stark signal om dålig matchning
+  const directScore = calculateDirectWordMatch(companyText, infText);
+  return Math.min(directScore, 50); // Max 50 om inga nisch-grupper matchar
 }
 
 /**

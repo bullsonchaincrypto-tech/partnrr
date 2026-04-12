@@ -335,7 +335,7 @@ function buildSearchQueries({ companyName, beskrivning, nischer, platforms }) {
       { terms: ['hälsa', 'wellness', 'välmående'], keywords: 'hälsa wellness' },
       { terms: ['mat', 'recept', 'matlagning', 'food', 'krydd', 'sås', 'marinad', 'livsmedel', 'restaurang', 'kök', 'bageri', 'bak', 'dryck', 'kaffe', 'te ', 'choklad', 'godis', 'snack'], keywords: 'mat recept matlagning foodie kök' },
       { terms: ['ekolog', 'hållbar', 'miljö', 'klimat', 'vegan', 'vegetar', 'natur', 'organic'], keywords: 'ekologisk hållbar mat miljö' },
-      { terms: ['tech', 'teknik', 'teknologi', 'ai', 'programmering', 'saas', 'startup', 'app '], keywords: 'tech teknik startup' },
+      { terms: ['tech', 'teknik', 'teknologi', 'ai', 'programmering', 'saas', 'startup', 'app ', 'devops', 'kodgranskning', 'kod', 'software', 'mjukvara', 'utvecklare', 'developer', 'data', 'cloud', 'moln', 'cybersäkerhet', 'it '], keywords: 'tech teknik programmering AI startup utvecklare' },
       { terms: ['mode', 'fashion', 'kläder', 'outfit', 'stil'], keywords: 'mode fashion stil' },
       { terms: ['skönhet', 'beauty', 'smink', 'hudvård', 'makeup', 'nagel', 'hår'], keywords: 'skönhet beauty' },
       { terms: ['resor', 'resa', 'travel', 'hotell', 'semester'], keywords: 'resor travel äventyr' },

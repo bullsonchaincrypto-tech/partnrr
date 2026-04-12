@@ -12,24 +12,45 @@ function convertPlaceholders(sql) {
 
 // Helper: convert SQLite syntax to PostgreSQL
 function convertSql(sql) {
-  // Convert datetime('now') to NOW()
-  sql = sql.replace(/datetime\('now'\)/g, "NOW()");
+  // Convert INSERT OR REPLACE → INSERT ... ON CONFLICT DO NOTHING (safe for caches)
+  sql = sql.replace(/INSERT\s+OR\s+REPLACE\s+INTO/gi, 'INSERT INTO');
+  // We'll add ON CONFLICT below after placeholders
+
+  // Convert datetime('now') and datetime("now") to NOW()
+  sql = sql.replace(/datetime\(['"]now['"]\)/g, "NOW()");
   // Convert datetime('now', '+30 days') to NOW() + INTERVAL '30 days'
-  sql = sql.replace(/datetime\('now',\s*'([^']*)'\)/g, (match, interval) => {
+  sql = sql.replace(/datetime\(['"]now['"],\s*'([^']*)'\)/g, (match, interval) => {
     return `(NOW() + INTERVAL '${interval}')`;
   });
   // Convert julianday differences to PostgreSQL EXTRACT
-  // julianday('now') - julianday(expr) >= N  →  EXTRACT(EPOCH FROM (NOW() - expr::timestamp)) / 86400 >= N
-  // julianday(expr) - julianday('now') <= N  →  EXTRACT(EPOCH FROM (expr::timestamp - NOW())) / 86400 <= N
   sql = sql.replace(/julianday\('now'\)\s*-\s*julianday\(([^)]+)\)/g,
     'EXTRACT(EPOCH FROM (NOW() - ($1)::timestamp)) / 86400');
   sql = sql.replace(/julianday\(([^)]+)\)\s*-\s*julianday\('now'\)/g,
     'EXTRACT(EPOCH FROM (($1)::timestamp - NOW())) / 86400');
-  // Generic julianday(a) - julianday(b)
   sql = sql.replace(/julianday\(([^)]+)\)\s*-\s*julianday\(([^)]+)\)/g,
     'EXTRACT(EPOCH FROM (($1)::timestamp - ($2)::timestamp)) / 86400');
+
+  // Convert empty double-quoted strings "" to '' (SQLite treats "" as empty string, PG treats as identifier)
+  sql = sql.replace(/!= ""/g, "!= ''");
+  sql = sql.replace(/= ""/g, "= ''");
+
+  // Convert ROUND(expr, N) to ROUND((expr)::numeric, N) for PostgreSQL
+  sql = sql.replace(/ROUND\(([^,)]+),\s*(\d+)\)/gi, 'ROUND(($1)::numeric, $2)');
+
   // Convert placeholders ? → $1, $2, $3...
   sql = convertPlaceholders(sql);
+
+  // For INSERT OR REPLACE conversions: add ON CONFLICT DO NOTHING
+  // Check if this was originally an INSERT OR REPLACE by looking for cache/config tables
+  if (sql.match(/INSERT INTO\s+(influencer_search_cache|enrichment_cache|agent_config|gmail_watch_state)/i)) {
+    // Add ON CONFLICT DO NOTHING before RETURNING (if present)
+    if (sql.includes('RETURNING')) {
+      sql = sql.replace(/\s*RETURNING/, ' ON CONFLICT DO NOTHING RETURNING');
+    } else {
+      sql = sql.trimEnd() + ' ON CONFLICT DO NOTHING';
+    }
+  }
+
   return sql;
 }
 
@@ -700,10 +721,10 @@ export async function runSql(sql, params = []) {
   try {
     let convertedSql = convertSql(sql);
 
-    // For INSERT statements, append RETURNING id
+    // For INSERT statements, append RETURNING id (but not for ON CONFLICT DO NOTHING — those tables may lack id)
     if (convertedSql.trim().toUpperCase().startsWith('INSERT')) {
       convertedSql = convertedSql.trimEnd();
-      if (!convertedSql.toUpperCase().includes('RETURNING')) {
+      if (!convertedSql.toUpperCase().includes('RETURNING') && !convertedSql.toUpperCase().includes('ON CONFLICT DO NOTHING')) {
         convertedSql += ' RETURNING id';
       }
     }

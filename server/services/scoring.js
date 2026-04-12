@@ -250,42 +250,176 @@ export async function generateMatchMotivation(influencer, companyProfile, scoreR
 }
 
 /**
+ * Claude Sonnet Scoring — Steg 6 i pipeline
+ *
+ * Istället för viktat poängsystem, låter Claude analysera ALLA influencers
+ * och ge varje en match_score (0-100) + motivation.
+ * Detta ger mycket bättre resultat eftersom Claude kan tolka kontext.
+ */
+async function scoreWithClaude(influencers, companyProfile) {
+  const apiKey = process.env.ANTHROPIC_API_KEY;
+  if (!apiKey || influencers.length === 0) return null;
+
+  // Formatera influencer-data kompakt
+  const infData = influencers.map((inf, i) => ({
+    index: i,
+    namn: inf.name || inf.namn || 'Okänd',
+    handle: inf.handle || inf.kanalnamn || '',
+    plattform: inf.platform || inf.plattform || '',
+    foljare: inf.followers || inf.foljare_exakt || null,
+    nisch: (inf.niches || []).join(', ') || inf.nisch || '',
+    bio: (inf.bio || inf.beskrivning || '').slice(0, 100),
+    datakalla: inf.datakalla || '',
+    ai_score_prev: inf.ai_score || null,
+  }));
+
+  const companyContext = [
+    `Företag: ${companyProfile?.namn || 'Okänt'}`,
+    `Bransch: ${companyProfile?.bransch || 'Ej angiven'}`,
+    `Beskrivning: ${companyProfile?.beskrivning || 'Ej angiven'}`,
+    companyProfile?.brief_answers?.goal ? `Mål: ${companyProfile.brief_answers.goal}` : '',
+  ].filter(Boolean).join('\n');
+
+  const systemPrompt = `Du är en expert på influencer-marknadsföring i Sverige. Du ska bedöma hur väl varje influencer matchar ett företag.
+
+GE VARJE INFLUENCER:
+1. match_score (0-100): Hur väl matchar influencern företagets nisch, publik och mål
+2. motivation (1-2 meningar på svenska): Varför denna score — var specifik
+
+BEDÖMNINGSKRITERIER:
+- Nisch-relevans (viktigast): Matchar influencerns innehåll företagets bransch?
+- Plattforms-passform: Rätt plattform för företagets målgrupp?
+- Autenticitet: Har profilen riktig data (followers, bio) eller bara AI-uppskattning?
+- Storlek: Lagom stora profiler (10K-500K) är ofta bättre för konvertering
+- Svenska profiler som riktar sig till svensk publik → bonus
+
+SCORING-GUIDE:
+90-100: Perfekt match — exakt rätt nisch, verifierad profil, rätt storlek
+80-89:  Mycket bra — rätt nisch, bra storlek
+70-79:  Bra match — relaterad nisch, bra potential
+60-69:  OK match — delvis relevant, kräver mer utredning
+50-59:  Svag match — lös koppling till branschen
+Under 50: Dålig match — inte relevant
+
+Svara med ENBART en JSON-array. Varje element: { "index": 0, "match_score": 85, "motivation": "..." }`;
+
+  const userMessage = `${companyContext}
+
+INFLUENCERS ATT BEDÖMA:
+${JSON.stringify(infData, null, 1)}
+
+Bedöm VARJE influencer. Svara med ENBART JSON-array:`;
+
+  try {
+    console.log(`[Scoring] Claude Sonnet bedömer ${influencers.length} influencers...`);
+    const res = await fetch('https://api.anthropic.com/v1/messages', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'x-api-key': apiKey,
+        'anthropic-version': '2023-06-01',
+      },
+      body: JSON.stringify({
+        model: 'claude-sonnet-4-6',
+        max_tokens: 4000,
+        system: systemPrompt,
+        messages: [{ role: 'user', content: userMessage }],
+      }),
+    });
+
+    if (!res.ok) {
+      console.warn(`[Scoring] Claude API ${res.status} — faller tillbaka på algoritmisk scoring`);
+      return null;
+    }
+
+    const data = await res.json();
+    const text = data.content?.[0]?.text || '';
+
+    // Parsa JSON från svaret
+    const match = text.match(/\[[\s\S]*\]/);
+    if (!match) {
+      console.warn('[Scoring] Kunde inte parsa Claude-svar');
+      return null;
+    }
+
+    const scores = JSON.parse(match[0]);
+    console.log(`[Scoring] ✅ Claude bedömde ${scores.length} influencers`);
+    return scores;
+  } catch (err) {
+    console.error('[Scoring] Claude scoring misslyckades:', err.message);
+    return null;
+  }
+}
+
+/**
  * Batch: Scorea och motivera en lista med influencers
+ *
+ * PRIMÄR: Claude Sonnet tolkar alla resultat och ger match_score (Steg 6)
+ * FALLBACK: Algoritmisk scoring (viktat AI 55% + nisch 45%)
  */
 export async function scoreAndRankInfluencers(influencers, companyProfile, { generateMotivations = true, topN = 5 } = {}) {
   // 1. Filter
   const filtered = await filterInfluencers(influencers, companyProfile);
 
-  // 2. Score alla (scoreInfluencer är async — måste awaitas)
-  const scored = await Promise.all(filtered.map(async inf => {
-    const result = await scoreInfluencer(inf, companyProfile);
-    return {
-      ...inf,
-      match_score: result.total_score,
-      score_details: result.component_scores,
-      score_breakdown: result.details,
-    };
-  }));
+  // 2. Försök Claude Sonnet scoring (primär)
+  const claudeScores = await scoreWithClaude(filtered, companyProfile);
+
+  let scored;
+
+  if (claudeScores?.length > 0) {
+    // ── Claude Sonnet scoring (primär) ──
+    console.log(`[Scoring] Använder Claude Sonnet scoring`);
+
+    // Skapa lookup map: index → score data
+    const scoreMap = new Map();
+    for (const s of claudeScores) {
+      scoreMap.set(s.index, s);
+    }
+
+    scored = filtered.map((inf, i) => {
+      const claude = scoreMap.get(i);
+      return {
+        ...inf,
+        match_score: claude?.match_score ?? 50,
+        ai_motivation: claude?.motivation || inf.ai_motivation || null,
+        score_details: { claude_score: claude?.match_score ?? 50 },
+        score_breakdown: { claude_motivation: claude?.motivation || '' },
+      };
+    });
+  } else {
+    // ── Fallback: algoritmisk scoring ──
+    console.log(`[Scoring] Fallback: algoritmisk scoring`);
+
+    scored = await Promise.all(filtered.map(async inf => {
+      const result = await scoreInfluencer(inf, companyProfile);
+      return {
+        ...inf,
+        match_score: result.total_score,
+        score_details: result.component_scores,
+        score_breakdown: result.details,
+      };
+    }));
+
+    // Generera motiveringar för topp N (bara vid fallback)
+    if (generateMotivations) {
+      const topInfluencers = scored.slice(0, topN);
+      const motivations = await Promise.all(
+        topInfluencers.map(inf =>
+          generateMatchMotivation(inf, companyProfile, {
+            total_score: inf.match_score,
+            component_scores: inf.score_details,
+          }).catch(() => null)
+        )
+      );
+
+      for (let i = 0; i < topInfluencers.length; i++) {
+        scored[i].ai_motivation = motivations[i];
+      }
+    }
+  }
 
   // 3. Sortera
   scored.sort((a, b) => b.match_score - a.match_score);
-
-  // 4. Generera motiveringar för topp N
-  if (generateMotivations) {
-    const topInfluencers = scored.slice(0, topN);
-    const motivations = await Promise.all(
-      topInfluencers.map(inf =>
-        generateMatchMotivation(inf, companyProfile, {
-          total_score: inf.match_score,
-          component_scores: inf.score_details,
-        }).catch(() => null)
-      )
-    );
-
-    for (let i = 0; i < topInfluencers.length; i++) {
-      scored[i].ai_motivation = motivations[i];
-    }
-  }
 
   return scored;
 }

@@ -6,7 +6,8 @@ import { findEmailsForChannels } from '../services/email-finder.js';
 import { searchSponsors, searchContacts, isApolloConfigured } from '../services/apollo.js';
 import { enrichInfluencers, enrichSingleProfile, isApifyConfigured } from '../services/social-enrichment.js';
 import { scoreAndRankInfluencers, scoreInfluencer } from '../services/scoring.js';
-import { searchInfluencersAI, generateNischKeywords } from '../services/ai-search.js';
+import { searchInfluencersAI, generateNischKeywords, buildSearchQueries } from '../services/ai-search.js';
+import { discoverInfluencers, isApifyConfigured as isApifyDiscoveryConfigured } from '../services/apify-discovery.js';
 
 const router = Router();
 
@@ -93,16 +94,51 @@ router.post('/influencers', async (req, res) => {
     }
 
     // ============================================================
-    // FAS 1.5: AI-sökning (fallback för plattformar utan API-resultat)
-    // Om Influencers.club + Phyllo inte returnerade något, använd AI web search
+    // FAS 1.5: Apify Discovery (Steg 2) — hitta influencers via hashtags
+    // Kör PARALLELLT med AI-sökning
     // ============================================================
     const nonYoutubePlatforms = selectedPlatforms.filter(p => p !== 'youtube');
+    let apifyDiscoveryData = { instagram: [], tiktok: [] };
+
+    if (nonYoutubePlatforms.length > 0 && isApifyDiscoveryConfigured()) {
+      console.log(`[Search] Steg 2: Apify Discovery — söker via hashtags...`);
+      try {
+        // Generera hashtags från nisch-labels
+        const hashtags = nischLabels.slice(0, 3).map(label =>
+          label.replace(/\s+/g, '').toLowerCase()
+        );
+        // Lägg till svenska varianter
+        const extraHashtags = nischLabels.slice(0, 2).map(label =>
+          `svensk${label.split(' ')[0].toLowerCase()}`
+        );
+        const allHashtags = [...new Set([...hashtags, ...extraHashtags])].slice(0, 4);
+        console.log(`[Search] Discovery hashtags: ${allHashtags.join(', ')}`);
+
+        apifyDiscoveryData = await discoverInfluencers(
+          allHashtags,
+          nonYoutubePlatforms,
+          { maxResultsPerHashtag: 30, timeoutSecs: 120 }
+        );
+        sources.apify_ig_discovery = apifyDiscoveryData.instagram?.length || 0;
+        sources.apify_tt_discovery = apifyDiscoveryData.tiktok?.length || 0;
+        console.log(`[Search] Apify Discovery: ${sources.apify_ig_discovery} IG + ${sources.apify_tt_discovery} TT creators`);
+      } catch (err) {
+        console.error(`[Search] Apify Discovery misslyckades:`, err.message);
+        sources.apify_ig_discovery = 0;
+        sources.apify_tt_discovery = 0;
+      }
+    }
+
+    // ============================================================
+    // FAS 2: AI-sökning (Steg 1+3) — SerpAPI + Apify → Claude Sonnet
+    // Nu med Apify discovery-data inkluderat
+    // ============================================================
     const hasNonYoutubeResults = allResults.some(r =>
       ['instagram', 'tiktok'].includes((r.platform || r.plattform || '').toLowerCase())
     );
 
     if (nonYoutubePlatforms.length > 0 && !hasNonYoutubeResults) {
-      console.log(`[Search] Inga API-resultat för ${nonYoutubePlatforms.join(', ')} — kör AI-sökning...`);
+      console.log(`[Search] Steg 1+3: AI-sökning (SerpAPI + Apify Discovery → Claude)...`);
       try {
         const aiInfluencers = await searchInfluencersAI({
           companyName: foretag.namn,
@@ -112,6 +148,7 @@ router.post('/influencers', async (req, res) => {
           syfte: foretag.syfte || null,
           nischer: nischLabels,
           platforms: nonYoutubePlatforms,
+          apifyDiscoveryData, // ← NY: skicka Apify-data till Claude
         });
         if (aiInfluencers?.length > 0) {
           // Normalisera AI-resultat till samma format som pipeline

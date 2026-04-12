@@ -318,7 +318,7 @@ async function searchGoogle(query) {
  * Detta ersätter den statiska nisch-mappningen — Claude förstår alla branscher
  * och genererar exakt rätt söktermer oavsett hur beskrivningen formuleras.
  */
-async function buildSearchQueries({ companyName, beskrivning, nischer, platforms }) {
+export async function buildSearchQueries({ companyName, beskrivning, nischer, platforms }) {
   const platformList = (platforms || ['instagram']).map(p => p.toLowerCase());
   const nischStr = (nischer || []).join(', ');
 
@@ -431,7 +431,7 @@ Generera optimala söktermer. Svara med ENBART JSON:
 // INFLUENCER-SÖKNING: Multi-engine SerpAPI → Sonnet
 // ============================================================
 
-export async function searchInfluencersAI({ companyName, industry, nischer, platforms, budget, audience_age, goal, previousCollabs, beskrivning, erbjudande_typ, syfte }) {
+export async function searchInfluencersAI({ companyName, industry, nischer, platforms, budget, audience_age, goal, previousCollabs, beskrivning, erbjudande_typ, syfte, apifyDiscoveryData }) {
   const platformStr = (platforms || ['youtube']).join(', ');
   const nischStr = (nischer || []).join(', ');
 
@@ -450,9 +450,15 @@ export async function searchInfluencersAI({ companyName, industry, nischer, plat
   const totalResults = shortVideoResults.length + googleResults.length;
   const serpWorked = totalResults > 0;
 
-  // ── STEG 2: Sonnet analyserar (om SerpAPI gav resultat) ──
-  if (serpWorked) {
+  // ── STEG 2+3: Sonnet analyserar SerpAPI + Apify discovery ──
+  const hasApifyData = apifyDiscoveryData && (apifyDiscoveryData.instagram?.length > 0 || apifyDiscoveryData.tiktok?.length > 0);
+  const hasAnyData = serpWorked || hasApifyData;
+
+  if (hasAnyData) {
     console.log(`[AI-Search] SerpAPI: ${shortVideoResults.length} short videos + ${googleResults.length} organic = ${totalResults} totalt`);
+    if (hasApifyData) {
+      console.log(`[AI-Search] Apify Discovery: ${apifyDiscoveryData.instagram?.length || 0} IG + ${apifyDiscoveryData.tiktok?.length || 0} TT creators`);
+    }
 
     // Formatera Short Videos som strukturerad data
     const svData = shortVideoResults.length > 0
@@ -466,12 +472,23 @@ export async function searchInfluencersAI({ companyName, industry, nischer, plat
         googleResults.map(r => `  ${r.title} | ${r.snippet} | ${r.url}`).join('\n')
       : '';
 
-    const condensed = [svData, gsData].filter(Boolean).join('\n\n').slice(0, 8000);
+    // Formatera Apify discovery-resultat
+    let apifyData = '';
+    if (hasApifyData) {
+      const { formatDiscoveryForClaude } = await import('./apify-discovery.js');
+      apifyData = formatDiscoveryForClaude(apifyDiscoveryData);
+    }
 
-    const systemPrompt = `Du är en expert på influencer-marknadsföring i Sverige. Du får sökresultat från Google och Google Short Videos (TikTok/Instagram Reels/YouTube Shorts).
+    const condensed = [svData, gsData, apifyData].filter(Boolean).join('\n\n').slice(0, 10000);
+
+    const systemPrompt = `Du är en expert på influencer-marknadsföring i Sverige. Du får data från FLERA KÄLLOR:
+1. Google Short Videos (TikTok/Instagram Reels/YouTube Shorts)
+2. Google-sökresultat (profiler, listor, artiklar)
+3. Apify Instagram Discovery (creators hittade via hashtag-sökning på Instagram)
+4. Apify TikTok Discovery (creators hittade via hashtag-sökning på TikTok)
 
 UPPGIFT:
-Analysera resultaten och identifiera svenska influencers som matchar företaget.
+Analysera ALLA resultat och identifiera de BÄSTA svenska influencers som matchar företaget.
 Returnera ENBART en JSON-array — ingen annan text.
 
 STRIKT MATCHNINGSKRAV:
@@ -481,15 +498,17 @@ STRIKT MATCHNINGSKRAV:
 - Om företaget säljer kläder → hitta mode-influencers, stilbloggare
 - SKIPPA profiler som inte matchar det specifika erbjudandet — en fitness-influencer passar INTE ett matföretag
 - Short Videos-resultaten ger KANALNAMN och PLATTFORM direkt — använd dessa!
+- Apify Discovery ger RIKTIGA Instagram/TikTok-handles som är aktiva i relevanta hashtags — dessa är ofta de bästa resultaten!
 - Inkludera BARA profiler du hittar bevis för i sökresultaten
 - Ange BARA kanalnamn som nämns i resultaten — hitta ALDRIG PÅ kanalnamn
 - Hellre 5 träffsäkra resultat än 20 dåliga — NISCH-MATCHNING ÄR VIKTIGARE ÄN KVANTITET
 
 VIKTIGT OM DATA:
-- Följarantal: ange BARA om det EXAKT nämns i sökresultaten, annars null
+- Följarantal: ange BARA om det EXAKT nämns i sökresultaten (Apify TikTok ger ofta followers), annars null
 - profil_beskrivning: ange BARA text som DIREKT citeras i sökresultaten. HITTA ALDRIG PÅ beskrivningar.
   Om du inte har exakt text från profilen, sätt till null. Apify hämtar riktig bio senare.
 - GISSA ALDRIG innehåll — om du inte ser det i sökresultaten, sätt null
+- Apify Discovery-creators som har många posts/videos i hashtaggen är troligen mer relevanta
 
 Svara med ENBART en JSON-array, inget annat.`;
 
@@ -527,11 +546,12 @@ REGLER FÖR FÄLTEN:
 
 ENBART JSON. Inga kommentarer.`;
 
-    console.log(`[AI-Search] Steg 2: Sonnet analyserar ${totalResults} resultat...`);
+    const allDataCount = totalResults + (apifyDiscoveryData?.instagram?.length || 0) + (apifyDiscoveryData?.tiktok?.length || 0);
+    console.log(`[AI-Search] Steg 3: Sonnet analyserar ${allDataCount} datapunkter (SerpAPI + Apify)...`);
     const raw = await callClaude(systemPrompt, userMessage, 5000);
     const influencers = parseJSON(raw);
 
-    console.log(`[AI-Search] ✅ ${influencers.length} influencers (Short Videos + Google → Sonnet)`);
+    console.log(`[AI-Search] ✅ ${influencers.length} influencers (SerpAPI + Apify Discovery → Sonnet)`);
     return normalizeResults(influencers);
   }
 

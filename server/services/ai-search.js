@@ -359,7 +359,7 @@ Generera optimala söktermer. Svara med ENBART JSON:
 }`;
 
     console.log(`[AI-Search] Steg 0: AI genererar söktermer för "${beskrivning?.slice(0, 80) || companyName}"...`);
-    const raw = await callClaude(systemPrompt, userMessage, 500, { model: 'claude-haiku-4-5-20251001' });
+    const raw = await callClaude(systemPrompt, userMessage, 500, { model: MODEL_DEFAULT });
     const parsed = parseJSON(raw);
 
     if (parsed.nisch_keywords) {
@@ -483,8 +483,13 @@ STRIKT MATCHNINGSKRAV:
 - Short Videos-resultaten ger KANALNAMN och PLATTFORM direkt — använd dessa!
 - Inkludera BARA profiler du hittar bevis för i sökresultaten
 - Ange BARA kanalnamn som nämns i resultaten — hitta ALDRIG PÅ kanalnamn
-- Följarantal: ange BARA om det nämns, annars null
 - Hellre 5 träffsäkra resultat än 20 dåliga — NISCH-MATCHNING ÄR VIKTIGARE ÄN KVANTITET
+
+VIKTIGT OM DATA:
+- Följarantal: ange BARA om det EXAKT nämns i sökresultaten, annars null
+- profil_beskrivning: ange BARA text som DIREKT citeras i sökresultaten. HITTA ALDRIG PÅ beskrivningar.
+  Om du inte har exakt text från profilen, sätt till null. Apify hämtar riktig bio senare.
+- GISSA ALDRIG innehåll — om du inte ser det i sökresultaten, sätt null
 
 Svara med ENBART en JSON-array, inget annat.`;
 
@@ -506,14 +511,19 @@ Returnera JSON-array:
     "namn": "Influencerns riktiga namn eller kanalnamn",
     "kanalnamn": "@kanalnamn",
     "plattform": "instagram|tiktok|youtube",
-    "foljare": 50000 eller null,
-    "nisch": "t.ex. fantasy fotboll, fotbollsanalys",
-    "profil_beskrivning": "Kort beskrivning baserat på sökresultaten",
-    "kontakt_epost": "email@example.com eller null",
+    "foljare": null,
+    "nisch": "t.ex. tech elektronik, matlagning",
+    "profil_beskrivning": null,
+    "kontakt_epost": null,
     "ai_score": 85,
     "ai_motivation": "Varför denna influencer passar ${companyName}"
   }
 ]
+
+REGLER FÖR FÄLTEN:
+- foljare: BARA exakt siffra om den står i sökresultaten, annars ALLTID null
+- profil_beskrivning: BARA exakt citat från sökresultaten, annars ALLTID null (Apify hämtar sen)
+- kontakt_epost: BARA om den syns i sökresultaten, annars null
 
 ENBART JSON. Inga kommentarer.`;
 

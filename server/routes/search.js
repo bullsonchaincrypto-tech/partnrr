@@ -158,19 +158,28 @@ router.post('/influencers', async (req, res) => {
     // ============================================================
     if (isApifyConfigured()) {
       const needsEnrichment = allResults.filter(
-        r => (r.datakalla === 'ai_estimated' || !r.verifierad) &&
+        r => !r.verifierad &&
              ['instagram', 'tiktok'].includes((r.platform || r.plattform || '').toLowerCase())
       );
       if (needsEnrichment.length > 0) {
-        console.log(`[Search] Enrichar ${needsEnrichment.length} profiler via Apify...`);
+        console.log(`[Search] Enrichar ${needsEnrichment.length} Instagram/TikTok-profiler via Apify...`);
+        console.log(`[Search] Handles: ${needsEnrichment.map(r => `@${r.handle || r.kanalnamn} (${r.platform})`).join(', ')}`);
         try {
           allResults = await enrichInfluencers(allResults);
-          sources.apify_enriched = allResults.filter(r => r.datakalla?.startsWith('apify_')).length;
+          const enriched = allResults.filter(r => r.datakalla?.startsWith('apify_'));
+          sources.apify_enriched = enriched.length;
+          console.log(`[Search] Apify enrichade ${enriched.length}/${needsEnrichment.length} profiler`);
+          // Logga followers för debugging
+          enriched.forEach(r => console.log(`[Search]   @${r.handle || r.kanalnamn}: ${r.followers || 0} followers, bio: ${r.bio ? 'JA' : 'NEJ'}`));
         } catch (err) {
           console.error('[Search] Enrichment error:', err.message);
           sources.apify_enriched = 0;
         }
+      } else {
+        console.log(`[Search] Ingen enrichment behövs (${allResults.filter(r => ['instagram', 'tiktok'].includes((r.platform || '').toLowerCase())).length} IG/TT-profiler, alla verifierade)`);
       }
+    } else {
+      console.log(`[Search] ⚠️ APIFY_API_TOKEN ej konfigurerat — Instagram/TikTok-profiler enrichas INTE`);
     }
 
     // ============================================================

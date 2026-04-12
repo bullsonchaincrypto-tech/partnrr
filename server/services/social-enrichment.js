@@ -30,7 +30,7 @@ const ACTORS = {
 /**
  * Kolla om Apify är konfigurerat
  */
-export async function isApifyConfigured() {
+export function isApifyConfigured() {
   return !!process.env.APIFY_API_TOKEN;
 }
 
@@ -52,6 +52,7 @@ function getToken() {
  */
 export async function enrichInfluencers(influencers) {
   if (!isApifyConfigured() || !influencers?.length) {
+    console.log(`[Enrichment] Skipping: configured=${isApifyConfigured()}, profiles=${influencers?.length || 0}`);
     return influencers;
   }
 

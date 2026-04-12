@@ -103,15 +103,21 @@ export async function enrichSingleProfile(handle, platform) {
   const pl = platform.toLowerCase();
 
   try {
+    let result = null;
     if (pl === 'instagram') {
       const results = await enrichInstagramProfiles([cleanHandle]);
-      return results[0] || null;
-    }
-    if (pl === 'tiktok') {
+      result = results[0] || null;
+    } else if (pl === 'tiktok') {
       const results = await enrichTikTokProfiles([cleanHandle]);
-      return results[0] || null;
+      result = results[0] || null;
     }
-    return null;
+
+    // Returnera null om profilen saknar riktig data (spökprofil)
+    if (result && !result.followers && !result.bio) {
+      console.log(`[Enrichment] @${cleanHandle} (${platform}): profil tom — returnerar null`);
+      return null;
+    }
+    return result;
   } catch (err) {
     console.error(`[Enrichment] Error for @${cleanHandle} on ${platform}:`, err.message);
     return null;
@@ -458,6 +464,15 @@ function formatFollowers(count) {
  */
 function mergeEnrichment(original, enriched) {
   const followerCount = enriched.followers || original.foljare_exakt || original.followers || 0;
+
+  // Apify returnerade profilen men den kan vara tom/privat/borttagen.
+  // Verifiera bara om vi faktiskt fick meningsfull data (followers > 0 eller bio finns).
+  const hasRealData = followerCount > 0 || !!enriched.bio;
+
+  if (!hasRealData) {
+    console.log(`[Enrichment] ⚠️ Spökprofil: @${enriched.username || original.handle} returnerades av Apify men har 0 followers och ingen bio — markeras EJ som verifierad`);
+  }
+
   return {
     ...original,
     // Verifierad data överskriver
@@ -474,9 +489,9 @@ function mergeEnrichment(original, enriched) {
     posts_count: enriched.posts_count || original.posts_count,
     kontakt_info: enriched.website || original.kontakt_info,
 
-    // Meta
-    verifierad: true,
-    datakalla: `apify_${enriched.platform}`,
+    // Meta — bara verifierad om Apify hade riktig data
+    verifierad: hasRealData,
+    datakalla: hasRealData ? `apify_${enriched.platform}` : (original.datakalla || 'ai_estimated'),
     is_verified_platform: enriched.is_verified,
     is_business: enriched.is_business,
     category: enriched.category || original.category,

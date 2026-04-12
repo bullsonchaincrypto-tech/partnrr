@@ -264,27 +264,10 @@ router.post('/influencers', async (req, res) => {
     });
 
     // ============================================================
-    // FAS 4.5: Filtrera bort spökprofiler (0 följare, ej verifierade)
-    // ============================================================
-    const beforeGhost = scored.length;
-    const ghostFiltered = scored.filter(r => {
-      const followers = r.foljare_exakt || parseInt(r.foljare) || 0;
-      // Behåll om: har följare ELLER är verifierad via API (YouTube etc)
-      if (followers > 0) return true;
-      if (r.verifierad && r.datakalla === 'youtube_api') return true;
-      // 0 följare + ej API-verifierad = troligtvis spökprofil
-      console.log(`[Search] Filtrerar bort spökprofil: ${r.namn || r.kanalnamn} (${r.plattform}, 0 följare, källa: ${r.datakalla})`);
-      return false;
-    });
-    if (beforeGhost > ghostFiltered.length) {
-      console.log(`[Search] Spökfilter: ${beforeGhost} → ${ghostFiltered.length} (${beforeGhost - ghostFiltered.length} borttagna)`);
-    }
-
-    // ============================================================
     // FAS 5: Filtrera bort irrelevanta resultat (under 70% matchning)
     // ============================================================
     const MIN_SCORE = 20;
-    let finalResults = ghostFiltered.filter(r => (r.match_score || 0) >= MIN_SCORE);
+    let finalResults = scored.filter(r => (r.match_score || 0) >= MIN_SCORE);
     console.log(`[Search] Score-filter: ${scored.length} → ${finalResults.length} (≥${MIN_SCORE}%)`);
 
     // Fallback: om inga resultat klarar tröskeln, returnera topp 20 sorterade efter score

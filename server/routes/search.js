@@ -260,6 +260,7 @@ router.post('/influencers', async (req, res) => {
     const scored = await scoreAndRankInfluencers(allResults, companyProfile, {
       generateMotivations: true,
       topN: 5,
+      nischLabels: nischLabels || [],
     });
 
     // ============================================================

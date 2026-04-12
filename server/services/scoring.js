@@ -256,7 +256,7 @@ export async function generateMatchMotivation(influencer, companyProfile, scoreR
  * och ge varje en match_score (0-100) + motivation.
  * Detta ger mycket bättre resultat eftersom Claude kan tolka kontext.
  */
-async function scoreWithClaude(influencers, companyProfile) {
+async function scoreWithClaude(influencers, companyProfile, nischLabels = []) {
   const apiKey = process.env.ANTHROPIC_API_KEY;
   if (!apiKey || influencers.length === 0) return null;
 
@@ -278,6 +278,7 @@ async function scoreWithClaude(influencers, companyProfile) {
     `Bransch: ${companyProfile?.bransch || 'Ej angiven'}`,
     `Beskrivning: ${companyProfile?.beskrivning || 'Ej angiven'}`,
     companyProfile?.brief_answers?.goal ? `Mål: ${companyProfile.brief_answers.goal}` : '',
+    nischLabels.length > 0 ? `AI-identifierade nischer för detta företag: ${nischLabels.join(', ')}` : '',
   ].filter(Boolean).join('\n');
 
   const systemPrompt = `Du är en expert på influencer-marknadsföring i Sverige. Du ska bedöma hur väl varje influencer matchar ett företag.
@@ -287,7 +288,7 @@ GE VARJE INFLUENCER:
 2. motivation (1-2 meningar på svenska): Varför denna score — var specifik
 
 BEDÖMNINGSKRITERIER:
-- Nisch-relevans (viktigast): Matchar influencerns innehåll företagets bransch?
+- Nisch-relevans (viktigast): Matchar influencerns innehåll företagets bransch och AI-identifierade nischer?
 - Plattforms-passform: Rätt plattform för företagets målgrupp?
 - Autenticitet: Har profilen riktig data (followers, bio) eller bara AI-uppskattning?
 - Storlek: Lagom stora profiler (10K-500K) är ofta bättre för konvertering
@@ -357,12 +358,12 @@ Bedöm VARJE influencer. Svara med ENBART JSON-array:`;
  * PRIMÄR: Claude Sonnet tolkar alla resultat och ger match_score (Steg 6)
  * FALLBACK: Algoritmisk scoring (viktat AI 55% + nisch 45%)
  */
-export async function scoreAndRankInfluencers(influencers, companyProfile, { generateMotivations = true, topN = 5 } = {}) {
+export async function scoreAndRankInfluencers(influencers, companyProfile, { generateMotivations = true, topN = 5, nischLabels = [] } = {}) {
   // 1. Filter
   const filtered = await filterInfluencers(influencers, companyProfile);
 
   // 2. Försök Claude Sonnet scoring (primär)
-  const claudeScores = await scoreWithClaude(filtered, companyProfile);
+  const claudeScores = await scoreWithClaude(filtered, companyProfile, nischLabels);
 
   let scored;
 

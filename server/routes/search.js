@@ -506,7 +506,6 @@ async function searchYouTube(foretag, nischLabels) {
   const channels = await searchYouTubeChannels(searchQueries, 10);
 
   return channels
-    .filter(ch => ch.foljare_exakt >= 1000)
     .map(ch => ({
       name: ch.namn,
       handle: ch.kanalnamn,

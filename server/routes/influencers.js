@@ -62,9 +62,8 @@ router.post('/find', async (req, res) => {
     console.log(`[Partnrr] Steg 2: Hämtar verifierad data från YouTube Data API v3...`);
     const allChannels = await searchYouTubeChannels(searchQueries, 10);
 
-    // Filtrera bort kanaler under 1000 prenumeranter
-    const filtered = allChannels.filter(ch => ch.foljare_exakt >= 1000);
-    console.log(`[Partnrr] ${allChannels.length} kanaler hittade, ${filtered.length} har 1000+ prenumeranter`);
+    const filtered = allChannels;
+    console.log(`[Partnrr] ${allChannels.length} kanaler hittade`);
 
     // Sortera: nisch-relevans baserat på VALDA nischer, sedan följare
     // Bygg relevans-nyckelord från valda nisch-ID:n

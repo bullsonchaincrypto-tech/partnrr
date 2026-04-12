@@ -15,12 +15,14 @@ router.get('/prospects/:foretagId', async (req, res) => {
 // AI: Find sponsor prospects
 router.post('/prospects/find', async (req, res) => {
   try {
-    const { foretagId } = req.body;
+    const { foretagId, exclude_names } = req.body;
     const foretag = await queryOne('SELECT * FROM foretag WHERE id = ?', [foretagId]);
     if (!foretag) return res.status(404).json({ error: 'Foretag hittades inte' });
 
+    const isAppend = exclude_names?.length > 0;
+
     // Steg 1: Sök Google Maps efter riktiga företag
-    console.log(`[Sponsors] Söker Google Maps för "${foretag.namn}"...`);
+    console.log(`[Sponsors] Söker Google Maps för "${foretag.namn}"...${isAppend ? ` (exkluderar ${exclude_names.length} redan hittade)` : ''}`);
     let googleMapsResults = [];
     try {
       googleMapsResults = await findSponsorsViaGoogleMaps(foretag.namn, foretag.beskrivning);
@@ -30,13 +32,24 @@ router.post('/prospects/find', async (req, res) => {
     }
 
     // Steg 2: Claude rankar och filtrerar (med Google Maps-data som underlag)
-    const prospects = await findSponsorProspects(foretag.namn, foretag.bransch, foretag.beskrivning, googleMapsResults);
+    const prospects = await findSponsorProspects(foretag.namn, foretag.bransch, foretag.beskrivning, googleMapsResults, exclude_names || []);
 
-    await runSql('DELETE FROM sponsor_prospects WHERE foretag_id = ?', [foretagId]);
+    // Vid "Hitta fler" — radera INTE befintliga prospects, bara lägg till nya
+    if (!isAppend) {
+      await runSql('DELETE FROM sponsor_prospects WHERE foretag_id = ?', [foretagId]);
+    }
 
-    // Filtrera bort prospects utan namn (krävs av NOT NULL constraint)
-    const validProspects = prospects.filter(p => p.namn && p.namn.trim());
-    console.log(`[Sponsors] ${validProspects.length}/${prospects.length} prospects har giltigt namn`);
+    // Filtrera bort prospects utan namn + redan befintliga (vid append)
+    let validProspects = prospects.filter(p => p.namn && p.namn.trim());
+    if (isAppend) {
+      const existingSet = new Set(exclude_names.map(n => n.toLowerCase()));
+      const before = validProspects.length;
+      validProspects = validProspects.filter(p => !existingSet.has(p.namn.trim().toLowerCase()));
+      if (before > validProspects.length) {
+        console.log(`[Sponsors] Dedup: ${before} → ${validProspects.length} (${before - validProspects.length} dubbletter borttagna)`);
+      }
+    }
+    console.log(`[Sponsors] ${validProspects.length} nya prospects att spara`);
 
     for (const p of validProspects) {
       await runSql(

@@ -490,7 +490,7 @@ Ge 3-5 konkreta förbättringsförslag på svenska.`;
   return await callClaude(system, prompt);
 }
 
-export async function findSponsorProspects(foretagNamn, bransch, beskrivning, googleMapsResults = []) {
+export async function findSponsorProspects(foretagNamn, bransch, beskrivning, googleMapsResults = [], excludeNames = []) {
   const system = `Du är en expert på svenska företag och sponsorpartnerskap.
 Du ska alltid svara med giltig JSON, inget annat.`;
 
@@ -513,13 +513,17 @@ För varje företag från Google Maps, behåll deras riktiga kontaktuppgifter (h
 Gissa e-post baserat på domännamnet (t.ex. info@foretag.se).`;
   }
 
+  const excludeSection = excludeNames.length > 0
+    ? `\nREDAN HITTADE FÖRETAG (EXKLUDERA DESSA — föreslå INTE dessa igen):\n${excludeNames.map(n => `  - ${n}`).join('\n')}\n`
+    : '';
+
   const prompt = `Hitta 25 svenska företag som passar som kampanjsponsorer för ${companyContext}.
 
 Basera dina förslag på vad företaget FAKTISKT gör — hitta sponsorer vars målgrupp matchar.
 ${beskrivning ? `Företagets beskrivning: "${beskrivning}"` : ''}
 ${mapsContext}
-
-Tänk på företag inom: sportrelaterade varumärken, energidrycker, sportappar, betting/odds, tech, lifestyle, kläder — men BARA om de är relevanta för företagets nisch.
+${excludeSection}
+${excludeNames.length > 0 ? 'VIKTIGT: Föreslå ENBART NYA företag som INTE finns i listan "REDAN HITTADE" ovan. Hitta andra relevanta företag.\n' : ''}Tänk på företag inom: sportrelaterade varumärken, energidrycker, sportappar, betting/odds, tech, lifestyle, kläder — men BARA om de är relevanta för företagets nisch.
 
 Returnera en JSON-array med exakt detta format:
 [

@@ -181,7 +181,11 @@ export default function Step2HittaInfluencers({ foretag, outreachType, influence
     setError('')
     try {
       if (isSponsor) {
-        const prospects = await api.findSponsorProspects(foretag.id)
+        // Vid "Hitta fler" — skicka med redan hittade företagsnamn
+        const excludeNames = append
+          ? influencers.map(i => (i.namn || '').toLowerCase()).filter(Boolean)
+          : []
+        const prospects = await api.findSponsorProspects(foretag.id, excludeNames.length > 0 ? excludeNames : undefined)
         const saved = await api.getSponsorProspects(foretag.id)
         const mapped = saved.map(p => ({
           ...p,

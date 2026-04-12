@@ -104,7 +104,7 @@ export const pauseFollowupSequence = (id, paused) => request(`/followup-sequence
 
 // Sponsors
 export const getSponsorProspects = (foretagId) => request(`/sponsors/prospects/${foretagId}`);
-export const findSponsorProspects = (foretagId) => request('/sponsors/prospects/find', { method: 'POST', body: JSON.stringify({ foretagId }) });
+export const findSponsorProspects = (foretagId, exclude_names) => request('/sponsors/prospects/find', { method: 'POST', body: JSON.stringify({ foretagId, exclude_names }) });
 export const toggleSponsorProspect = (id) => request(`/sponsors/prospects/${id}/toggle`, { method: 'PUT' });
 export const selectAllProspects = (foretagId, selected) => request(`/sponsors/prospects/${foretagId}/select-all`, { method: 'PUT', body: JSON.stringify({ selected }) });
 export const bulkSaveSponsorProspects = (foretagId, prospects) => request('/sponsors/prospects/bulk-save', { method: 'POST', body: JSON.stringify({ foretag_id: foretagId, prospects }) });

@@ -143,7 +143,7 @@ router.get('/roi/timeline', async (req, res) => {
     // Per månad: hur mycket spenderat, hur många signups
     const monthly = await queryAll(`
       SELECT
-        strftime('%Y-%m', k.activated_at) as manad,
+        TO_CHAR(k.activated_at, 'YYYY-MM') as manad,
         COUNT(DISTINCT k.id) as antal_kontrakt,
         COUNT(DISTINCT k.influencer_id) as antal_influencers,
         SUM(k.videos_delivered) as videos,
@@ -152,7 +152,7 @@ router.get('/roi/timeline', async (req, res) => {
       FROM kontrakt k
       WHERE k.activated_at IS NOT NULL
         AND k.status IN ('aktivt', 'utgånget', 'avslutat', 'signerat')
-      GROUP BY strftime('%Y-%m', k.activated_at)
+      GROUP BY TO_CHAR(k.activated_at, 'YYYY-MM')
       ORDER BY manad ASC
     `);
 
@@ -305,25 +305,25 @@ router.get('/roi/profit-trend', async (req, res) => {
     // Kostnader per månad (baserat på kontrakt activated_at)
     const monthlyCosts = await queryAll(`
       SELECT
-        strftime('%Y-%m', k.activated_at) as manad,
+        TO_CHAR(k.activated_at, 'YYYY-MM') as manad,
         SUM(k.videos_delivered * 300 + k.total_signups * 10) as kostnad,
         SUM(k.total_signups) as signups,
         COUNT(DISTINCT k.id) as kontrakt
       FROM kontrakt k
       WHERE k.activated_at IS NOT NULL
         AND k.status IN ('aktivt', 'utgånget', 'avslutat', 'signerat')
-      GROUP BY strftime('%Y-%m', k.activated_at)
+      GROUP BY TO_CHAR(k.activated_at, 'YYYY-MM')
     `);
 
     // Intäkter per månad (baserat på avtalsdatum)
     const monthlyRevenue = await queryAll(`
       SELECT
-        strftime('%Y-%m', avtalsdatum) as manad,
+        TO_CHAR(avtalsdatum, 'YYYY-MM') as manad,
         SUM(belopp_sek) as intakt,
         SUM(CASE WHEN betald = 1 THEN belopp_sek ELSE 0 END) as inbetalt
       FROM intakter
       WHERE status != 'makulerad' AND avtalsdatum IS NOT NULL
-      GROUP BY strftime('%Y-%m', avtalsdatum)
+      GROUP BY TO_CHAR(avtalsdatum, 'YYYY-MM')
     `);
 
     // Merge månader

@@ -480,7 +480,7 @@ export default function Step2HittaInfluencers({ foretag, outreachType, influence
                 <p>2. Söker på: <span className="text-purple-400">{selectedPlatforms.map(p => PLATTFORMAR.find(x => x.id === p)?.label).join(', ')}</span></p>
                 {selectedPlatforms.includes('youtube') && <p>3. YouTube Data API v3 hämtar verifierad kanaldata</p>}
                 {selectedPlatforms.some(p => p !== 'youtube') && <p>4. SerpAPI + Apify verifierar Instagram/TikTok-profiler</p>}
-                <p>5. AI rankar och samlar kontaktinformation</p>
+                <p>5. AI rankar resultat och söker e-postadresser via SerpAPI</p>
               </>
             )}
           </div>

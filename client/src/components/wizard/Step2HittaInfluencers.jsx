@@ -167,7 +167,7 @@ export default function Step2HittaInfluencers({ foretag, outreachType, influence
     }
   }
 
-  const handleFind = async () => {
+  const handleFind = async ({ append = false } = {}) => {
     if (!foretag?.id) {
       setError('Företagsprofil saknas. Gå tillbaka till Steg 1.')
       return
@@ -205,13 +205,18 @@ export default function Step2HittaInfluencers({ foretag, outreachType, influence
           viewCount: 0,
           _isSponsor: true,
         }))
-        // Utöka listan istället för att ersätta — deduplicera baserat på namn
-        setInfluencers(prev => {
-          const existingNames = new Set(prev.map(i => i.namn?.toLowerCase()))
-          const newResults = mapped.filter(r => !existingNames.has(r.namn?.toLowerCase()))
-          if (newResults.length === 0) return prev
-          return [...prev, ...newResults]
-        })
+        if (append) {
+          // "Hitta fler" — append utan att ta bort befintliga
+          setInfluencers(prev => {
+            const existingNames = new Set(prev.map(i => i.namn?.toLowerCase()))
+            const newResults = mapped.filter(r => !existingNames.has(r.namn?.toLowerCase()))
+            if (newResults.length === 0) return prev
+            return [...prev, ...newResults]
+          })
+        } else {
+          // Ny sökning — ersätt alla
+          setInfluencers(mapped)
+        }
       } else {
         // ─── PRIMÄR: Phyllo + YouTube pipeline (verifierad data) ───
         let pipelineWorked = false
@@ -237,14 +242,19 @@ export default function Step2HittaInfluencers({ foretag, outreachType, influence
               vald: inf.vald || 0,
             }))
             results.sort((a, b) => (b.match_score || 0) - (a.match_score || 0))
-            // Append till befintliga resultat istället för att ersätta
-            setInfluencers(prev => {
-              if (prev.length === 0) return results
-              const existingKeys = new Set(prev.map(i => `${(i.kanalnamn || i.namn || '').toLowerCase()}_${(i.plattform || '').toLowerCase()}`))
-              const newResults = results.filter(r => !existingKeys.has(`${(r.kanalnamn || r.namn || '').toLowerCase()}_${(r.plattform || '').toLowerCase()}`))
-              if (newResults.length === 0) return prev
-              return [...prev, ...newResults]
-            })
+            if (append) {
+              // "Hitta fler" — append utan att ta bort befintliga (dedup)
+              setInfluencers(prev => {
+                if (prev.length === 0) return results
+                const existingKeys = new Set(prev.map(i => `${(i.kanalnamn || i.namn || '').toLowerCase()}_${(i.plattform || '').toLowerCase()}`))
+                const newResults = results.filter(r => !existingKeys.has(`${(r.kanalnamn || r.namn || '').toLowerCase()}_${(r.plattform || '').toLowerCase()}`))
+                if (newResults.length === 0) return prev
+                return [...prev, ...newResults]
+              })
+            } else {
+              // Ny sökning — ersätt alla pipeline-resultat (behåll manuellt sökta)
+              setInfluencers(results)
+            }
             const isAIPowered = !!(searchResult.sources?.ai_web_search)
             setSearchMeta({
               sources: searchResult.sources || {},
@@ -525,7 +535,7 @@ export default function Step2HittaInfluencers({ foretag, outreachType, influence
           {/* Hitta fler-knapp */}
           {!loading && (
             <button
-              onClick={handleFind}
+              onClick={() => handleFind({ append: true })}
               className={`w-full flex items-center justify-center gap-2 py-2.5 rounded-lg border text-sm font-medium transition-all ${
                 isSponsor
                   ? 'border-blue-500/40 text-blue-400 hover:bg-blue-500/10'
@@ -895,7 +905,7 @@ export default function Step2HittaInfluencers({ foretag, outreachType, influence
           {isSponsor && influencers.length > 0 && (
             <div className="mt-3 flex justify-center">
               <button
-                onClick={handleFind}
+                onClick={() => handleFind({ append: true })}
                 disabled={loading}
                 className="flex items-center gap-2 text-sm text-blue-400 hover:text-blue-300 px-4 py-2 rounded-lg border border-blue-500/30 hover:border-blue-500/50 bg-blue-500/5 hover:bg-blue-500/10 transition-colors disabled:opacity-50"
               >

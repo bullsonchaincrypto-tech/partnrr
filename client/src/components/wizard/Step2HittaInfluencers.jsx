@@ -313,26 +313,40 @@ export default function Step2HittaInfluencers({ foretag, outreachType, influence
       return
     }
     try {
-      const visibleIds = new Set(displayList.map(i => i.id))
-      const toggleFn = isSponsor ? api.toggleSponsorProspect : api.toggleInfluencer
-      const togglePromises = displayList
-        .filter(i => (val ? !i.vald : i.vald))
-        .map(i => toggleFn(i.id))
-      const results = await Promise.all(togglePromises)
-      setInfluencers((prev) => prev.map(i => {
-        if (!visibleIds.has(i.id)) return i
-        if (isSponsor) {
-          const updated = results.find(r => r.id === i.id)
-          return { ...i, vald: updated?.vald ?? (val ? 1 : 0) }
+      // Använd bulk-API istället för enskilda toggles
+      if (isSponsor && foretag?.id) {
+        const results = await api.selectAllProspects(foretag.id, val)
+        // results är en array med alla prospects
+        if (Array.isArray(results)) {
+          setInfluencers(prev => prev.map(i => {
+            const updated = results.find(r => r.id === i.id)
+            return updated ? { ...i, vald: updated.vald } : { ...i, vald: val ? 1 : 0 }
+          }))
+        } else {
+          // Fallback: uppdatera lokalt
+          setInfluencers(prev => prev.map(i => ({ ...i, vald: val ? 1 : 0 })))
         }
-        const updated = results.find(r => r.id === i.id)
-        if (updated) {
-          return { ...i, ...updated, kontakt_epost: i.kontakt_epost || updated.kontakt_epost, foljare_exakt: i.foljare_exakt, thumbnail: i.thumbnail, beskrivning: i.beskrivning, datakalla: i.datakalla, verifierad: i.verifierad, videoCount: i.videoCount, viewCount: i.viewCount }
+      } else if (foretag?.id) {
+        const results = await api.selectAllInfluencers(foretag.id, val)
+        if (Array.isArray(results)) {
+          setInfluencers(prev => prev.map(i => {
+            const updated = results.find(r => r.id === i.id)
+            if (updated) {
+              return { ...i, ...updated, kontakt_epost: i.kontakt_epost || updated.kontakt_epost, foljare_exakt: i.foljare_exakt, thumbnail: i.thumbnail, beskrivning: i.beskrivning, datakalla: i.datakalla, verifierad: i.verifierad, videoCount: i.videoCount, viewCount: i.viewCount }
+            }
+            return { ...i, vald: val ? 1 : 0 }
+          }))
+        } else {
+          setInfluencers(prev => prev.map(i => ({ ...i, vald: val ? 1 : 0 })))
         }
-        return { ...i, vald: val ? 1 : 0 }
-      }))
+      } else {
+        // Ingen foretag.id — fallback till lokal toggle
+        setInfluencers(prev => prev.map(i => ({ ...i, vald: val ? 1 : 0 })))
+      }
     } catch (err) {
       console.error(err)
+      // Vid fel — uppdatera ändå lokalt så UI:t matchar
+      setInfluencers(prev => prev.map(i => ({ ...i, vald: val ? 1 : 0 })))
     }
   }
 

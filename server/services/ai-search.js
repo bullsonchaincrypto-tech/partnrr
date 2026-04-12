@@ -431,7 +431,7 @@ Generera optimala söktermer. Svara med ENBART JSON:
 // INFLUENCER-SÖKNING: Multi-engine SerpAPI → Sonnet
 // ============================================================
 
-export async function searchInfluencersAI({ companyName, industry, nischer, platforms, budget, audience_age, goal, previousCollabs, beskrivning, erbjudande_typ, syfte, apifyDiscoveryData }) {
+export async function searchInfluencersAI({ companyName, industry, nischer, platforms, budget, audience_age, goal, previousCollabs, beskrivning, erbjudande_typ, syfte, apifyDiscoveryData, excludeHandles = [] }) {
   const platformStr = (platforms || ['youtube']).join(', ');
   const nischStr = (nischer || []).join(', ');
 
@@ -512,17 +512,21 @@ VIKTIGT OM DATA:
 
 Svara med ENBART en JSON-array, inget annat.`;
 
+    const excludeSection = excludeHandles.length > 0
+      ? `\nREDAN HITTADE (EXKLUDERA DESSA — inkludera INTE dessa eller varianter av deras handles):\n${excludeHandles.map(h => `  - @${h}`).join('\n')}\n`
+      : '';
+
     const userMessage = `FÖRETAG: ${companyName}
 BESKRIVNING: ${beskrivning || 'Ej angiven'}
 BRANSCH: ${industry || nischStr || 'gaming'}
 PLATTFORMAR: ${platformStr}
 ${budget ? `BUDGET: ${budget}` : ''}
 ${goal ? `MÅL: ${goal}` : ''}
-
+${excludeSection}
 ${condensed}
 
 Baserat på resultaten ovan, extrahera upp till 20 SVENSKA influencers.
-VIKTIGT: Inkludera BARA profiler som skapar innehåll PÅ SVENSKA eller riktar sig till en SVENSK publik.
+${excludeHandles.length > 0 ? 'VIKTIGT: Exkludera ALLA profiler listade ovan under "REDAN HITTADE". Hitta NYA profiler som INTE finns i den listan. Inkludera inte heller varianter av deras kanalnamn (t.ex. om @wettersol redan finns, inkludera inte @wettersolab).\n' : ''}VIKTIGT: Inkludera BARA profiler som skapar innehåll PÅ SVENSKA eller riktar sig till en SVENSK publik.
 Uteslut internationella/engelskspråkiga profiler även om de är relevanta ämnesvis.
 Returnera JSON-array:
 [
@@ -569,13 +573,17 @@ STRIKT MATCHNINGSKRAV:
 
 Svara med ENBART en JSON-array — ingen annan text.`;
 
+  const fallbackExclude = excludeHandles.length > 0
+    ? `\nREDAN HITTADE (EXKLUDERA):\n${excludeHandles.map(h => `  - @${h}`).join('\n')}\n`
+    : '';
+
   const fallbackUserMessage = `FÖRETAG: ${companyName}
 BESKRIVNING: ${beskrivning || 'Ej angiven'}
 BRANSCH: ${industry || nischStr || 'gaming'}
 PLATTFORMAR: ${platformStr}
-
+${fallbackExclude}
 Sök webben och hitta upp till 20 SVENSKA influencers som passar detta företag.
-VIKTIGT: Inkludera BARA profiler som skapar innehåll PÅ SVENSKA eller riktar sig till en SVENSK publik.
+${excludeHandles.length > 0 ? 'VIKTIGT: Hitta NYA profiler — exkludera alla listade under "REDAN HITTADE" och varianter av deras kanalnamn.\n' : ''}VIKTIGT: Inkludera BARA profiler som skapar innehåll PÅ SVENSKA eller riktar sig till en SVENSK publik.
 Uteslut internationella/engelskspråkiga profiler.
 Returnera JSON-array:
 [

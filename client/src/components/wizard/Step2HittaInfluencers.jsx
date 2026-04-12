@@ -227,12 +227,16 @@ export default function Step2HittaInfluencers({ foretag, outreachType, influence
         } catch { /* OK */ }
 
         try {
-          console.log('[Steg2] Primär sökning: Phyllo + YouTube pipeline...')
+          // Vid "Hitta fler" — skicka med befintliga handles så AI:n inte genererar dubbletter
+          const excludeHandles = append
+            ? influencers.map(i => (i.kanalnamn || i.namn || '').toLowerCase()).filter(Boolean)
+            : []
+          console.log(`[Steg2] ${append ? 'Hitta fler' : 'Primär'} sökning: Phyllo + YouTube pipeline...${excludeHandles.length ? ` (exkluderar ${excludeHandles.length} befintliga)` : ''}`)
           const searchResult = await api.searchInfluencers(foretag.id, selectedPlatforms, {
             min_followers: 1000,
             min_engagement: briefAnswers.min_engagement || null,
             max_price: briefAnswers.budget ? parseInt(briefAnswers.budget) : null,
-          })
+          }, excludeHandles.length > 0 ? excludeHandles : undefined)
 
           if (searchResult.results?.length > 0) {
             const results = searchResult.results.map(inf => ({

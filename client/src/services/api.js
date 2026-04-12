@@ -259,7 +259,7 @@ export const getBriefQuestions = (enrichment_data, bransch, outreach_type) => re
 export const saveCompanyProfile = (id, data) => request(`/foretag/${id}/profile`, { method: 'PUT', body: JSON.stringify(data) });
 
 // Intelligent sökning
-export const searchInfluencers = (company_profile_id, platforms, filters) => request('/search/influencers', { method: 'POST', body: JSON.stringify({ company_profile_id, platforms, filters }) });
+export const searchInfluencers = (company_profile_id, platforms, filters, exclude_handles) => request('/search/influencers', { method: 'POST', body: JSON.stringify({ company_profile_id, platforms, filters, exclude_handles }) });
 export const filterSearchResults = (data) => request('/search/influencers/filter', { method: 'POST', body: JSON.stringify(data) });
 export const getInfluencerProfile = (id) => request(`/search/influencer/${id}/profile`);
 export const searchInfluencerDirect = (query, foretagId) => request('/influencers/search-direct', { method: 'POST', body: JSON.stringify({ query, foretagId }) });

@@ -23,7 +23,7 @@ const router = Router();
  */
 router.post('/influencers', async (req, res) => {
   try {
-    const { company_profile_id, platforms, filters } = req.body;
+    const { company_profile_id, platforms, filters, exclude_handles } = req.body;
 
     const foretag = await queryOne('SELECT * FROM foretag WHERE id = ?', [Number(company_profile_id)]);
     if (!foretag) return res.status(404).json({ error: 'Företag hittades inte' });
@@ -148,7 +148,8 @@ router.post('/influencers', async (req, res) => {
           syfte: foretag.syfte || null,
           nischer: nischLabels,
           platforms: nonYoutubePlatforms,
-          apifyDiscoveryData, // ← NY: skicka Apify-data till Claude
+          apifyDiscoveryData,
+          excludeHandles: exclude_handles || [],
         });
         if (aiInfluencers?.length > 0) {
           // Normalisera AI-resultat till samma format som pipeline

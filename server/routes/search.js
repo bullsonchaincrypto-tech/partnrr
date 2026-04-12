@@ -6,7 +6,7 @@ import { findEmailsForChannels } from '../services/email-finder.js';
 import { searchSponsors, searchContacts, isApolloConfigured } from '../services/apollo.js';
 import { enrichInfluencers, enrichSingleProfile, isApifyConfigured } from '../services/social-enrichment.js';
 import { scoreAndRankInfluencers, scoreInfluencer } from '../services/scoring.js';
-import { searchInfluencersAI } from '../services/ai-search.js';
+import { searchInfluencersAI, generateNischKeywords } from '../services/ai-search.js';
 
 const router = Router();
 
@@ -40,7 +40,20 @@ router.post('/influencers', async (req, res) => {
     companyProfile.beskrivning = foretag.beskrivning || '';
 
     const selectedPlatforms = platforms || ['youtube'];
-    const nischLabels = getNischLabels(foretag.bransch, foretag.beskrivning);
+
+    // Steg 0: Hämta nisch-labels — AI-genererade om möjligt, annars statiska
+    let nischLabels = getNischLabels(foretag.bransch, foretag.beskrivning);
+    try {
+      if (foretag.beskrivning) {
+        const aiLabels = await generateNischKeywords(foretag.beskrivning, foretag.namn);
+        if (aiLabels.length > 0) {
+          nischLabels = aiLabels;
+          console.log(`[Search] AI-genererade nisch-labels: ${aiLabels.join(', ')}`);
+        }
+      }
+    } catch (err) {
+      console.warn(`[Search] AI nisch-generering misslyckades, använder statiska: ${err.message}`);
+    }
 
     console.log(`[Search] Söker influencers för ${foretag.namn} på ${selectedPlatforms.join(', ')}`);
     console.log(`[Search] Nischer: ${nischLabels.join(', ')}`);

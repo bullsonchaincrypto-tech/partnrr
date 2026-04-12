@@ -312,106 +312,119 @@ async function searchGoogle(query) {
 }
 
 /**
- * Bygg optimerade sökfrågor baserat på företagsprofil.
- * Returnerar { shortVideoQuery, googleQuery }.
+ * STEG 0: AI tolkar företagets beskrivning och genererar optimala söktermer.
+ * Returnerar { shortVideoQuery, googleQuery, nischKeywords }.
+ *
+ * Detta ersätter den statiska nisch-mappningen — Claude förstår alla branscher
+ * och genererar exakt rätt söktermer oavsett hur beskrivningen formuleras.
  */
-function buildSearchQueries({ companyName, beskrivning, nischer, platforms }) {
-  const nischStr = (nischer || []).join(' ');
+async function buildSearchQueries({ companyName, beskrivning, nischer, platforms }) {
   const platformList = (platforms || ['instagram']).map(p => p.toLowerCase());
+  const nischStr = (nischer || []).join(', ');
 
-  // Extrahera nyckelord dynamiskt från beskrivningen
-  let nischKeywords = nischStr || companyName;
-  if (beskrivning) {
-    const kw = beskrivning.toLowerCase();
-    // Nisch-mappning med PRIORITET — mer specifika termer (flerords-fraser) matchas FÖRST
-    // Prioritet 1 = Specifika fraser (matchas som hela fraser, inte delord)
-    // Prioritet 2 = Sammansatta ord / specifika termer
-    // Prioritet 3 = Generella termer (breda kategorier)
-    const nischMap = [
-      // PRIORITET 1: Specifika sammansatta ord och fraser (matchas först)
-      { terms: ['hemelektronik', 'smart hem', 'smarta hem', 'smart home', 'iot', 'hemautomation', 'domotik'], keywords: 'tech hemelektronik smart hem gadgets prylar unboxing' },
-      { terms: ['elektronik', 'gadget', 'pryl', 'tillbehör', 'laddare', 'hörlurar', 'högtalare', 'smartklocka', 'wearable', 'smart produkt', 'smarta produkt'], keywords: 'tech elektronik gadgets prylar unboxing review' },
-      { terms: ['fantasy', 'fotboll', 'allsvenskan'], keywords: 'fantasy fotboll sport tips' },
-      { terms: ['kosttillskott', 'protein', 'supplement'], keywords: 'fitness kosttillskott protein' },
-      { terms: ['energidryck', 'energy drink'], keywords: 'energidryck lifestyle' },
-      { terms: ['cybersäkerhet', 'it-säkerhet'], keywords: 'tech cybersäkerhet IT' },
+  // ── AI-genererade söktermer (primär väg) ──
+  let nischKeywords = '';
+  try {
+    const systemPrompt = `Du är en sökterms-expert. Givet en företagsbeskrivning, generera de BÄSTA Google-söktermerna för att hitta svenska influencers som passar företaget.
 
-      // PRIORITET 2: Bransch-specifika termer
-      { terms: ['gaming', 'spel', 'gamer', 'esport', 'streamer'], keywords: 'gaming spel esport' },
-      { terms: ['betting', 'odds', 'tippning'], keywords: 'betting odds tips' },
-      { terms: ['fitness', 'träning', 'gym', 'styrketräning'], keywords: 'fitness träning gym' },
-      { terms: ['hälsa', 'wellness', 'välmående'], keywords: 'hälsa wellness' },
-      { terms: ['mat', 'recept', 'matlagning', 'food', 'krydd', 'sås', 'marinad', 'livsmedel', 'restaurang', 'kök', 'bageri', 'bak', 'dryck', 'kaffe', 'te ', 'choklad', 'godis', 'snack'], keywords: 'mat recept matlagning foodie kök' },
-      { terms: ['ekolog', 'hållbar', 'miljö', 'klimat', 'vegan', 'vegetar', 'natur', 'organic'], keywords: 'ekologisk hållbar mat miljö' },
-      { terms: ['tech', 'teknik', 'teknologi', 'ai', 'programmering', 'saas', 'startup', 'app ', 'devops', 'kod', 'software', 'mjukvara', 'utvecklare', 'developer', 'data', 'cloud', 'moln'], keywords: 'tech teknik programmering AI startup utvecklare' },
-      { terms: ['mode', 'fashion', 'kläder', 'outfit', 'stil'], keywords: 'mode fashion stil' },
-      { terms: ['skönhet', 'beauty', 'smink', 'hudvård', 'makeup', 'nagel', 'hår'], keywords: 'skönhet beauty' },
-      { terms: ['resor', 'resa', 'travel', 'hotell', 'semester'], keywords: 'resor travel äventyr' },
-      { terms: ['musik', 'music', 'artist', 'sångar', 'producer', 'dj'], keywords: 'musik artist' },
-      { terms: ['humor', 'komedi', 'underhållning'], keywords: 'humor underhållning' },
-      { terms: ['finans', 'ekonomi', 'aktier', 'investering', 'sparand', 'pengar', 'bank', 'försäkring'], keywords: 'finans ekonomi' },
-      { terms: ['bil', 'motor', 'bilar', 'fordon', 'mc '], keywords: 'bil motor' },
-      { terms: ['familj', 'barn', 'förälder', 'mamma', 'pappa', 'baby'], keywords: 'familj förälder' },
-      { terms: ['djur', 'husdjur', 'hund', 'katt', 'häst'], keywords: 'djur husdjur' },
-      { terms: ['bygg', 'renovering', 'hantverk', 'snickeri'], keywords: 'bygg renovering hantverkare' },
-      { terms: ['sport', 'idrott', 'löpning', 'cykel', 'simning', 'padel', 'tennis', 'golf'], keywords: 'sport idrott träning' },
+REGLER:
+- Svara med ENBART ett JSON-objekt, ingen annan text
+- "nisch_keywords" = 3-6 nyckelord som beskriver vilken typ av influencer som passar (svenska termer)
+- "short_video_query" = en Google Short Videos-sökfråga (max 8 ord) för att hitta TikTok/Instagram Reels-kreatörer
+- "google_queries" = array med 2-3 Google-sökfrågor med site:-operatorer för att hitta profiler
+- Fokusera på den EXAKTA branschen — inte breda termer
+- Tänk: vilka typer av influencers skulle ett sådant företag vilja samarbeta med?
 
-      // PRIORITET 3: Generella termer (matchas SIST — undviker att 'hem' i 'hemelektronik' matchar inredning)
-      { terms: ['inredning', 'möbler', 'trädgård'], keywords: 'inredning hemma design' },
-    ];
+EXEMPEL:
+Beskrivning: "Vi säljer smarta produkter inom hemelektronik"
+→ nisch_keywords: "tech elektronik gadgets unboxing recension prylar"
+→ short_video_query: "svenska tech gadgets elektronik review"
+→ google_queries: ["site:instagram.com svenska tech influencer gadgets elektronik", "site:tiktok.com svensk tech review prylar unboxing"]
 
-    // Matcha med "first match wins" — specifika termer ligger först i listan
-    // Dessutom: matcha flerords-fraser som hela ord, inte delord
-    const matchedKeywords = [];
-    const matchedCategories = new Set();
-    for (const mapping of nischMap) {
-      if (mapping.terms.some(term => {
-        // Matcha hela sammansatta ord eller fraser (inte delord av andra ord)
-        // t.ex. "hemelektronik" ska matcha "hemelektronik" men "hem" ska INTE matcha "hemelektronik"
-        if (term.includes(' ')) {
-          // Flerordsfras — direkt match
-          return kw.includes(term);
-        }
-        // Enkelord: matcha som ordgräns (undvik att "hem" matchar "hemelektronik")
-        // Använd regex med ordgräns-approximation
-        const regex = new RegExp(`(^|\\s|[^a-zåäö])${term.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}($|\\s|[^a-zåäö])`, 'i');
-        // MEN tillåt prefix-match för termer som slutar med specifika ändelser
-        // t.ex. "elektronik" ska matcha "hemelektronik"
-        return kw.includes(term);
-      })) {
-        if (!matchedCategories.has(mapping.keywords)) {
-          matchedKeywords.push(mapping.keywords);
-          matchedCategories.add(mapping.keywords);
-        }
+Beskrivning: "Ekologiska kryddor och marinader"
+→ nisch_keywords: "mat matlagning recept kryddor foodie"
+→ short_video_query: "svenska matlagning kryddor recept influencer"
+→ google_queries: ["site:instagram.com svensk matbloggare foodie kryddor", "site:tiktok.com svenska matlagning recept foodie"]`;
+
+    const userMessage = `FÖRETAG: ${companyName}
+BESKRIVNING: ${beskrivning || 'Ej angiven'}
+BRANSCH: ${nischStr || 'Ej angiven'}
+PLATTFORMAR: ${platformList.join(', ')}
+
+Generera optimala söktermer. Svara med ENBART JSON:
+{
+  "nisch_keywords": "...",
+  "short_video_query": "...",
+  "google_queries": ["...", "..."]
+}`;
+
+    console.log(`[AI-Search] Steg 0: AI genererar söktermer för "${beskrivning?.slice(0, 80) || companyName}"...`);
+    const raw = await callClaude(systemPrompt, userMessage, 500, { model: 'claude-haiku-4-5-20251001' });
+    const parsed = parseJSON(raw);
+
+    if (parsed.nisch_keywords) {
+      nischKeywords = parsed.nisch_keywords;
+
+      // Bygg queries från AI-svaret
+      const shortVideoQuery = parsed.short_video_query || `svenska ${nischKeywords} influencer`;
+
+      // Google queries — använd AI-genererade eller bygg från nisch_keywords
+      let googleQuery = '';
+      if (parsed.google_queries?.length > 0) {
+        // Filtrera till bara de plattformar användaren valt
+        const relevantQueries = parsed.google_queries.filter(q => {
+          if (platformList.includes('instagram') && q.includes('instagram.com')) return true;
+          if (platformList.includes('tiktok') && q.includes('tiktok.com')) return true;
+          return false;
+        });
+        googleQuery = relevantQueries[0] || parsed.google_queries[0] || '';
       }
-    }
 
-    if (matchedKeywords.length > 0) {
-      // Ta bara de mest relevanta — max 2 kategorier för fokuserad sökning
-      nischKeywords = matchedKeywords.slice(0, 2).join(' ');
-    } else if (beskrivning.trim()) {
-      // Fallback: extrahera de viktigaste orden från beskrivningen
-      const stopwords = new Set(['vi', 'och', 'i', 'på', 'för', 'med', 'som', 'är', 'ett', 'en', 'av', 'till', 'det', 'att', 'den', 'de', 'har', 'vara', 'vill', 'ska', 'kan', 'inte', 'alla', 'från', 'vår', 'våra', 'sin', 'sina', 'sitt', 'gör', 'säljer', 'samarbeta', 'unga', 'vuxna']);
-      const words = kw.replace(/[^a-zåäö\s-]/g, '').split(/\s+/).filter(w => w.length > 3 && !stopwords.has(w));
-      if (words.length > 0) nischKeywords = words.slice(0, 5).join(' ');
+      if (!googleQuery) {
+        // Fallback: bygg Google query manuellt
+        const siteOps = platformList.map(p => {
+          if (p === 'instagram') return 'site:instagram.com';
+          if (p === 'tiktok') return 'site:tiktok.com';
+          return '';
+        }).filter(Boolean);
+        googleQuery = siteOps.length > 0
+          ? `(${siteOps.join(' OR ')}) svenska ${nischKeywords} influencer 2025`
+          : `svenska ${nischKeywords} influencer ${platformList.join(' ')} 2025`;
+      }
+
+      console.log(`[AI-Search] ✅ AI-genererade termer: "${nischKeywords}"`);
+      console.log(`[AI-Search]    Short Videos: "${shortVideoQuery}"`);
+      console.log(`[AI-Search]    Google: "${googleQuery}"`);
+
+      return { shortVideoQuery, googleQuery, nischKeywords };
     }
+  } catch (err) {
+    console.warn(`[AI-Search] ⚠️ AI-söktermsgenerering misslyckades: ${err.message} — faller tillbaka på statisk mappning`);
   }
 
-  // Short Videos query — söker TikTok/Reels/Shorts automatiskt
-  const shortVideoQuery = `svenska ${nischKeywords} influencer`;
+  // ── Fallback: statisk nisch-extraktion (om AI misslyckas) ──
+  if (!nischKeywords) {
+    if (beskrivning) {
+      const stopwords = new Set(['vi', 'och', 'i', 'på', 'för', 'med', 'som', 'är', 'ett', 'en', 'av', 'till', 'det', 'att', 'den', 'de', 'har', 'vara', 'vill', 'ska', 'kan', 'inte', 'alla', 'från', 'vår', 'våra', 'sin', 'sina', 'sitt', 'gör', 'säljer', 'samarbeta', 'unga', 'vuxna', 'företag', 'produkter', 'inom']);
+      const words = beskrivning.toLowerCase().replace(/[^a-zåäö\s-]/g, '').split(/\s+/).filter(w => w.length > 3 && !stopwords.has(w));
+      nischKeywords = words.slice(0, 5).join(' ') || companyName;
+    } else {
+      nischKeywords = nischStr || companyName;
+    }
+    console.log(`[AI-Search] Fallback söktermer: "${nischKeywords}"`);
+  }
 
-  // Google query med site:-operatorer för den valda plattformen
+  const shortVideoQuery = `svenska ${nischKeywords} influencer`;
   const siteOps = platformList.map(p => {
     if (p === 'instagram') return 'site:instagram.com';
     if (p === 'tiktok') return 'site:tiktok.com';
     return '';
   }).filter(Boolean);
-
   const googleQuery = siteOps.length > 0
-    ? `(${siteOps.join(' OR ')}) svenska ${nischKeywords} influencer 2024 2025`
-    : `svenska ${nischKeywords} influencer ${platformList.join(' ')} 2024 2025`;
+    ? `(${siteOps.join(' OR ')}) svenska ${nischKeywords} influencer 2025`
+    : `svenska ${nischKeywords} influencer ${platformList.join(' ')} 2025`;
 
-  return { shortVideoQuery, googleQuery };
+  return { shortVideoQuery, googleQuery, nischKeywords };
 }
 
 // ============================================================
@@ -422,7 +435,7 @@ export async function searchInfluencersAI({ companyName, industry, nischer, plat
   const platformStr = (platforms || ['youtube']).join(', ');
   const nischStr = (nischer || []).join(', ');
 
-  const { shortVideoQuery, googleQuery } = buildSearchQueries({ companyName, beskrivning, nischer, platforms });
+  const { shortVideoQuery, googleQuery, nischKeywords } = await buildSearchQueries({ companyName, beskrivning, nischer, platforms });
 
   // ── STEG 1: Parallella SerpAPI-sökningar (2 queries) ──
   console.log(`[AI-Search] Steg 1: Multi-engine sökning...`);
@@ -556,6 +569,23 @@ ENBART JSON. Inga kommentarer.`;
 
   console.log(`[AI-Search] ✅ ${influencers.length} influencers (Claude web_search fallback)`);
   return normalizeResults(influencers);
+}
+
+/**
+ * Exporterad helper: Generera AI-drivna nisch-keywords som andra moduler (t.ex. YouTube-sökning) kan använda.
+ * Returnerar en array av söktermer.
+ */
+export async function generateNischKeywords(beskrivning, companyName) {
+  try {
+    const result = await buildSearchQueries({ companyName: companyName || '', beskrivning, nischer: [], platforms: ['youtube'] });
+    if (result.nischKeywords) {
+      // Splitta keywords till en array av labels
+      return result.nischKeywords.split(/\s+/).filter(w => w.length > 2);
+    }
+  } catch (err) {
+    console.warn('[AI-Search] generateNischKeywords misslyckades:', err.message);
+  }
+  return [];
 }
 
 function normalizeResults(influencers) {

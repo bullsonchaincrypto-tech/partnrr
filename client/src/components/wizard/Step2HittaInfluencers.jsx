@@ -332,66 +332,39 @@ export default function Step2HittaInfluencers({ foretag, outreachType, influence
   const isAiResults = influencers.length > 0 && String(influencers[0]?.id).startsWith('ai-')
 
   const toggleOne = async (id) => {
-    // AI-resultat: toggla lokalt
-    if (isAiResults) {
-      setInfluencers(prev => prev.map(i => i.id === id ? { ...i, vald: i.vald ? 0 : 1 } : i))
-      return
-    }
-    try {
-      if (isSponsor) {
-        const updated = await api.toggleSponsorProspect(id)
-        setInfluencers((prev) => prev.map((i) => (i.id === id ? { ...i, vald: updated.vald } : i)))
-      } else {
-        const updated = await api.toggleInfluencer(id)
-        setInfluencers((prev) => prev.map((i) => (i.id === id ? { ...i, ...updated, kontakt_epost: i.kontakt_epost || updated.kontakt_epost, foljare_exakt: i.foljare_exakt, thumbnail: i.thumbnail, beskrivning: i.beskrivning, datakalla: i.datakalla, verifierad: i.verifierad, videoCount: i.videoCount, viewCount: i.viewCount } : i)))
+    // Alltid toggla lokalt FÖRST — snabb respons i UI
+    setInfluencers(prev => prev.map(i => i.id === id ? { ...i, vald: i.vald ? 0 : 1 } : i))
+
+    // Synca till DB i bakgrunden (om det är DB-id:n)
+    if (!isAiResults && typeof id === 'number') {
+      try {
+        if (isSponsor) {
+          await api.toggleSponsorProspect(id)
+        } else {
+          await api.toggleInfluencer(id)
+        }
+      } catch (err) {
+        console.error('[Toggle] API sync misslyckades:', err)
       }
-    } catch (err) {
-      console.error(err)
     }
   }
 
   const selectAll = async (val) => {
-    // AI-resultat: toggla alla lokalt
-    if (isAiResults) {
-      const visibleIds = new Set(displayList.map(i => i.id))
-      setInfluencers(prev => prev.map(i => visibleIds.has(i.id) ? { ...i, vald: val ? 1 : 0 } : i))
-      return
-    }
-    try {
-      // Använd bulk-API istället för enskilda toggles
-      if (isSponsor && foretag?.id) {
-        const results = await api.selectAllProspects(foretag.id, val)
-        // results är en array med alla prospects
-        if (Array.isArray(results)) {
-          setInfluencers(prev => prev.map(i => {
-            const updated = results.find(r => r.id === i.id)
-            return updated ? { ...i, vald: updated.vald } : { ...i, vald: val ? 1 : 0 }
-          }))
+    // Alltid uppdatera lokalt FÖRST — snabb respons
+    const visibleIds = new Set(displayList.map(i => i.id))
+    setInfluencers(prev => prev.map(i => visibleIds.has(i.id) ? { ...i, vald: val ? 1 : 0 } : i))
+
+    // Synca till DB i bakgrunden
+    if (!isAiResults && foretag?.id) {
+      try {
+        if (isSponsor) {
+          await api.selectAllProspects(foretag.id, val)
         } else {
-          // Fallback: uppdatera lokalt
-          setInfluencers(prev => prev.map(i => ({ ...i, vald: val ? 1 : 0 })))
+          await api.selectAllInfluencers(foretag.id, val)
         }
-      } else if (foretag?.id) {
-        const results = await api.selectAllInfluencers(foretag.id, val)
-        if (Array.isArray(results)) {
-          setInfluencers(prev => prev.map(i => {
-            const updated = results.find(r => r.id === i.id)
-            if (updated) {
-              return { ...i, ...updated, kontakt_epost: i.kontakt_epost || updated.kontakt_epost, foljare_exakt: i.foljare_exakt, thumbnail: i.thumbnail, beskrivning: i.beskrivning, datakalla: i.datakalla, verifierad: i.verifierad, videoCount: i.videoCount, viewCount: i.viewCount }
-            }
-            return { ...i, vald: val ? 1 : 0 }
-          }))
-        } else {
-          setInfluencers(prev => prev.map(i => ({ ...i, vald: val ? 1 : 0 })))
-        }
-      } else {
-        // Ingen foretag.id — fallback till lokal toggle
-        setInfluencers(prev => prev.map(i => ({ ...i, vald: val ? 1 : 0 })))
+      } catch (err) {
+        console.error('[SelectAll] API sync misslyckades:', err)
       }
-    } catch (err) {
-      console.error(err)
-      // Vid fel — uppdatera ändå lokalt så UI:t matchar
-      setInfluencers(prev => prev.map(i => ({ ...i, vald: val ? 1 : 0 })))
     }
   }
 

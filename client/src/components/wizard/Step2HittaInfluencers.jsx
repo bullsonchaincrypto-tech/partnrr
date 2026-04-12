@@ -1,4 +1,4 @@
-import { useState, useMemo, useRef, useCallback } from 'react'
+import { useState, useEffect, useMemo, useRef, useCallback } from 'react'
 import { Search, Loader2, ArrowRight, ArrowLeft, Users, Youtube, ExternalLink, CheckCircle, Check, ArrowUpDown, Filter, Instagram, X, Heart, Ban, ShieldCheck, ShieldAlert, Database, Sparkles } from 'lucide-react'
 import * as api from '../../services/api'
 
@@ -60,12 +60,24 @@ export default function Step2HittaInfluencers({ foretag, outreachType, influence
   const [sortBy, setSortBy] = useState('score_desc')
   const [filterNisch, setFilterNisch] = useState('')
   const [expandedId, setExpandedId] = useState(null)
-  const [selectedPlatforms, setSelectedPlatforms] = useState(['youtube'])
+  const [selectedPlatforms, setSelectedPlatforms] = useState(['youtube', 'instagram', 'tiktok'])
   const [searchMeta, setSearchMeta] = useState(null)
   const [directSearch, setDirectSearch] = useState('')
   const abortRef = useRef(null)
+  const prevOutreachType = useRef(outreachType)
 
   const isSponsor = outreachType === 'sponsor'
+
+  // Rensa influencers när användaren byter flöde (influencer ↔ sponsor)
+  useEffect(() => {
+    if (prevOutreachType.current !== outreachType) {
+      prevOutreachType.current = outreachType
+      setInfluencers([])
+      setSearchMeta(null)
+      setError('')
+      setDirectSearch('')
+    }
+  }, [outreachType, setInfluencers])
 
   const cancelSearch = useCallback(() => {
     if (abortRef.current) {
@@ -133,13 +145,8 @@ export default function Step2HittaInfluencers({ foretag, outreachType, influence
         // Influencer-sökning: sök på alla plattformar
         const results = await api.searchInfluencerDirect(directSearch.trim(), foretag.id)
         if (results?.length > 0) {
-          setInfluencers(prev => {
-            const existingIds = new Set(prev.map(i => i.kanalnamn?.toLowerCase()))
-            const newResults = results
-              .filter(r => !existingIds.has(r.kanalnamn?.toLowerCase()))
-              .map(r => ({ ...r, vald: 0 }))
-            return [...newResults, ...prev]
-          })
+          // Direkt-sökning ersätter resultaten (inte append) för att undvika förvirring
+          setInfluencers(results.map(r => ({ ...r, vald: 0 })))
         } else {
           setError(`Inga resultat för "${directSearch}"`)
         }
@@ -191,7 +198,13 @@ export default function Step2HittaInfluencers({ foretag, outreachType, influence
           viewCount: 0,
           _isSponsor: true,
         }))
-        setInfluencers(mapped)
+        // Utöka listan istället för att ersätta — deduplicera baserat på namn
+        setInfluencers(prev => {
+          const existingNames = new Set(prev.map(i => i.namn?.toLowerCase()))
+          const newResults = mapped.filter(r => !existingNames.has(r.namn?.toLowerCase()))
+          if (newResults.length === 0) return prev
+          return [...prev, ...newResults]
+        })
       } else {
         // ─── PRIMÄR: Phyllo + YouTube pipeline (verifierad data) ───
         let pipelineWorked = false
@@ -364,6 +377,33 @@ export default function Step2HittaInfluencers({ foretag, outreachType, influence
         }
       </p>
 
+      {/* Plattformsväljare — bara för influencer-flödet */}
+      {!isSponsor && (
+        <div className="mb-4">
+          <p className="text-xs text-gray-500 mb-2">Välj plattformar att söka på:</p>
+          <div className="flex gap-2">
+            {PLATTFORMAR.map(p => {
+              const isSelected = selectedPlatforms.includes(p.id)
+              return (
+                <button
+                  key={p.id}
+                  onClick={() => togglePlatform(p.id)}
+                  className={`flex items-center gap-2 px-4 py-2 rounded-lg border text-sm font-medium transition-all ${
+                    isSelected
+                      ? p.color + ' border-opacity-100'
+                      : 'bg-gray-800/30 text-gray-500 border-gray-700 hover:border-gray-600'
+                  }`}
+                >
+                  <span>{p.icon}</span>
+                  <span>{p.label}</span>
+                  {isSelected && <Check className="w-3.5 h-3.5" />}
+                </button>
+              )
+            })}
+          </div>
+        </div>
+      )}
+
       {/* AI auto-find — HERO CTA */}
       <div className="mb-6 space-y-4">
         <button
@@ -436,10 +476,11 @@ export default function Step2HittaInfluencers({ foretag, outreachType, influence
               </>
             ) : (
               <>
-                <p>1. Söker på: <span className="text-purple-400">{selectedPlatforms.map(p => PLATTFORMAR.find(x => x.id === p)?.label).join(', ')}</span></p>
-                {selectedPlatforms.includes('youtube') && <p>2. YouTube Data API v3 hämtar verifierad kanaldata (min 1K prenumeranter)</p>}
-                {selectedPlatforms.some(p => p !== 'youtube') && <p>{selectedPlatforms.includes('youtube') ? '3' : '2'}. AI-sökning för {selectedPlatforms.filter(p => p !== 'youtube').map(p => PLATTFORMAR.find(x => x.id === p)?.label).join(', ')}</p>}
-                <p>{selectedPlatforms.length + 1}. Söker e-postadresser automatiskt</p>
+                <p>1. AI analyserar din beskrivning: <span className="text-purple-400">{foretag?.beskrivning?.slice(0, 60) || foretag?.bransch || 'din profil'}{foretag?.beskrivning?.length > 60 ? '...' : ''}</span></p>
+                <p>2. Söker på: <span className="text-purple-400">{selectedPlatforms.map(p => PLATTFORMAR.find(x => x.id === p)?.label).join(', ')}</span></p>
+                {selectedPlatforms.includes('youtube') && <p>3. YouTube Data API v3 hämtar verifierad kanaldata</p>}
+                {selectedPlatforms.some(p => p !== 'youtube') && <p>4. SerpAPI + Apify verifierar Instagram/TikTok-profiler</p>}
+                <p>5. AI rankar och samlar kontaktinformation</p>
               </>
             )}
           </div>

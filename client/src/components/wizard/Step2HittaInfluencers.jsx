@@ -1,5 +1,5 @@
 import { useState, useEffect, useMemo, useRef, useCallback } from 'react'
-import { Search, Loader2, ArrowRight, ArrowLeft, Users, Youtube, ExternalLink, CheckCircle, Check, ArrowUpDown, Filter, Instagram, X, Heart, Ban, ShieldCheck, ShieldAlert, Database, Sparkles } from 'lucide-react'
+import { Search, Loader2, ArrowRight, ArrowLeft, Users, Youtube, ExternalLink, CheckCircle, Check, ArrowUpDown, Filter, Instagram, X, Heart, Ban, ShieldCheck, ShieldAlert, Database, Sparkles, ChevronDown, ChevronUp } from 'lucide-react'
 import * as api from '../../services/api'
 
 const getChannelUrl = (kanalnamn, plattform) => {
@@ -707,9 +707,17 @@ export default function Step2HittaInfluencers({ foretag, outreachType, influence
 
                   <button
                     onClick={(e) => { e.stopPropagation(); setExpandedId(expandedId === inf.id ? null : inf.id) }}
-                    className="text-xs text-gray-600 hover:text-gray-400 flex-shrink-0"
+                    className={`flex items-center gap-1 text-[10px] px-2 py-1 rounded border transition-colors flex-shrink-0 ${
+                      expandedId === inf.id
+                        ? 'text-purple-400 border-purple-500/40 bg-purple-500/10'
+                        : 'text-gray-500 border-gray-700 hover:text-gray-300 hover:border-gray-600 bg-gray-800/50'
+                    }`}
                   >
-                    ···
+                    {expandedId === inf.id ? (
+                      <><ChevronUp className="w-3 h-3" /> Stäng</>
+                    ) : (
+                      <><ChevronDown className="w-3 h-3" /> Detaljer</>
+                    )}
                   </button>
                 </div>
 
@@ -735,36 +743,6 @@ export default function Step2HittaInfluencers({ foretag, outreachType, influence
                             <div>
                               <span className="text-gray-500 block mb-1">Beskrivning:</span>
                               <p className="text-gray-400 text-xs line-clamp-3">{inf.beskrivning}</p>
-                            </div>
-                          )}
-
-                          {/* Score-breakdown */}
-                          {inf.score_details && (
-                            <div>
-                              <span className="text-gray-500 block mb-1.5">Matchnings-analys:</span>
-                              <div className="space-y-1">
-                                {[
-                                  { label: 'Nisch-relevans', key: 'niche_relevance', weight: '30%' },
-                                  { label: 'Publik-matchning', key: 'audience_match', weight: '25%' },
-                                  { label: 'Engagement', key: 'engagement_quality', weight: '20%' },
-                                  { label: 'Budget-fit', key: 'budget_fit', weight: '15%' },
-                                  { label: 'Tillväxt', key: 'growth_potential', weight: '10%' },
-                                ].map(({ label, key, weight }) => {
-                                  const val = inf.score_details[key] || 0
-                                  return (
-                                    <div key={key} className="flex items-center gap-2">
-                                      <span className="text-gray-500 w-24 text-[10px]">{label} ({weight})</span>
-                                      <div className="flex-1 h-1.5 bg-gray-700 rounded-full overflow-hidden">
-                                        <div
-                                          className={`h-full rounded-full ${val >= 70 ? 'bg-green-500' : val >= 40 ? 'bg-yellow-500' : 'bg-gray-500'}`}
-                                          style={{ width: `${val}%` }}
-                                        />
-                                      </div>
-                                      <span className={`w-8 text-right text-[10px] ${val >= 70 ? 'text-green-400' : val >= 40 ? 'text-yellow-400' : 'text-gray-500'}`}>{val}</span>
-                                    </div>
-                                  )
-                                })}
-                              </div>
                             </div>
                           )}
                         </div>
@@ -793,28 +771,6 @@ export default function Step2HittaInfluencers({ foretag, outreachType, influence
                               {inf.foljare_exakt > 0 && (
                                 <p className="text-gray-400"><span className="text-gray-500">Följare:</span> {inf.foljare_exakt?.toLocaleString('sv-SE')}</p>
                               )}
-                              {inf.avg_views > 0 && (
-                                <p className="text-gray-400"><span className="text-gray-500">Snitt visningar:</span> {formatNumber(inf.avg_views)}</p>
-                              )}
-                              {inf.sweden_audience_pct != null && inf.sweden_audience_pct > 0 && (
-                                <p className="text-gray-400">
-                                  <span className="text-gray-500">Svensk publik:</span>{' '}
-                                  <span className={inf.sweden_audience_pct >= 0.3 ? 'text-green-400' : 'text-yellow-400'}>
-                                    {Math.round(inf.sweden_audience_pct * 100)}%
-                                  </span>
-                                </p>
-                              )}
-                              {inf.fake_follower_pct != null && (
-                                <p className="text-gray-400">
-                                  <span className="text-gray-500">Fake followers:</span>{' '}
-                                  <span className={inf.fake_follower_pct < 5 ? 'text-green-400' : inf.fake_follower_pct < 15 ? 'text-yellow-400' : 'text-red-400'}>
-                                    {inf.fake_follower_pct.toFixed(1)}%
-                                  </span>
-                                </p>
-                              )}
-                              {inf.growth_rate_30d != null && (
-                                <p className="text-gray-400"><span className="text-gray-500">Tillväxt (30d):</span> <span className={inf.growth_rate_30d > 0 ? 'text-green-400' : 'text-red-400'}>{inf.growth_rate_30d > 0 ? '+' : ''}{inf.growth_rate_30d.toFixed(1)}%</span></p>
-                              )}
                               {inf.videoCount > 0 && (
                                 <p className="text-gray-400"><span className="text-gray-500">Videos:</span> {formatNumber(inf.videoCount)}</p>
                               )}
@@ -822,65 +778,13 @@ export default function Step2HittaInfluencers({ foretag, outreachType, influence
                                 <p className="text-green-400"><span className="text-gray-500">E-post:</span> {inf.kontakt_epost}</p>
                               )}
                               <p className="text-gray-400"><span className="text-gray-500">Källa:</span> {
-                                inf.datakalla === 'phyllo_api' ? '✅ Phyllo (verifierad)' :
-                                inf.datakalla === 'ai_genererad' ? '🤖 AI-genererad' :
                                 inf.datakalla === 'youtube_api' ? '✅ YouTube API' :
+                                inf.datakalla?.startsWith('apify_') ? '✅ Apify' :
                                 inf.datakalla || 'YouTube API'
                               }</p>
                             </>
                           )}
                         </div>
-                      </div>
-
-                      {/* Pris */}
-                      <div className="mt-3 pt-3 border-t border-gray-700/50">
-                        <div className="flex items-center justify-between">
-                          <div>
-                            <span className="text-gray-500 text-xs">Estimerat pris per sponsrad video:</span>
-                            <p className="text-sm font-medium text-white mt-0.5">
-                              {priceEst.exact
-                                ? `${priceEst.exact.toLocaleString('sv-SE')} SEK`
-                                : `${priceEst.low.toLocaleString('sv-SE')} – ${priceEst.high.toLocaleString('sv-SE')} SEK`
-                              }
-                            </p>
-                          </div>
-                          <span className="text-[10px] text-gray-600 text-right max-w-[140px]">
-                            {priceEst.exact ? 'Baserat på Phyllo-data' : 'Baserat på kanalstorlek (svensk marknad)'}
-                          </span>
-                        </div>
-                      </div>
-
-                      {/* Favorit & Blacklist actions */}
-                      <div className="mt-3 pt-3 border-t border-gray-700/50 flex items-center gap-2">
-                        <button
-                          onClick={(e) => {
-                            e.stopPropagation()
-                            api.addFavorite({
-                              namn: inf.namn, kanalnamn: inf.kanalnamn, plattform: inf.plattform,
-                              foljare: inf.foljare, nisch: inf.nisch, kontakt_epost: inf.kontakt_epost,
-                            }).then(() => alert('Sparad som favorit!'))
-                              .catch(() => alert('Redan sparad'))
-                          }}
-                          className="flex items-center gap-1.5 text-xs text-pink-400 hover:text-pink-300 px-2.5 py-1.5 rounded-lg bg-pink-500/10 hover:bg-pink-500/20 border border-pink-500/20 transition-colors"
-                        >
-                          <Heart className="w-3 h-3" /> Spara som favorit
-                        </button>
-                        <button
-                          onClick={(e) => {
-                            e.stopPropagation()
-                            if (!confirm(`Blacklista ${inf.namn}? Denna influencer filtreras bort i framtida sökningar.`)) return
-                            api.addToBlacklist({
-                              namn: inf.namn, kanalnamn: inf.kanalnamn, plattform: inf.plattform,
-                              kontakt_epost: inf.kontakt_epost, anledning: 'manuell_wizard',
-                            }).then(() => {
-                              toggleOne(inf.id) // Avmarkera
-                              alert('Tillagd på blacklist')
-                            })
-                          }}
-                          className="flex items-center gap-1.5 text-xs text-red-400/60 hover:text-red-400 px-2.5 py-1.5 rounded-lg hover:bg-red-500/10 border border-transparent hover:border-red-500/20 transition-colors"
-                        >
-                          <Ban className="w-3 h-3" /> Blacklista
-                        </button>
                       </div>
                     </div>
                   )

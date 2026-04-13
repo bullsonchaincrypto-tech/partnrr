@@ -787,9 +787,9 @@ export default function Step2HittaInfluencers({ foretag, outreachType, influence
                         <button
                           onClick={(e) => { e.stopPropagation(); setEditingEmailId(inf.id); setEditingEmailValue('') }}
                           title={inf.plattform?.toLowerCase().includes('youtube') ? 'Kolla kanalens About-sida (Mer info) för e-post' : 'Klicka för att lägga till e-post manuellt'}
-                          className="text-[9px] px-1.5 py-0.5 rounded bg-red-500/10 text-red-400/80 border border-red-500/20 whitespace-nowrap hover:bg-red-500/20 hover:text-red-300 cursor-pointer transition-colors"
+                          className="text-[9px] px-1.5 py-0.5 rounded bg-purple-500/10 text-purple-400 border border-purple-500/30 whitespace-nowrap hover:bg-purple-500/20 hover:text-purple-300 cursor-pointer transition-colors"
                         >
-                          Ingen e-post
+                          + Lägg till e-post
                         </button>
                       )
                     )}

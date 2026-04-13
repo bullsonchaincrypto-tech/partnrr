@@ -6,7 +6,7 @@ import { findEmailsForChannels } from '../services/email-finder.js';
 import { searchSponsors, searchContacts, isApolloConfigured } from '../services/apollo.js';
 import { enrichInfluencers, enrichSingleProfile, isApifyConfigured } from '../services/social-enrichment.js';
 import { scoreAndRankInfluencers, scoreInfluencer } from '../services/scoring.js';
-import { searchInfluencersAI, generateNischKeywords, buildSearchQueries } from '../services/ai-search.js';
+import { searchInfluencersAI, generateNischKeywords, buildSearchQueries, generateYouTubeSearchTerms } from '../services/ai-search.js';
 import { discoverInfluencers, isApifyConfigured as isApifyDiscoveryConfigured } from '../services/apify-discovery.js';
 
 const router = Router();
@@ -616,16 +616,26 @@ router.post('/sponsors/contacts', async (req, res) => {
  * Sök YouTube via befintlig pipeline
  */
 async function searchYouTube(foretag, nischLabels) {
-  let searchQueries = getLockedSearchQueries(foretag.bransch);
+  // Generera smarta söktermer via Claude baserat på företagsbeskrivningen
+  let searchQueries = [];
 
-  // Om bransch saknas, bygg söktermer från nischLabels (som inkluderar beskrivning)
-  if (!foretag.bransch && nischLabels.length > 0) {
+  if (foretag.beskrivning) {
+    try {
+      searchQueries = await generateYouTubeSearchTerms(foretag.beskrivning, foretag.namn);
+    } catch (err) {
+      console.warn(`[Search] Claude YouTube-söktermer misslyckades: ${err.message}`);
+    }
+  }
+
+  // Fallback: bygg från nischLabels om Claude inte gav resultat
+  if (searchQueries.length === 0 && nischLabels.length > 0) {
     searchQueries = nischLabels.flatMap(label => [
       `${label} youtube sverige`,
       `${label} svensk youtuber`,
-      `${label} svenska tips`,
     ]);
   }
+
+  console.log(`[Search] YouTube API: ${searchQueries.length} söktermer`);
 
   const channels = await searchYouTubeChannels(searchQueries, 10);
 

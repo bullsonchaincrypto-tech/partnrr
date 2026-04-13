@@ -366,6 +366,71 @@ export async function generateNischKeywords(beskrivning, companyName) {
   return [];
 }
 
+/**
+ * Generera smarta YouTube-söktermer via Claude.
+ *
+ * Claude analyserar företagsbeskrivningen och genererar 10-15 varierade
+ * söktermer optimerade för YouTube Search API (type: channel, regionCode: SE).
+ *
+ * Returnerar en array av strängar, t.ex.:
+ *   ["bilrecensioner sverige", "begagnade bilar test", "bilköp tips", ...]
+ */
+export async function generateYouTubeSearchTerms(beskrivning, companyName) {
+  const client = getClient();
+
+  console.log(`[AI-Search] Genererar YouTube-söktermer för "${companyName}"...`);
+
+  try {
+    const response = await client.messages.create({
+      model: MODEL_DEFAULT,
+      max_tokens: 600,
+      messages: [{
+        role: 'user',
+        content: `Du hjälper ett svenskt företag hitta relevanta YouTube-kanaler att samarbeta med.
+
+Företag: ${companyName}
+Beskrivning: ${beskrivning}
+
+Generera 12-15 VARIERADE svenska söktermer som hittar YouTube-kanaler inom detta område.
+
+REGLER:
+- Söktermerna ska vara optimerade för YouTube:s sök-API (hitta KANALER, inte videos)
+- Blanda breda termer ("bilar sverige") med specifika ("begagnade bilar test", "bilrecensioner")
+- Inkludera relaterade ämnen som samma målgrupp tittar på
+- Alla termer på SVENSKA
+- Tänk: vilka typer av kanaler skulle företagets kunder följa?
+- Inkludera varianter: nybörjare, expert, tips, recensioner, vlogg, etc.
+- UNDVIK engelska termer om det inte är branschstandard
+
+Svara med ENBART en JSON-array av strängar, ingen annan text.
+Exempel: ["bilrecensioner sverige", "begagnade bilar test", "bilköp tips"]`
+      }],
+    });
+
+    trackApiCost({ service: 'anthropic', endpoint: 'generateYouTubeSearchTerms' });
+
+    const text = response.content[0]?.text?.trim() || '[]';
+    const jsonMatch = text.match(/\[[\s\S]*\]/);
+    if (!jsonMatch) {
+      console.warn('[AI-Search] Kunde inte parsa YouTube-söktermer, ingen JSON-array hittad');
+      return [];
+    }
+
+    const terms = JSON.parse(jsonMatch[0]);
+    if (!Array.isArray(terms)) return [];
+
+    const cleaned = terms
+      .filter(t => typeof t === 'string' && t.length > 2)
+      .slice(0, 15);
+
+    console.log(`[AI-Search] YouTube-söktermer (${cleaned.length}): ${cleaned.join(', ')}`);
+    return cleaned;
+  } catch (err) {
+    console.error('[AI-Search] generateYouTubeSearchTerms fel:', err.message);
+    return [];
+  }
+}
+
 // ============================================================
 // INFLUENCER-SÖKNING: Multi-engine SerpAPI → Sonnet
 // ============================================================

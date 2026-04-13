@@ -325,26 +325,39 @@ export async function buildSearchQueries({ companyName, beskrivning, nischer, pl
   // ── AI-genererade söktermer (primär väg) ──
   let nischKeywords = '';
   try {
-    const systemPrompt = `Du är en sökterms-expert. Givet en företagsbeskrivning, generera de BÄSTA Google-söktermerna för att hitta svenska influencers som passar företaget.
+    const systemPrompt = `Du är en sökterms-expert. Givet en företagsbeskrivning, generera de BÄSTA Google-söktermerna OCH Instagram/TikTok-hashtags för att hitta svenska influencers som passar företaget.
 
 REGLER:
 - Svara med ENBART ett JSON-objekt, ingen annan text
 - "nisch_keywords" = 3-6 nyckelord som beskriver vilken typ av influencer som passar (svenska termer)
 - "short_video_query" = en Google Short Videos-sökfråga (max 8 ord) för att hitta TikTok/Instagram Reels-kreatörer
 - "google_queries" = array med 2-3 Google-sökfrågor med site:-operatorer för att hitta profiler
+- "discovery_hashtags" = array med 4-6 Instagram/TikTok-hashtags som SVENSKA influencers i denna nisch faktiskt använder
 - Fokusera på den EXAKTA branschen — inte breda termer
 - Tänk: vilka typer av influencers skulle ett sådant företag vilja samarbeta med?
+
+REGLER FÖR HASHTAGS (discovery_hashtags):
+- Hashtags MÅSTE vara svenska eller Sverige-specifika — ALDRIG generiska engelska som "grooming", "fashion", "fitness"
+- Använd hashtags som svenska influencers faktiskt postar med
+- Inkludera ALLTID minst 2 hashtags med "sverige", "svensk", eller en svensk stad
+- Undvik hashtags som används globalt utan svensk koppling (#grooming ger japanska posts, #fashion ger amerikanska posts)
+- Bra mönster: #[nisch]sverige, #svensk[nisch], #[nisch]stockholm, #[nisch]blogg
 
 EXEMPEL:
 Beskrivning: "Vi säljer smarta produkter inom hemelektronik"
 → nisch_keywords: "tech elektronik gadgets unboxing recension prylar"
 → short_video_query: "svenska tech gadgets elektronik review"
 → google_queries: ["site:instagram.com svenska tech influencer gadgets elektronik", "site:tiktok.com svensk tech review prylar unboxing"]
+→ discovery_hashtags: ["techsverige", "svensktech", "prylarsverige", "smartahemsverige", "elektronikrecension"]
 
 Beskrivning: "Ekologiska kryddor och marinader"
 → nisch_keywords: "mat matlagning recept kryddor foodie"
 → short_video_query: "svenska matlagning kryddor recept influencer"
-→ google_queries: ["site:instagram.com svensk matbloggare foodie kryddor", "site:tiktok.com svenska matlagning recept foodie"]`;
+→ google_queries: ["site:instagram.com svensk matbloggare foodie kryddor", "site:tiktok.com svenska matlagning recept foodie"]
+→ discovery_hashtags: ["matlagningsverige", "svenskmatblogg", "receptsverige", "foodiesverige", "svenskmat"]
+
+Beskrivning: "Hundfoder och hundtillbehör"
+→ discovery_hashtags: ["hundisverige", "svenskhund", "hundlivstockholm", "hundälskare", "hundtillbehorsverige"]`;
 
     const userMessage = `FÖRETAG: ${companyName}
 BESKRIVNING: ${beskrivning || 'Ej angiven'}
@@ -355,7 +368,8 @@ Generera optimala söktermer. Svara med ENBART JSON:
 {
   "nisch_keywords": "...",
   "short_video_query": "...",
-  "google_queries": ["...", "..."]
+  "google_queries": ["...", "..."],
+  "discovery_hashtags": ["svensknisch1", "nischsverige2", "..."]
 }`;
 
     console.log(`[AI-Search] Steg 0: AI genererar söktermer för "${beskrivning?.slice(0, 80) || companyName}"...`);
@@ -392,11 +406,14 @@ Generera optimala söktermer. Svara med ENBART JSON:
           : `svenska ${nischKeywords} influencer ${platformList.join(' ')} 2025`;
       }
 
+      const discoveryHashtags = parsed.discovery_hashtags || [];
+
       console.log(`[AI-Search] ✅ AI-genererade termer: "${nischKeywords}"`);
       console.log(`[AI-Search]    Short Videos: "${shortVideoQuery}"`);
       console.log(`[AI-Search]    Google: "${googleQuery}"`);
+      console.log(`[AI-Search]    Discovery hashtags: ${discoveryHashtags.join(', ') || 'inga'}`);
 
-      return { shortVideoQuery, googleQuery, nischKeywords };
+      return { shortVideoQuery, googleQuery, nischKeywords, discoveryHashtags };
     }
   } catch (err) {
     console.warn(`[AI-Search] ⚠️ AI-söktermsgenerering misslyckades: ${err.message} — faller tillbaka på statisk mappning`);
@@ -424,18 +441,20 @@ Generera optimala söktermer. Svara med ENBART JSON:
     ? `(${siteOps.join(' OR ')}) svenska ${nischKeywords} influencer 2025`
     : `svenska ${nischKeywords} influencer ${platformList.join(' ')} 2025`;
 
-  return { shortVideoQuery, googleQuery, nischKeywords };
+  // Fallback hashtags: svensk + nisch-keyword
+  const fallbackHashtags = nischKeywords.split(' ').slice(0, 3).map(w => `svensk${w}`);
+  return { shortVideoQuery, googleQuery, nischKeywords, discoveryHashtags: fallbackHashtags };
 }
 
 // ============================================================
 // INFLUENCER-SÖKNING: Multi-engine SerpAPI → Sonnet
 // ============================================================
 
-export async function searchInfluencersAI({ companyName, industry, nischer, platforms, budget, audience_age, goal, previousCollabs, beskrivning, erbjudande_typ, syfte, apifyDiscoveryData, excludeHandles = [] }) {
+export async function searchInfluencersAI({ companyName, industry, nischer, platforms, budget, audience_age, goal, previousCollabs, beskrivning, erbjudande_typ, syfte, apifyDiscoveryData, excludeHandles = [], prebuiltQueries = null }) {
   const platformStr = (platforms || ['youtube']).join(', ');
   const nischStr = (nischer || []).join(', ');
 
-  const { shortVideoQuery, googleQuery, nischKeywords } = await buildSearchQueries({ companyName, beskrivning, nischer, platforms });
+  const { shortVideoQuery, googleQuery, nischKeywords } = prebuiltQueries || await buildSearchQueries({ companyName, beskrivning, nischer, platforms });
 
   // ── STEG 1: Parallella SerpAPI-sökningar (2 queries) ──
   console.log(`[AI-Search] Steg 1: Multi-engine sökning...`);

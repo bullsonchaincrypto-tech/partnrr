@@ -124,19 +124,28 @@ async function discoverInstagram(hashtags, maxResults, timeoutSecs) {
     return [];
   }
 
-  console.log(`[ApifyDiscovery] Instagram: ${items.length} posts hittade, extraherar creators...`);
+  // Filtrera bort skräp-posts (0 likes OCH 0 kommentarer = värdelös)
+  const qualityPosts = items.filter(post => {
+    const likes = post.likesCount || post.likes || 0;
+    const comments = post.commentsCount || post.comments || 0;
+    return likes > 0 || comments > 0;
+  });
+  console.log(`[ApifyDiscovery] Instagram: ${items.length} posts hittade, ${qualityPosts.length} med engagement, extraherar creators...`);
 
-  // Extrahera unika creators från posts
+  // Extrahera unika creators från kvalitets-posts
   const creatorMap = new Map();
 
-  for (const post of items) {
+  for (const post of qualityPosts) {
     const owner = post.ownerUsername || post.owner?.username || post.username;
     if (!owner) continue;
 
     const key = owner.toLowerCase();
     if (creatorMap.has(key)) {
-      // Uppdatera post-count
-      creatorMap.get(key).posts_found++;
+      const existing = creatorMap.get(key);
+      existing.posts_found++;
+      // Behåll bästa engagement
+      existing.post_likes = Math.max(existing.post_likes, post.likesCount || post.likes || 0);
+      existing.post_comments = Math.max(existing.post_comments, post.commentsCount || post.comments || 0);
       continue;
     }
 
@@ -146,7 +155,7 @@ async function discoverInstagram(hashtags, maxResults, timeoutSecs) {
       full_name: post.ownerFullName || post.owner?.fullName || '',
       bio: '', // Inte tillgänglig i posts — fylls i av enrichment (Steg 5)
       followers: null, // Inte tillgänglig — fylls i av enrichment
-      posts_found: 1, // Antal posts vi hittade i hashtag-sökningen
+      posts_found: 1,
       hashtag_source: post.hashtags?.slice(0, 5) || [],
       profile_url: `https://www.instagram.com/${owner}/`,
       is_verified: post.ownerIsVerified || false,
@@ -165,8 +174,8 @@ async function discoverInstagram(hashtags, maxResults, timeoutSecs) {
     return scoreB - scoreA;
   });
 
-  console.log(`[ApifyDiscovery] Instagram: ${creators.length} unika creators extraherade`);
-  return creators.slice(0, 30); // Max 30 unika creators
+  console.log(`[ApifyDiscovery] Instagram: ${creators.length} unika creators extraherade (filtrerade från ${items.length} posts)`);
+  return creators.slice(0, 30);
 }
 
 // ============================================================
@@ -193,12 +202,18 @@ async function discoverTikTok(hashtags, maxResults, timeoutSecs) {
     return [];
   }
 
-  console.log(`[ApifyDiscovery] TikTok: ${items.length} videos hittade, extraherar creators...`);
+  // Filtrera bort skräp-videos (0 plays OCH 0 likes = värdelös)
+  const qualityItems = items.filter(item => {
+    const plays = item.playCount || item.plays || 0;
+    const likes = item.diggCount || item.likes || 0;
+    return plays > 0 || likes > 0;
+  });
+  console.log(`[ApifyDiscovery] TikTok: ${items.length} videos hittade, ${qualityItems.length} med engagement, extraherar creators...`);
 
-  // Extrahera unika creators från videos
+  // Extrahera unika creators från kvalitets-videos
   const creatorMap = new Map();
 
-  for (const item of items) {
+  for (const item of qualityItems) {
     // TikTok scraper returnerar videos med authorMeta
     const author = item.authorMeta || item.author || {};
     const username = author.name || author.uniqueId || author.id || item.authorId || '';
@@ -206,7 +221,10 @@ async function discoverTikTok(hashtags, maxResults, timeoutSecs) {
 
     const key = username.toLowerCase();
     if (creatorMap.has(key)) {
-      creatorMap.get(key).videos_found++;
+      const existing = creatorMap.get(key);
+      existing.videos_found++;
+      existing.video_plays = Math.max(existing.video_plays, item.playCount || item.plays || 0);
+      existing.video_likes = Math.max(existing.video_likes, item.diggCount || item.likes || 0);
       continue;
     }
 

@@ -94,30 +94,45 @@ router.post('/influencers', async (req, res) => {
     }
 
     // ============================================================
-    // FAS 1.5: Apify Discovery (Steg 2) — hitta influencers via hashtags
-    // Kör PARALLELLT med AI-sökning
+    // FAS 1.5: AI-genererade hashtags + Apify Discovery
+    // Steg 0 genererar svenska hashtags → Apify söker med dem
     // ============================================================
     const nonYoutubePlatforms = selectedPlatforms.filter(p => p !== 'youtube');
     let apifyDiscoveryData = { instagram: [], tiktok: [] };
+    let aiSearchQueries = null;
+
+    if (nonYoutubePlatforms.length > 0) {
+      // Kör Steg 0 tidigt så vi får AI-hashtags till Apify Discovery
+      try {
+        aiSearchQueries = await buildSearchQueries({
+          companyName: foretag.namn,
+          beskrivning: foretag.beskrivning,
+          nischer: nischLabels,
+          platforms: nonYoutubePlatforms,
+        });
+      } catch (err) {
+        console.warn(`[Search] buildSearchQueries misslyckades: ${err.message}`);
+      }
+    }
 
     if (nonYoutubePlatforms.length > 0 && isApifyDiscoveryConfigured()) {
-      console.log(`[Search] Steg 2: Apify Discovery — söker via hashtags...`);
+      console.log(`[Search] Steg 2: Apify Discovery — söker via AI-genererade hashtags...`);
       try {
-        // Generera hashtags från nisch-labels
-        const hashtags = nischLabels.slice(0, 3).map(label =>
-          label.replace(/\s+/g, '').toLowerCase()
-        );
-        // Lägg till svenska varianter
-        const extraHashtags = nischLabels.slice(0, 2).map(label =>
+        // Använd AI-genererade hashtags (svenska + nisch-specifika)
+        const aiHashtags = aiSearchQueries?.discoveryHashtags || [];
+        // Fallback: bygg från nisch-labels om AI inte gav hashtags
+        const fallbackHashtags = nischLabels.slice(0, 2).map(label =>
           `svensk${label.split(' ')[0].toLowerCase()}`
         );
-        const allHashtags = [...new Set([...hashtags, ...extraHashtags])].slice(0, 4);
-        console.log(`[Search] Discovery hashtags: ${allHashtags.join(', ')}`);
+        const allHashtags = aiHashtags.length > 0
+          ? aiHashtags.slice(0, 5)
+          : [...new Set(fallbackHashtags)].slice(0, 4);
+        console.log(`[Search] Discovery hashtags (${aiHashtags.length > 0 ? 'AI' : 'fallback'}): ${allHashtags.join(', ')}`);
 
         apifyDiscoveryData = await discoverInfluencers(
           allHashtags,
           nonYoutubePlatforms,
-          { maxResultsPerHashtag: 30, timeoutSecs: 120 }
+          { maxResultsPerHashtag: 10, timeoutSecs: 120 }
         );
         sources.apify_ig_discovery = apifyDiscoveryData.instagram?.length || 0;
         sources.apify_tt_discovery = apifyDiscoveryData.tiktok?.length || 0;
@@ -150,6 +165,7 @@ router.post('/influencers', async (req, res) => {
           platforms: nonYoutubePlatforms,
           apifyDiscoveryData,
           excludeHandles: exclude_handles || [],
+          prebuiltQueries: aiSearchQueries,
         });
         if (aiInfluencers?.length > 0) {
           // Normalisera AI-resultat till samma format som pipeline

@@ -2,7 +2,7 @@ import { useState, useEffect, useRef, useCallback } from 'react'
 import { Users, Building, ArrowRight, ArrowLeft, Loader2, Check, Globe, Mail, User, FileText, Package, Wrench, Sparkles, ExternalLink } from 'lucide-react'
 import * as api from '../../services/api'
 
-const TOTAL_QUESTIONS = 7
+const TOTAL_QUESTIONS = 6
 
 // ─── Animeringshjälp ───
 function SlideIn({ children, direction = 'right' }) {
@@ -176,7 +176,7 @@ export default function Step1Foretag({ foretag, setForetag, setKontaktperson, ou
   const [foretagNamn, setForetagNamn] = useState(foretag?.namn || '')
   const [orgNummer, setOrgNummer] = useState(foretag?.org_nummer || '')
   const [domain, setDomain] = useState(foretag?.hemsida || '')
-  const [epost, setEpost] = useState(foretag?.epost || '')
+  const [authEmail, setAuthEmail] = useState('')
   const [erbjudandeTyp, setErbjudandeTyp] = useState(foretag?.erbjudande_typ || '')
   const [beskrivning, setBeskrivning] = useState(foretag?.beskrivning || '')
 
@@ -193,6 +193,13 @@ export default function Step1Foretag({ foretag, setForetag, setKontaktperson, ou
   const goBack = useCallback(() => {
     setDirection('left')
     setQ(prev => Math.max(prev - 1, 0))
+  }, [])
+
+  // Hämta inloggad e-post (Gmail/Microsoft) — används istället för manuell e-postfråga
+  useEffect(() => {
+    api.getAuthStatus().then(auth => {
+      if (auth?.email) setAuthEmail(auth.email)
+    }).catch(() => {})
   }, [])
 
   // Keyboard: Escape = tillbaka
@@ -230,7 +237,7 @@ export default function Step1Foretag({ foretag, setForetag, setKontaktperson, ou
       const submitData = {
         namn: foretagNamn,
         org_nummer: orgNummer || null,
-        epost,
+        epost: authEmail || '',
         kontaktperson: kontaktpersonVal,
         syfte: syfte === 'influencers' ? 'influencers' : 'sponsorer',
         erbjudande_typ: erbjudandeTyp,
@@ -412,23 +419,8 @@ export default function Step1Foretag({ foretag, setForetag, setKontaktperson, ou
           </SlideIn>
         )
 
-      // ═══ FRÅGA 5: E-post ═══
+      // ═══ FRÅGA 5: Produkter / Tjänster / Både och ═══
       case 4:
-        return (
-          <SlideIn key="q4" direction={direction}>
-            <TextQuestion
-              label="Din e-postadress"
-              placeholder="jimmy@rankleague.com"
-              type="email"
-              value={epost}
-              onChange={setEpost}
-              onSubmit={goNext}
-            />
-          </SlideIn>
-        )
-
-      // ═══ FRÅGA 6: Produkter / Tjänster / Både och ═══
-      case 5:
         return (
           <SlideIn key="q5" direction={direction}>
             <h2 className="text-2xl font-bold text-white mb-8">Säljer ni produkter eller tjänster?</h2>
@@ -466,8 +458,8 @@ export default function Step1Foretag({ foretag, setForetag, setKontaktperson, ou
           </SlideIn>
         )
 
-      // ═══ FRÅGA 7: Beskrivning ═══
-      case 6:
+      // ═══ FRÅGA 6: Beskrivning ═══
+      case 5:
         return (
           <SlideIn key="q6" direction={direction}>
             <div className="max-w-xl">

@@ -131,6 +131,17 @@ router.post('/generate-kontrakt', async (req, res) => {
       return res.status(400).json({ error: 'influencer/sponsor och foretag krävs' });
     }
 
+    // Hämta inloggad e-post (Gmail/Microsoft) — används i kontraktet istället för manuellt angiven
+    try {
+      const { getActiveProvider } = await import('../services/email-service.js');
+      const activeProvider = await getActiveProvider();
+      if (activeProvider?.email) {
+        foretagData.epost = activeProvider.email;
+      }
+    } catch (authErr) {
+      console.log('[Kontrakt] Kunde inte hämta auth-email:', authErr.message);
+    }
+
     let pdfBuffer;
     if (isSponsor) {
       pdfBuffer = await generateSponsorKontraktPdf({

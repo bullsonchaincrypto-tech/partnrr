@@ -81,7 +81,7 @@ export async function initDb() {
     CREATE TABLE IF NOT EXISTS foretag (
       id SERIAL PRIMARY KEY,
       namn TEXT NOT NULL,
-      epost TEXT NOT NULL,
+      epost TEXT DEFAULT '',
       kontaktperson TEXT,
       bransch TEXT,
       created_at TIMESTAMP DEFAULT NOW(),
@@ -660,6 +660,8 @@ export async function initDb() {
     "ALTER TABLE sponsor_prospects ADD COLUMN IF NOT EXISTS telefon TEXT",
     "ALTER TABLE sponsor_prospects ADD COLUMN IF NOT EXISTS betyg TEXT",
     "ALTER TABLE sponsor_prospects ADD COLUMN IF NOT EXISTS kalla TEXT DEFAULT 'ai'",
+    "ALTER TABLE foretag ALTER COLUMN epost DROP NOT NULL",
+    "ALTER TABLE foretag ALTER COLUMN epost SET DEFAULT ''",
   ];
 
   for (const sql of alterQueries) {

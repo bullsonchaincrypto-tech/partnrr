@@ -316,7 +316,7 @@ async function searchGoogle(query) {
  * Bygg optimerade sökfrågor baserat på företagsprofil.
  * Returnerar { shortVideoQuery, googleQuery }.
  */
-function buildSearchQueries({ companyName, beskrivning, nischer, platforms }) {
+export function buildSearchQueries({ companyName, beskrivning, nischer, platforms }) {
   const nischStr = (nischer || []).join(' ');
   const platformList = (platforms || ['instagram']).map(p => p.toLowerCase());
 
@@ -348,6 +348,22 @@ function buildSearchQueries({ companyName, beskrivning, nischer, platforms }) {
     : `svenska ${nischKeywords} influencer ${platformList.join(' ')} 2024 2025`;
 
   return { shortVideoQuery, googleQuery };
+}
+
+/**
+ * Exporterad helper: Generera AI-drivna nisch-keywords som andra moduler (t.ex. YouTube-sökning) kan använda.
+ * Returnerar en array av söktermer.
+ */
+export async function generateNischKeywords(beskrivning, companyName) {
+  try {
+    const result = buildSearchQueries({ companyName: companyName || '', beskrivning, nischer: [], platforms: ['youtube'] });
+    if (result.nischKeywords) {
+      return result.nischKeywords.split(/\s+/).filter(w => w.length > 2);
+    }
+  } catch (err) {
+    console.warn('[AI-Search] generateNischKeywords misslyckades:', err.message);
+  }
+  return [];
 }
 
 // ============================================================

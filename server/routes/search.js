@@ -635,9 +635,31 @@ async function searchYouTube(foretag, nischLabels) {
     ]);
   }
 
-  console.log(`[Search] YouTube API: ${searchQueries.length} söktermer`);
+  console.log(`[Search] YouTube API: ${searchQueries.length} söktermer: ${searchQueries.slice(0, 5).join(', ')}${searchQueries.length > 5 ? '...' : ''}`);
 
-  const channels = await searchYouTubeChannels(searchQueries, 10);
+  // Kör första omgången med alla söktermer
+  let channels = await searchYouTubeChannels(searchQueries, 10);
+  console.log(`[Search] YouTube API: ${channels.length} kanaler efter första sökning`);
+
+  // Om vi fick för få resultat, lägg till breda fallback-söktermer
+  if (channels.length < 20 && nischLabels.length > 0) {
+    const broadTerms = [
+      ...nischLabels.map(l => `${l} svensk youtuber`),
+      ...nischLabels.map(l => `${l} vlogg sverige`),
+      'svenska youtube kanaler underhållning',
+      'populära svenska youtubers',
+    ].filter(t => !searchQueries.includes(t));
+
+    if (broadTerms.length > 0) {
+      console.log(`[Search] YouTube: Bara ${channels.length} resultat — kör ${broadTerms.length} breda fallback-söktermer`);
+      const extraChannels = await searchYouTubeChannels(broadTerms, 10);
+      // Merge utan dubbletter
+      const existingIds = new Set(channels.map(c => c.channelId));
+      const newChannels = extraChannels.filter(c => !existingIds.has(c.channelId));
+      channels = [...channels, ...newChannels];
+      console.log(`[Search] YouTube: +${newChannels.length} nya kanaler från fallback (totalt: ${channels.length})`);
+    }
+  }
 
   return channels
     .map(ch => ({

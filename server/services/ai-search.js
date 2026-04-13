@@ -383,7 +383,7 @@ export async function generateYouTubeSearchTerms(beskrivning, companyName) {
   try {
     const response = await client.messages.create({
       model: MODEL_DEFAULT,
-      max_tokens: 600,
+      max_tokens: 800,
       messages: [{
         role: 'user',
         content: `Du hjälper ett svenskt företag hitta relevanta YouTube-kanaler att samarbeta med.
@@ -391,19 +391,33 @@ export async function generateYouTubeSearchTerms(beskrivning, companyName) {
 Företag: ${companyName}
 Beskrivning: ${beskrivning}
 
-Generera 12-15 VARIERADE svenska söktermer som hittar YouTube-kanaler inom detta område.
+Generera exakt 20 MAXIMALT VARIERADE svenska söktermer som hittar YouTube-kanaler.
+
+KRITISKT — Varje sökterm MÅSTE ge OLIKA resultat. YouTube returnerar samma kanaler för snarlika sökningar. Dina 20 termer ska täcka:
+
+1. KÄRNÄMNET (3-4 termer) — direkt kopplat till företaget
+   Exempel: "bilrecensioner", "lastbilar sverige"
+
+2. RELATERADE INTRESSEN (5-6 termer) — vad samma målgrupp OCKSÅ tittar på
+   Exempel: Om företaget säljer bilar → "mekaniker verkstad", "roadtrip vlogg", "bilmässa"
+
+3. LIVSSTILS-KANALER (4-5 termer) — bredare innehåll som når samma publik
+   Exempel: "svensk motor vlogg", "EPA traktor bygge", "husbil äventyr"
+
+4. BRANSCH-ANGRÄNSANDE (3-4 termer) — närliggande branscher
+   Exempel: "bilförsäkring tips", "körkort övningskörning", "motorsport sverige"
+
+5. UNDERHÅLLNING/HUMOR (2-3 termer) — populärkultur i nischen
+   Exempel: "roliga bilar fails", "barn leker bilar"
 
 REGLER:
-- Söktermerna ska vara optimerade för YouTube:s sök-API (hitta KANALER, inte videos)
-- Blanda breda termer ("bilar sverige") med specifika ("begagnade bilar test", "bilrecensioner")
-- Inkludera relaterade ämnen som samma målgrupp tittar på
-- Alla termer på SVENSKA
-- Tänk: vilka typer av kanaler skulle företagets kunder följa?
-- Inkludera varianter: nybörjare, expert, tips, recensioner, vlogg, etc.
-- UNDVIK engelska termer om det inte är branschstandard
+- Optimera för YouTubes sök-API (hitta KANALER, inte videos)
+- ALLA termer på svenska (engelska OK om branschstandard)
+- UNDVIK synonymer/varianter av samma sak ("bilar test" och "biltester" ger SAMMA resultat)
+- Varje term ska vara 2-4 ord lång
+- Tänk: "vilka OLIKA typer av kreatörer" når samma målgrupp?
 
-Svara med ENBART en JSON-array av strängar, ingen annan text.
-Exempel: ["bilrecensioner sverige", "begagnade bilar test", "bilköp tips"]`
+Svara med ENBART en JSON-array av 20 strängar, ingen annan text.`
       }],
     });
 
@@ -421,7 +435,7 @@ Exempel: ["bilrecensioner sverige", "begagnade bilar test", "bilköp tips"]`
 
     const cleaned = terms
       .filter(t => typeof t === 'string' && t.length > 2)
-      .slice(0, 15);
+      .slice(0, 20);
 
     console.log(`[AI-Search] YouTube-söktermer (${cleaned.length}): ${cleaned.join(', ')}`);
     return cleaned;

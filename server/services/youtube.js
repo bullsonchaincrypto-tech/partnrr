@@ -12,6 +12,7 @@ export async function searchYouTubeChannels(searchQueries, maxResultsPerQuery = 
   if (!apiKey) throw new Error('YOUTUBE_API_KEY saknas i .env — aktivera YouTube Data API v3 i Google Cloud Console och skapa en API-nyckel.');
 
   const allChannelIds = new Set();
+  let totalHits = 0;
 
   // Steg 1: Sök kanaler med varje sökterm
   for (const query of searchQueries) {
@@ -28,15 +29,22 @@ export async function searchYouTubeChannels(searchQueries, maxResultsPerQuery = 
 
       trackApiCost({ service: 'youtube', endpoint: 'search.list' });
 
-      for (const item of (searchRes.data.items || [])) {
+      const items = searchRes.data.items || [];
+      const beforeSize = allChannelIds.size;
+      for (const item of items) {
         if (item.id?.channelId) {
           allChannelIds.add(item.id.channelId);
         }
       }
+      const newUnique = allChannelIds.size - beforeSize;
+      totalHits += items.length;
+      console.log(`[YouTube] "${query}" → ${items.length} träffar, ${newUnique} nya unika (totalt: ${allChannelIds.size})`);
     } catch (err) {
       console.error(`YouTube search error for "${query}":`, err.message);
     }
   }
+
+  console.log(`[YouTube] Totalt: ${totalHits} träffar → ${allChannelIds.size} unika kanaler (${searchQueries.length} söktermer)`);
 
   if (allChannelIds.size === 0) {
     return [];
@@ -93,6 +101,9 @@ export async function searchYouTubeChannels(searchQueries, maxResultsPerQuery = 
       console.error('YouTube channels.list error:', err.message);
     }
   }
+
+  const filteredCount = channelIds.length - channels.length;
+  console.log(`[YouTube] Country-filter: ${channelIds.length} → ${channels.length} kanaler (${filteredCount} borttagna pga land ≠ SE)`);
 
   // Returnera utan sortering — routen hanterar sortering (nisch > följare)
   return channels;

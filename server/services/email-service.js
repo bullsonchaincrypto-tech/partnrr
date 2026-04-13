@@ -90,8 +90,8 @@ export async function removeEmailConfig() {
 }
 
 // ─── Create SMTP transporter from saved config ──────────────
-function createSmtpTransport() {
-  const config = getEmailConfig();
+async function createSmtpTransport() {
+  const config = await getEmailConfig();
   if (!config) throw new Error('Ingen e-postkonfiguration sparad');
 
   return nodemailer.createTransport({
@@ -179,8 +179,8 @@ async function sendViaGmail({ to, subject, body, attachmentBuffer, attachmentNam
 
 // ─── Send via SMTP (Outlook, Yahoo, Custom) ─────────────────
 async function sendViaSmtp({ to, subject, body, attachmentBuffer, attachmentName }) {
-  const config = getEmailConfig();
-  const transport = createSmtpTransport();
+  const config = await getEmailConfig();
+  const transport = await createSmtpTransport();
 
   const mailOptions = {
     from: config.display_name ? `"${config.display_name}" <${config.email}>` : config.email,
@@ -318,7 +318,7 @@ async function sendViaMicrosoft({ to, subject, body, attachmentBuffer, attachmen
 
 // ─── Universal send — routes to the right provider ──────────
 export async function sendEmail({ to, subject, body, attachmentBuffer, attachmentName }) {
-  const config = getEmailConfig();
+  const config = await getEmailConfig();
   const msTokens = await queryOne('SELECT * FROM microsoft_tokens WHERE id = 1');
   const gmailTokens = await queryOne('SELECT * FROM gmail_tokens WHERE id = 1');
 

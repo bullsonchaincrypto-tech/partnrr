@@ -100,7 +100,8 @@ export async function discoverInfluencers(hashtags, platforms = ['instagram', 't
 
 async function discoverInstagram(hashtags, maxResults, timeoutSecs) {
   // Bygg hashtag-URLs för Instagram
-  const directUrls = hashtags.slice(0, 3).map(tag =>
+  // Använd alla 5 hashtags från Claude för bredare träffyta
+  const directUrls = hashtags.slice(0, 5).map(tag =>
     `https://www.instagram.com/explore/tags/${encodeURIComponent(tag.replace(/^#/, ''))}/`
   );
 
@@ -183,8 +184,8 @@ async function discoverInstagram(hashtags, maxResults, timeoutSecs) {
 // ============================================================
 
 async function discoverTikTok(hashtags, maxResults, timeoutSecs) {
-  // clockworks/tiktok-scraper tar hashtags som array
-  const cleanHashtags = hashtags.slice(0, 3).map(tag => tag.replace(/^#/, ''));
+  // clockworks/tiktok-scraper tar hashtags som array — använd alla 5 från Claude
+  const cleanHashtags = hashtags.slice(0, 5).map(tag => tag.replace(/^#/, ''));
 
   console.log(`[ApifyDiscovery] TikTok hashtags: ${cleanHashtags.join(', ')}`);
 
@@ -193,6 +194,11 @@ async function discoverTikTok(hashtags, maxResults, timeoutSecs) {
     {
       hashtags: cleanHashtags,
       resultsPerPage: maxResults,
+      // Sök specifikt efter profiler/creators — inte "Top" (blandat)
+      searchSection: 'user',
+      // Proxy via Sverige → TikTok visar svenska creators/innehåll
+      proxyCountryCode: 'SE',
+      maxProfilesPerQuery: 20,
     },
     timeoutSecs
   );

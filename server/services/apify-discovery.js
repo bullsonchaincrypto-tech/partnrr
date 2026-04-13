@@ -147,14 +147,13 @@ async function discoverInstagram(hashtags, maxResults, timeoutSecs) {
   }
 
   // Filtrera bort skräp-posts:
-  // - 0 childPosts OCH 0 kommentarer = värdelöst resultat (kostar pengar utan nytta)
-  // - 0 likes OCH 0 kommentarer = inget engagement
+  // Posts med 0 childPosts OCH 0 kommentarer = tomma/värdelösa resultat
+  // Dessa kostar pengar att enricha utan nytta
   const qualityPosts = items.filter(post => {
-    const likes = post.likesCount || post.likes || 0;
     const comments = post.commentsCount || post.comments || 0;
     const childPosts = post.childPosts?.length || post.sidecardImages?.length || 0;
-    // Kräv minst NÅGOT engagement eller innehåll
-    if (likes === 0 && comments === 0) return false;
+    // Kräv minst childPosts ELLER kommentarer — annars skräp
+    if (childPosts === 0 && comments === 0) return false;
     return true;
   });
   console.log(`[ApifyDiscovery] Instagram: ${items.length} posts hittade, ${qualityPosts.length} med engagement (filtrerade bort ${items.length - qualityPosts.length} tomma), extraherar creators...`);

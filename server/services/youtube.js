@@ -42,6 +42,11 @@ export async function searchYouTubeChannels(searchQueries, maxResultsPerQuery = 
       console.log(`[YouTube] "${query}" → ${items.length} träffar, ${newUnique} nya unika (totalt: ${allChannelIds.size})`);
     } catch (err) {
       console.error(`YouTube search error for "${query}":`, err.message);
+      // Om kvoten är slut (403) — avbryt hela loopen, fortsätta är meningslöst
+      if (err.code === 403 || err.status === 403 || err.message?.includes('quota')) {
+        console.error(`[YouTube] ⚠️ Kvot-fel — avbryter resterande ${searchQueries.length - searchQueries.indexOf(query) - 1} sökningar`);
+        break;
+      }
     }
   }
 

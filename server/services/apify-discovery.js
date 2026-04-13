@@ -194,8 +194,8 @@ async function discoverTikTok(hashtags, maxResults, timeoutSecs) {
     {
       hashtags: cleanHashtags,
       resultsPerPage: maxResults,
-      // Sök specifikt efter profiler/creators — inte "Top" (blandat)
-      searchSection: 'user',
+      // searchSection gäller bara keyword-sök, INTE hashtag-sök — lämna tom
+      searchSection: '',
       // Proxy via Sverige → TikTok visar svenska creators/innehåll
       proxyCountryCode: 'SE',
       maxProfilesPerQuery: 20,

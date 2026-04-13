@@ -110,8 +110,8 @@ export async function findEmailsForChannels(channels, concurrency = 8) {
         ).catch(err => {
           console.error(`[E-post] Timeout/error ${ch.kanalnamn}:`, err.message);
           return { email: null, method: null, confidence: null, error: err.message };
-        });
-      })
+        })
+      )
     );
 
     for (let j = 0; j < batch.length; j++) {

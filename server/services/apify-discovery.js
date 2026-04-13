@@ -25,6 +25,20 @@ const DISCOVERY_ACTORS = {
   tiktok: 'clockworks/tiktok-scraper',
 };
 
+// Max antal unika creators att returnera per plattform
+const MAX_CREATORS_PER_PLATFORM = 25;
+
+/**
+ * Rensa trasiga unicode-surrogat ur en sträng.
+ * TikTok/IG-data kan innehålla lone surrogates (t.ex. halva emojis)
+ * som kraschar JSON.stringify → Claude API 400.
+ */
+function sanitizeString(str) {
+  if (typeof str !== 'string') return str || '';
+  // Ta bort lone surrogates (U+D800–U+DFFF som inte är korrekta par)
+  return str.replace(/[\uD800-\uDFFF]/g, '');
+}
+
 export function isApifyConfigured() {
   return !!process.env.APIFY_API_TOKEN;
 }
@@ -110,12 +124,16 @@ async function discoverInstagram(hashtags, maxResults, timeoutSecs) {
 
   console.log(`[ApifyDiscovery] Instagram hashtag-URLs: ${directUrls.join(', ')}`);
 
+  // Begränsa till 5 posts per hashtag → 25 totalt max (5 hashtags × 5 posts)
+  // Sparar pengar — vi behöver bara unika creators, inte massa posts
+  const resultsPerHashtag = Math.min(maxResults, 5);
+
   const items = await runApifyActor(
     DISCOVERY_ACTORS.instagram,
     {
       directUrls,
       resultsType: 'posts',
-      resultsLimit: maxResults,
+      resultsLimit: resultsPerHashtag,
       searchType: 'hashtag',
       searchLimit: 1,
       addParentData: false,
@@ -128,13 +146,18 @@ async function discoverInstagram(hashtags, maxResults, timeoutSecs) {
     return [];
   }
 
-  // Filtrera bort skräp-posts (0 likes OCH 0 kommentarer = värdelös)
+  // Filtrera bort skräp-posts:
+  // - 0 childPosts OCH 0 kommentarer = värdelöst resultat (kostar pengar utan nytta)
+  // - 0 likes OCH 0 kommentarer = inget engagement
   const qualityPosts = items.filter(post => {
     const likes = post.likesCount || post.likes || 0;
     const comments = post.commentsCount || post.comments || 0;
-    return likes > 0 || comments > 0;
+    const childPosts = post.childPosts?.length || post.sidecardImages?.length || 0;
+    // Kräv minst NÅGOT engagement eller innehåll
+    if (likes === 0 && comments === 0) return false;
+    return true;
   });
-  console.log(`[ApifyDiscovery] Instagram: ${items.length} posts hittade, ${qualityPosts.length} med engagement, extraherar creators...`);
+  console.log(`[ApifyDiscovery] Instagram: ${items.length} posts hittade, ${qualityPosts.length} med engagement (filtrerade bort ${items.length - qualityPosts.length} tomma), extraherar creators...`);
 
   // Extrahera unika creators från kvalitets-posts
   const creatorMap = new Map();
@@ -154,9 +177,9 @@ async function discoverInstagram(hashtags, maxResults, timeoutSecs) {
     }
 
     creatorMap.set(key, {
-      handle: owner,
+      handle: sanitizeString(owner),
       platform: 'instagram',
-      full_name: post.ownerFullName || post.owner?.fullName || '',
+      full_name: sanitizeString(post.ownerFullName || post.owner?.fullName || ''),
       bio: '', // Inte tillgänglig i posts — fylls i av enrichment (Steg 5)
       followers: null, // Inte tillgänglig — fylls i av enrichment
       posts_found: 1,
@@ -179,7 +202,7 @@ async function discoverInstagram(hashtags, maxResults, timeoutSecs) {
   });
 
   console.log(`[ApifyDiscovery] Instagram: ${creators.length} unika creators extraherade (filtrerade från ${items.length} posts)`);
-  return creators.slice(0, 30);
+  return creators.slice(0, MAX_CREATORS_PER_PLATFORM);
 }
 
 // ============================================================
@@ -192,11 +215,15 @@ async function discoverTikTok(hashtags, maxResults, timeoutSecs) {
 
   console.log(`[ApifyDiscovery] TikTok hashtags: ${cleanHashtags.join(', ')}`);
 
+  // Begränsa till 5 videos per hashtag → 25 totalt max (5 hashtags × 5 videos)
+  // Sparar pengar och ger ändå tillräckligt med unika creators
+  const resultsPerHashtag = Math.min(maxResults, 5);
+
   const items = await runApifyActor(
     DISCOVERY_ACTORS.tiktok,
     {
       hashtags: cleanHashtags,
-      resultsPerPage: maxResults,
+      resultsPerPage: resultsPerHashtag,
       // searchSection gäller bara keyword-sök, INTE hashtag-sök — lämna tom
       searchSection: '',
       // Proxy via Sverige → TikTok visar svenska creators/innehåll
@@ -238,10 +265,10 @@ async function discoverTikTok(hashtags, maxResults, timeoutSecs) {
     }
 
     creatorMap.set(key, {
-      handle: username,
+      handle: sanitizeString(username),
       platform: 'tiktok',
-      full_name: author.nickName || author.nickname || author.name || '',
-      bio: author.signature || author.bio || '',
+      full_name: sanitizeString(author.nickName || author.nickname || author.name || ''),
+      bio: sanitizeString(author.signature || author.bio || ''),
       followers: author.fans || author.followers || author.followerCount || null,
       videos_found: 1,
       hashtag_source: (item.hashtags || []).map(h => h.name || h).slice(0, 5),
@@ -262,8 +289,8 @@ async function discoverTikTok(hashtags, maxResults, timeoutSecs) {
     return scoreB - scoreA;
   });
 
-  console.log(`[ApifyDiscovery] TikTok: ${creators.length} unika creators extraherade`);
-  return creators.slice(0, 30);
+  console.log(`[ApifyDiscovery] TikTok: ${creators.length} unika creators extraherade (max ${MAX_CREATORS_PER_PLATFORM})`);
+  return creators.slice(0, MAX_CREATORS_PER_PLATFORM);
 }
 
 // ============================================================
@@ -352,7 +379,7 @@ export function formatDiscoveryForClaude(discoveryResults) {
         c.followers ? `${c.followers} followers` : '',
         `— ${c.videos_found} videos i hashtaggen`,
         c.video_plays ? `(${c.video_plays} visningar)` : '',
-        c.bio ? `Bio: "${c.bio.slice(0, 80)}"` : '',
+        c.bio ? `Bio: "${sanitizeString(c.bio).slice(0, 80)}"` : '',
       ].filter(Boolean).join(' ');
       parts.push(line);
     }

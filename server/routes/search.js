@@ -128,11 +128,8 @@ router.post('/influencers', async (req, res) => {
         } catch (err) {
           console.warn(`[Search] generateDiscoveryHashtags misslyckades: ${err.message}`);
         }
-        // Fallback om Claude inte gav hashtags
-        if (!allHashtags.length) {
-          allHashtags = nischLabels.slice(0, 3).map(l => l.split(' ')[0].toLowerCase());
-        }
-        console.log(`[Search] Discovery hashtags (${allHashtags.length > 0 ? 'AI' : 'fallback'}): ${allHashtags.join(', ')}`);
+        // Ingen fallback — vi kör med det Claude ger oss (0-10 hashtags)
+        console.log(`[Search] Discovery hashtags (${allHashtags.length}): ${allHashtags.join(', ')}`);
 
         apifyDiscoveryData = await discoverInfluencers(
           allHashtags,

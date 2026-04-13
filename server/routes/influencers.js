@@ -729,7 +729,7 @@ router.post('/search-direct', async (req, res) => {
           const data = await serpRes.json();
           const organics = data.organic_results || [];
 
-          for (const item of organics.slice(0, 8)) {
+          for (const item of organics.slice(0, 12)) {
             const url = (item.link || '').toLowerCase();
             const title = item.title || '';
             const snippet = item.snippet || '';

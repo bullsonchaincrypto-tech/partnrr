@@ -578,46 +578,46 @@ export default function Step2HittaInfluencers({ foretag, outreachType, influence
             {displayList.map((inf) => (
               <div key={inf.id}>
                 <div
-                  className={`flex items-center gap-3 p-2.5 rounded-lg border cursor-pointer transition-colors ${
+                  className={`flex items-center gap-2 px-2.5 py-1.5 rounded-lg border cursor-pointer transition-colors ${
                     inf.vald
                       ? 'border-purple-500/50 bg-purple-500/10'
                       : 'border-gray-800/50 bg-gray-800/20 hover:border-gray-700'
                   }`}
                   onClick={() => toggleOne(inf.id)}
                 >
-                  <div className={`w-5 h-5 rounded border flex items-center justify-center flex-shrink-0 ${
+                  <div className={`w-4 h-4 rounded border flex items-center justify-center flex-shrink-0 ${
                     inf.vald ? 'bg-purple-600 border-purple-600' : 'border-gray-600'
                   }`}>
-                    {inf.vald ? <Check className="w-3 h-3 text-white" /> : null}
+                    {inf.vald ? <Check className="w-2.5 h-2.5 text-white" /> : null}
                   </div>
 
                   {inf.thumbnail ? (
-                    <img src={inf.thumbnail} alt="" className="w-8 h-8 rounded-full object-cover flex-shrink-0" />
+                    <img src={inf.thumbnail} alt="" className="w-7 h-7 rounded-full object-cover flex-shrink-0" />
                   ) : (
-                    <div className="w-8 h-8 rounded-full bg-gray-700 flex-shrink-0" />
+                    <div className="w-7 h-7 rounded-full bg-gray-700 flex-shrink-0" />
                   )}
 
                   <div className="flex-1 min-w-0">
-                    <div className="flex items-center gap-2">
-                      <span className="font-medium text-white text-sm">{inf.namn}</span>
+                    <div className="flex items-center gap-1.5 flex-wrap">
+                      <span className="font-medium text-white text-sm leading-tight">{inf.namn}</span>
                       {/* Plattformsbadge */}
                       {(() => {
                         const plat = PLATTFORMAR.find(p => (inf.plattform || '').toLowerCase().includes(p.id))
                         return plat ? (
-                          <span className={`text-[10px] px-1.5 py-0.5 rounded ${plat.color}`}>{plat.icon} {plat.label}</span>
+                          <span className={`text-[10px] px-1 py-0 rounded ${plat.color}`}>{plat.icon} {plat.label}</span>
                         ) : null
                       })()}
                       {/* Datakälla-badge — dölj för sponsors */}
                       {!inf._isSponsor && (
                         (inf.verifierad || inf.datakalla === 'youtube_api' || inf.datakalla === 'phyllo_api') ? (
-                          <span className="text-[10px] px-1.5 py-0.5 rounded bg-emerald-500/15 text-emerald-400 border border-emerald-500/20 flex items-center gap-0.5"
+                          <span className="text-[10px] px-1 py-0 rounded bg-emerald-500/15 text-emerald-400 border border-emerald-500/20 flex items-center gap-0.5"
                             title={`Verifierad via ${inf.datakalla === 'phyllo_api' ? 'Phyllo' : 'YouTube API'} — riktig data`}>
-                            <ShieldCheck className="w-3 h-3" /> Verifierad
+                            <ShieldCheck className="w-2.5 h-2.5" /> Verifierad
                           </span>
                         ) : (inf.datakalla === 'ai_genererad' || inf.datakalla === 'ai_search') ? (
-                          <span className="text-[10px] px-1.5 py-0.5 rounded bg-amber-500/15 text-amber-400 border border-amber-500/20 flex items-center gap-0.5"
+                          <span className="text-[10px] px-1 py-0 rounded bg-amber-500/15 text-amber-400 border border-amber-500/20 flex items-center gap-0.5"
                             title="AI-uppskattad data — följarantal och beskrivning kan avvika">
-                            <ShieldAlert className="w-3 h-3" /> Uppskattad
+                            <ShieldAlert className="w-2.5 h-2.5" /> Uppskattad
                           </span>
                         ) : null
                       )}
@@ -625,11 +625,11 @@ export default function Step2HittaInfluencers({ foretag, outreachType, influence
                       {inf._isSponsor && (
                         <>
                           {inf.kalla === 'google_maps' && (
-                            <span className="text-[10px] px-1.5 py-0.5 rounded bg-green-500/15 text-green-400 border border-green-500/20"
+                            <span className="text-[10px] px-1 py-0 rounded bg-green-500/15 text-green-400 border border-green-500/20"
                               title="Hittad via Google — verifierat företag">Verifierat</span>
                           )}
                           {inf.betyg && (
-                            <span className="text-[10px] px-1.5 py-0.5 rounded bg-yellow-500/15 text-yellow-400 border border-yellow-500/20"
+                            <span className="text-[10px] px-1 py-0 rounded bg-yellow-500/15 text-yellow-400 border border-yellow-500/20"
                               title={`Google-omdöme: ${inf.betyg} av 5 stjärnor`}>⭐ {inf.betyg}</span>
                           )}
                         </>
@@ -658,67 +658,63 @@ export default function Step2HittaInfluencers({ foretag, outreachType, influence
                           @{inf.kanalnamn} <ExternalLink className="w-2.5 h-2.5" />
                         </a>
                       )}
+                      {/* Nisch — inline */}
+                      {inf.nisch && (
+                        <span className="text-[10px] text-gray-500">{inf.nisch}</span>
+                      )}
                     </div>
-                    <div className="text-xs text-gray-500">{inf.nisch}</div>
-                    {/* Kanalbeskrivning — visas direkt */}
-                    {inf.beskrivning && (
-                      <p className="text-xs text-gray-500/80 mt-0.5 line-clamp-2 leading-relaxed max-w-xl">{inf.beskrivning}</p>
-                    )}
-                    {/* AI-motivering — visas direkt */}
+                    {/* AI-motivering — visas direkt, compact */}
                     {inf.ai_motivation && (
-                      <p className="text-xs text-purple-400/70 mt-1 line-clamp-1 max-w-xl">
-                        <span className="text-purple-400/50 mr-1">✨</span>
+                      <p className="text-[11px] text-purple-400/70 line-clamp-1 leading-tight mt-0.5">
+                        <span className="text-purple-400/50 mr-0.5">✨</span>
                         {inf.ai_motivation}
                       </p>
                     )}
                   </div>
 
-                  {/* AI Match Score */}
-                  {inf.match_score != null && (
-                    <div className="flex-shrink-0 w-14 text-center" title={`AI-bedömning av hur väl denna profil matchar din verksamhet (${inf.match_score}/100)`}>
-                      <div className={`text-xs font-bold px-1.5 py-0.5 rounded-full ${
-                        inf.match_score >= 70 ? 'bg-green-500/20 text-green-400' :
-                        inf.match_score >= 40 ? 'bg-yellow-500/20 text-yellow-400' :
-                        'bg-gray-700/50 text-gray-400'
-                      }`}>
-                        {inf.match_score}%
+                  {/* Right side: score + followers + detaljer — tight group */}
+                  <div className="flex items-center gap-2 flex-shrink-0">
+                    {/* AI Match Score */}
+                    {inf.match_score != null && (
+                      <div className="text-center w-12" title={`AI-bedömning av hur väl denna profil matchar din verksamhet (${inf.match_score}/100)`}>
+                        <div className={`text-xs font-bold px-1 py-0 rounded-full ${
+                          inf.match_score >= 70 ? 'bg-green-500/20 text-green-400' :
+                          inf.match_score >= 40 ? 'bg-yellow-500/20 text-yellow-400' :
+                          'bg-gray-700/50 text-gray-400'
+                        }`}>
+                          {inf.match_score}%
+                        </div>
                       </div>
-                      <div className="text-[9px] text-gray-600 mt-0.5">matchning</div>
-                    </div>
-                  )}
-
-
-                  {/* Följare — bara för influencers, inte sponsors */}
-                  {!inf._isSponsor && (
-                    <div className="text-right flex-shrink-0 w-20">
-                      <div className="text-sm font-medium text-white">{inf.foljare}</div>
-                      <div className="text-xs text-gray-500">{(inf.plattform || '').toLowerCase().includes('youtube') ? 'prenumeranter' : 'följare'}</div>
-                    </div>
-                  )}
-                  {/* Sponsor: extra badges borttagna (telefon visas i expanderad vy) */}
-
-                  <div className="flex-shrink-0 w-5">
-                    {inf.kontakt_epost ? (
-                      <span className="text-green-400" title={`E-post: ${inf.kontakt_epost}`}>✉</span>
-                    ) : (
-                      <span className="text-gray-700" title="Ingen e-post hittad">✉</span>
                     )}
+
+                    {/* Följare — bara för influencers */}
+                    {!inf._isSponsor && (
+                      <div className="text-right w-16">
+                        <div className="text-xs font-medium text-white leading-tight">{inf.foljare}</div>
+                        <div className="text-[9px] text-gray-500 leading-tight">{(inf.plattform || '').toLowerCase().includes('youtube') ? 'pren.' : 'följare'}</div>
+                      </div>
+                    )}
+
+                    {/* E-post-indikator — liten prick */}
+                    {inf.kontakt_epost && (
+                      <span className="text-green-400 text-[10px]" title={`E-post: ${inf.kontakt_epost}`}>✉</span>
+                    )}
+
+                    <button
+                      onClick={(e) => { e.stopPropagation(); setExpandedId(expandedId === inf.id ? null : inf.id) }}
+                      className={`flex items-center gap-0.5 text-[10px] px-1.5 py-0.5 rounded border transition-colors ${
+                        expandedId === inf.id
+                          ? 'text-purple-400 border-purple-500/40 bg-purple-500/10'
+                          : 'text-gray-500 border-gray-700 hover:text-gray-300 hover:border-gray-600 bg-gray-800/50'
+                      }`}
+                    >
+                      {expandedId === inf.id ? (
+                        <><ChevronUp className="w-3 h-3" /> Stäng</>
+                      ) : (
+                        <><ChevronDown className="w-3 h-3" /> Detaljer</>
+                      )}
+                    </button>
                   </div>
-
-                  <button
-                    onClick={(e) => { e.stopPropagation(); setExpandedId(expandedId === inf.id ? null : inf.id) }}
-                    className={`flex items-center gap-1 text-[10px] px-2 py-1 rounded border transition-colors flex-shrink-0 ${
-                      expandedId === inf.id
-                        ? 'text-purple-400 border-purple-500/40 bg-purple-500/10'
-                        : 'text-gray-500 border-gray-700 hover:text-gray-300 hover:border-gray-600 bg-gray-800/50'
-                    }`}
-                  >
-                    {expandedId === inf.id ? (
-                      <><ChevronUp className="w-3 h-3" /> Stäng</>
-                    ) : (
-                      <><ChevronDown className="w-3 h-3" /> Detaljer</>
-                    )}
-                  </button>
                 </div>
 
                 {expandedId === inf.id && (() => {

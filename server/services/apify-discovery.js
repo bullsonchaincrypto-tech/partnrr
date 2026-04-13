@@ -281,7 +281,7 @@ export function formatDiscoveryForClaude(discoveryResults) {
 
   if (discoveryResults.instagram?.length > 0) {
     parts.push('APIFY INSTAGRAM DISCOVERY (hittade via hashtag-sökning):');
-    for (const c of discoveryResults.instagram.slice(0, 20)) {
+    for (const c of discoveryResults.instagram.slice(0, 30)) {
       const line = [
         `  @${c.handle}`,
         c.full_name ? `(${c.full_name})` : '',
@@ -295,7 +295,7 @@ export function formatDiscoveryForClaude(discoveryResults) {
 
   if (discoveryResults.tiktok?.length > 0) {
     parts.push('\nAPIFY TIKTOK DISCOVERY (hittade via hashtag-sökning):');
-    for (const c of discoveryResults.tiktok.slice(0, 20)) {
+    for (const c of discoveryResults.tiktok.slice(0, 30)) {
       const line = [
         `  @${c.handle}`,
         c.full_name ? `(${c.full_name})` : '',

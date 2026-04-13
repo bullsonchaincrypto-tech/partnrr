@@ -300,7 +300,7 @@ async function searchGoogle(query) {
 
   if (!data) return [];
 
-  const results = (data.organic_results || []).slice(0, 8).map(item => ({
+  const results = (data.organic_results || []).slice(0, 10).map(item => ({
     type: 'organic',
     title: item.title || '',
     snippet: item.snippet || '',
@@ -528,7 +528,7 @@ ${goal ? `MÅL: ${goal}` : ''}
 ${excludeSection}
 ${condensed}
 
-Baserat på resultaten ovan, extrahera upp till 20 SVENSKA influencers.
+Baserat på resultaten ovan, extrahera upp till 30 SVENSKA influencers.
 ${excludeHandles.length > 0 ? 'VIKTIGT: Exkludera ALLA profiler listade ovan under "REDAN HITTADE". Hitta NYA profiler som INTE finns i den listan. Inkludera inte heller varianter av deras kanalnamn (t.ex. om @wettersol redan finns, inkludera inte @wettersolab).\n' : ''}VIKTIGT: Inkludera BARA profiler som skapar innehåll PÅ SVENSKA eller riktar sig till en SVENSK publik.
 Uteslut internationella/engelskspråkiga profiler även om de är relevanta ämnesvis.
 Returnera JSON-array:
@@ -585,7 +585,7 @@ BESKRIVNING: ${beskrivning || 'Ej angiven'}
 BRANSCH: ${industry || nischStr || 'gaming'}
 PLATTFORMAR: ${platformStr}
 ${fallbackExclude}
-Sök webben och hitta upp till 20 SVENSKA influencers som passar detta företag.
+Sök webben och hitta upp till 30 SVENSKA influencers som passar detta företag.
 ${excludeHandles.length > 0 ? 'VIKTIGT: Hitta NYA profiler — exkludera alla listade under "REDAN HITTADE" och varianter av deras kanalnamn.\n' : ''}VIKTIGT: Inkludera BARA profiler som skapar innehåll PÅ SVENSKA eller riktar sig till en SVENSK publik.
 Uteslut internationella/engelskspråkiga profiler.
 Returnera JSON-array:

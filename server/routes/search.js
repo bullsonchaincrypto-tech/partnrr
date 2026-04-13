@@ -271,9 +271,9 @@ router.post('/influencers', async (req, res) => {
     let finalResults = scored.filter(r => (r.match_score || 0) >= MIN_SCORE);
     console.log(`[Search] Score-filter: ${scored.length} → ${finalResults.length} (≥${MIN_SCORE}%)`);
 
-    // Fallback: om inga resultat klarar tröskeln, returnera topp 20 sorterade efter score
+    // Fallback: om inga resultat klarar tröskeln, returnera topp 30 sorterade efter score
     if (finalResults.length === 0 && scored.length > 0) {
-      finalResults = scored.slice(0, 20);
+      finalResults = scored.slice(0, 30);
       console.log(`[Search] Fallback: returnerar topp ${finalResults.length} resultat utan tröskel`);
     }
 

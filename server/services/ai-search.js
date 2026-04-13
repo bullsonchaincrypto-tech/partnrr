@@ -27,6 +27,7 @@ import Anthropic from '@anthropic-ai/sdk';
 import fetch from 'node-fetch';
 import { trackApiCost } from './cost-tracker.js';
 import { runApifyActor, isApifyConfigured } from './social-enrichment.js';
+import { formatDiscoveryForClaude } from './apify-discovery.js';
 
 const MODEL_DEFAULT = 'claude-sonnet-4-6';
 
@@ -519,7 +520,7 @@ Svara med ENBART en JSON-array av 5 strängar, ingen annan text.`
 // INFLUENCER-SÖKNING: Multi-engine SerpAPI → Sonnet
 // ============================================================
 
-export async function searchInfluencersAI({ companyName, industry, nischer, platforms, budget, audience_age, goal, previousCollabs, beskrivning, erbjudande_typ, syfte }) {
+export async function searchInfluencersAI({ companyName, industry, nischer, platforms, budget, audience_age, goal, previousCollabs, beskrivning, erbjudande_typ, syfte, apifyDiscoveryData, excludeHandles, prebuiltQueries }) {
   const platformStr = (platforms || ['youtube']).join(', ');
   const nischStr = (nischer || []).join(', ');
 
@@ -554,9 +555,19 @@ export async function searchInfluencersAI({ companyName, industry, nischer, plat
         googleResults.map(r => `  ${r.title} | ${r.snippet} | ${r.url}`).join('\n')
       : '';
 
-    const condensed = [svData, gsData].filter(Boolean).join('\n\n').slice(0, 8000);
+    // Formatera Apify discovery-data (creators hittade via hashtag-sökning)
+    let apifyData = '';
+    if (apifyDiscoveryData && (apifyDiscoveryData.instagram?.length > 0 || apifyDiscoveryData.tiktok?.length > 0)) {
+      apifyData = formatDiscoveryForClaude(apifyDiscoveryData);
+      console.log(`[AI-Search] Inkluderar Apify discovery-data: ${apifyDiscoveryData.instagram?.length || 0} IG + ${apifyDiscoveryData.tiktok?.length || 0} TT creators`);
+    }
 
-    const systemPrompt = `Du är en expert på influencer-marknadsföring i Sverige. Du får sökresultat från Google och Google Short Videos (TikTok/Instagram Reels/YouTube Shorts).
+    const condensed = [svData, gsData, apifyData].filter(Boolean).join('\n\n').slice(0, 12000);
+
+    const systemPrompt = `Du är en expert på influencer-marknadsföring i Sverige. Du får sökresultat från tre källor:
+1. Google Short Videos (TikTok/Instagram Reels/YouTube Shorts)
+2. Google Search (profiler, listor, artiklar)
+3. Apify Discovery (RIKTIGA creators hittade via hashtag-sökning på Instagram/TikTok — dessa är VERIFIERADE handles!)
 
 UPPGIFT:
 Analysera resultaten och identifiera svenska influencers som matchar företaget.
@@ -567,10 +578,13 @@ STRIKT MATCHNINGSKRAV:
 - Om företaget handlar om fantasy fotboll → hitta fotbollsanalytiker, fantasy sports-kreatörer, tipsters
 - SKIPPA generella gaming/esport-profiler som inte matchar det specifika erbjudandet
 - Short Videos-resultaten ger KANALNAMN och PLATTFORM direkt — använd dessa!
+- APIFY DISCOVERY-resultat är RIKTIGA handles från Instagram/TikTok — prioritera dessa högt!
+  De har redan verifierats via hashtaggar som matchar företagets nisch.
+  Inkludera dem om de skapar relevant innehåll.
 - Inkludera BARA profiler du hittar bevis för i sökresultaten
 - Ange BARA kanalnamn som nämns i resultaten — hitta ALDRIG PÅ kanalnamn
 - Följarantal: ange BARA om det nämns, annars null
-- Hellre 10 träffsäkra resultat än 20 dåliga
+- Hellre 15 träffsäkra resultat än 20 dåliga
 
 Svara med ENBART en JSON-array, inget annat.`;
 

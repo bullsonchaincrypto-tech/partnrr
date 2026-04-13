@@ -41,20 +41,20 @@ router.get('/stats', async (req, res) => {
   }));
 
   const perMonth = await queryAll(`
-    SELECT TO_CHAR(skickat_datum, 'YYYY-MM') as manad, COUNT(*) as count
+    SELECT TO_CHAR(skickat_datum::timestamp, 'YYYY-MM') as manad, COUNT(*) as count
     FROM outreach_meddelanden
     WHERE skickat_datum IS NOT NULL
-    GROUP BY TO_CHAR(skickat_datum, 'YYYY-MM')
+    GROUP BY TO_CHAR(skickat_datum::timestamp, 'YYYY-MM')
     ORDER BY manad DESC
     LIMIT 12
   `);
 
   // Per week stats
   const perWeek = await queryAll(`
-    SELECT TO_CHAR(skickat_datum, 'IYYY-"W"IW') as vecka, COUNT(*) as count
+    SELECT TO_CHAR(skickat_datum::timestamp, 'IYYY-"W"IW') as vecka, COUNT(*) as count
     FROM outreach_meddelanden
     WHERE skickat_datum IS NOT NULL
-    GROUP BY TO_CHAR(skickat_datum, 'IYYY-"W"IW')
+    GROUP BY TO_CHAR(skickat_datum::timestamp, 'IYYY-"W"IW')
     ORDER BY vecka DESC
     LIMIT 12
   `);

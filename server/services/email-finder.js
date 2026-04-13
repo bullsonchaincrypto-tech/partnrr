@@ -11,12 +11,10 @@ const resolveMx = promisify(dns.resolveMx);
  * Hitta e-postadress för en YouTube-kanal automatiskt.
  * VERSION 6 — Optimerad: SerpAPI + MX-validering + sociala länkar.
  *
- * Waterfall med early exit (5 steg):
+ * Waterfall med early exit (3 steg):
  * 1.   YouTube-beskrivningen — regex på text vi redan har (instant, gratis)
  * 1.5  YouTube Email Scraper — Apify actor som scrapar About-sidan (bakom CAPTCHA)
  * 2.   Apify Google Search (eller SerpAPI som fallback) — riktiga Google-sökresultat
- * 3.   Sociala profillänkar — Instagram, hemsidor från beskrivningen
- * 4.   DuckDuckGo + Bing (bara om SerpAPI-nyckel saknas)
  *
  * Alla hittade e-poster MX-valideras innan de returneras.
  */
@@ -28,13 +26,6 @@ const CONFIDENCE = {
   serpapi_page: 'high',
   apify_google_snippet: 'high',
   apify_google_page: 'high',
-  duckduckgo: 'medium',
-  bing: 'medium',
-  social_instagram: 'medium',
-  social_twitter: 'medium',
-  social_tiktok: 'medium',
-  social_facebook: 'medium',
-  linked_website: 'medium',
   cache: 'cached',
 };
 
@@ -101,25 +92,6 @@ export async function findEmailForChannel(channelInfo) {
     const serpResult = await searchWithSerpAPI(handle, { namn });
     if (serpResult) {
       const result = await found(serpResult.email, serpResult.method);
-      if (result) return result;
-    }
-  }
-
-  // ── Steg 3: Sociala profillänkar + länkade webbsidor från beskrivningen ──
-  const allLinks = extractAllLinks(beskrivning || '');
-  if (allLinks.socialLinks.length > 0 || allLinks.websiteLinks.length > 0) {
-    const socialResult = await scrapeSocialAndWebLinks(allLinks);
-    if (socialResult) {
-      const result = await found(socialResult.email, socialResult.method);
-      if (result) return result;
-    }
-  }
-
-  // ── Steg 4: DuckDuckGo + Bing (bara om SerpAPI saknas) ──
-  if (handle && !process.env.SERPAPI_KEY) {
-    const searchResult = await searchMultipleEngines(handle);
-    if (searchResult) {
-      const result = await found(searchResult.email, searchResult.method);
       if (result) return result;
     }
   }
@@ -556,139 +528,6 @@ async function serpApiQuery(query, apiKey) {
 }
 
 
-// ═══════════════════════════════════════════════
-// SOCIALA PROFILLÄNKAR
-// ═══════════════════════════════════════════════
-
-function extractAllLinks(text) {
-  if (!text) return { socialLinks: [], websiteLinks: [] };
-
-  const urlRegex = /https?:\/\/[^\s<>"')\]]+/gi;
-  const matches = text.match(urlRegex) || [];
-
-  const socialDomains = {
-    'instagram.com': 'instagram',
-    'twitter.com': 'twitter',
-    'x.com': 'twitter',
-    'tiktok.com': 'tiktok',
-    'facebook.com': 'facebook',
-  };
-
-  const skipDomains = ['youtube.com', 'youtu.be', 'twitch.tv', 'discord.gg', 'discord.com', 'snapchat.com', 'bit.ly', 'linktr.ee'];
-
-  const socialLinks = [];
-  const websiteLinks = [];
-
-  for (const url of matches) {
-    if (skipDomains.some(d => url.includes(d))) continue;
-
-    let isSocial = false;
-    for (const [domain, platform] of Object.entries(socialDomains)) {
-      if (url.includes(domain)) {
-        socialLinks.push({ url, platform });
-        isSocial = true;
-        break;
-      }
-    }
-
-    if (!isSocial) {
-      websiteLinks.push(url);
-    }
-  }
-
-  return { socialLinks: socialLinks.slice(0, 4), websiteLinks: websiteLinks.slice(0, 3) };
-}
-
-async function scrapeSocialAndWebLinks({ socialLinks, websiteLinks }) {
-  const tasks = [];
-
-  for (const { url, platform } of socialLinks) {
-    tasks.push(scrapeSocialProfile(url, platform));
-  }
-
-  for (const url of websiteLinks) {
-    tasks.push(scrapeWebsiteForEmail(url));
-  }
-
-  const results = await Promise.all(tasks.map(p => p.catch(() => null)));
-  return results.find(r => r !== null) || null;
-}
-
-async function scrapeSocialProfile(url, platform) {
-  const html = await quickFetch(url, 4000);
-  if (!html) return null;
-
-  const email = extractEmails(html);
-  if (email) {
-    return { email, method: `social_${platform}`, source: url };
-  }
-  return null;
-}
-
-async function scrapeWebsiteForEmail(url) {
-  let email = await fetchPageEmail(url, 3000);
-  if (email) return { email, method: 'linked_website', source: url };
-
-  try {
-    const base = new URL(url).origin;
-    const contactPages = ['/contact', '/kontakt', '/about', '/om', '/om-oss', '/kontakta-oss'];
-
-    const contactResults = await Promise.all(
-      contactPages.map(async (path) => {
-        const e = await fetchPageEmail(`${base}${path}`, 3000);
-        return e ? { email: e, method: 'linked_website', source: `${base}${path}` } : null;
-      })
-    );
-
-    return contactResults.find(r => r !== null) || null;
-  } catch {
-    return null;
-  }
-}
-
-
-// ═══════════════════════════════════════════════
-// SÖKMOTORER — DUCKDUCKGO + BING (fallback)
-// ═══════════════════════════════════════════════
-
-async function searchMultipleEngines(handle) {
-  const searches = [
-    searchDuckDuckGo(`${handle} email`),
-    searchDuckDuckGo(`${handle} kontakt email`),
-    searchBing(`${handle} email`),
-    searchBing(`${handle} youtube kontakt`),
-  ];
-
-  const results = await Promise.all(
-    searches.map(p => p.catch(() => null))
-  );
-
-  for (const r of results) {
-    if (r?.email) return r;
-  }
-  return null;
-}
-
-async function searchDuckDuckGo(query) {
-  const url = `https://html.duckduckgo.com/html/?q=${encodeURIComponent(query)}`;
-  const html = await quickFetch(url, 5000);
-  if (!html) return null;
-  if (html.includes('error-lite') || html.includes('Something went wrong') || !html.includes('result__')) return null;
-
-  const email = extractEmails(html);
-  if (email) return { email, method: 'duckduckgo', source: query };
-  return null;
-}
-
-async function searchBing(query) {
-  const url = `https://www.bing.com/search?q=${encodeURIComponent(query)}&setlang=sv`;
-  const html = await quickFetch(url, 5000);
-  if (!html) return null;
-
-  const email = extractEmails(html);
-  if (email) return { email, method: 'bing', source: query };
-  return null;
-}
 
 
 // ═══════════════════════════════════════════════
@@ -753,27 +592,6 @@ async function fetchPageEmail(url, timeoutMs = 4000) {
   } catch {
     return null;
   }
-}
-
-function extractDuckDuckGoUrls(html) {
-  const urlRegex = /class="result__a" href="([^"]+)"/g;
-  const urls = [];
-  let match;
-  while ((match = urlRegex.exec(html)) !== null) {
-    let url = match[1];
-    if (url.startsWith('//duckduckgo.com/l/?')) {
-      const uddg = url.match(/uddg=(https?[^&]+)/);
-      if (uddg) url = decodeURIComponent(uddg[1]);
-      else continue;
-    }
-    if (!url.startsWith('http')) continue;
-
-    const skip = ['youtube.com', 'instagram.com', 'tiktok.com', 'facebook.com', 'twitter.com', 'x.com', 'reddit.com', 'wikipedia.org', 'twitch.tv'];
-    if (!skip.some(d => url.includes(d))) {
-      urls.push(url);
-    }
-  }
-  return urls.slice(0, 3);
 }
 
 function extractEmails(text) {

@@ -249,4 +249,62 @@ router.post('/daily-summary/send', async (req, res) => {
   }
 });
 
+// POST /api/dashboard/reset — Rensa ALL data (admin-funktion)
+router.post('/reset', async (req, res) => {
+  try {
+    const { confirm } = req.body;
+    if (confirm !== 'RENSA_ALLT') {
+      return res.status(400).json({ error: 'Skicka { "confirm": "RENSA_ALLT" } för att bekräfta' });
+    }
+
+    // Ordning: barn-tabeller först (foreign keys)
+    const tables = [
+      'email_tracking',
+      'followup_log',
+      'uppfoljningar',
+      'content_submissions',
+      'content_tracking',
+      'content_scan_log',
+      'automation_log',
+      'inbox_messages',
+      'conversation_threads',
+      'activity_log',
+      'api_costs',
+      'fakturor',
+      'intakter',
+      'influencer_signups',
+      'influencer_blacklist',
+      'influencer_favorites',
+      'saved_searches',
+      'influencer_search_cache',
+      'enrichment_cache',
+      'ab_tests',
+      'kampanjer',
+      'kontrakt',
+      'sponsor_outreach',
+      'sponsor_prospects',
+      'outreach_meddelanden',
+      'influencers',
+      'foretag',
+    ];
+
+    const results = {};
+    for (const table of tables) {
+      try {
+        const before = (await queryOne(`SELECT COUNT(*) as count FROM ${table}`))?.count || 0;
+        await runSql(`DELETE FROM ${table}`);
+        results[table] = { deleted: before };
+      } catch (err) {
+        results[table] = { error: err.message };
+      }
+    }
+
+    console.log('[Dashboard] RESET: All data cleared');
+    res.json({ success: true, results });
+  } catch (error) {
+    console.error('Dashboard reset error:', error);
+    res.status(500).json({ error: error.message });
+  }
+});
+
 export default router;

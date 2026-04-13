@@ -21,7 +21,8 @@ export async function searchYouTubeChannels(searchQueries, maxResultsPerQuery = 
         key: apiKey,
         q: query,
         type: 'channel',
-        regionCode: 'SE',
+        // Ingen regionCode — det filtrerar bort svenska kanaler som inte explicit satt land=SE.
+        // relevanceLanguage räcker för att prioritera svenskt innehåll.
         relevanceLanguage: 'sv',
         maxResults: maxResultsPerQuery,
         part: 'snippet',
@@ -71,9 +72,11 @@ export async function searchYouTubeChannels(searchQueries, maxResultsPerQuery = 
         const snippet = ch.snippet || {};
         const branding = ch.brandingSettings?.channel || {};
 
-        // BARA svenska kanaler — filtrera bort alla andra länder
+        // Filtrera bort kanaler som explicit har ett ANNAT land än SE.
+        // Kanaler utan land (vanligt bland svenska kanaler) släpps igenom.
         const country = (snippet.country || '').toUpperCase();
-        if (country && country !== 'SE') {
+        const allowedCountries = new Set(['', 'SE']);
+        if (!allowedCountries.has(country)) {
           console.log(`[Partnrr] Filtrerar bort "${snippet.title}" (land: ${country})`);
           continue;
         }

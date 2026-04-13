@@ -643,7 +643,7 @@ async function searchYouTube(foretag, nischLabels) {
   console.log(`[Search] YouTube API: ${searchQueries.length} söktermer: ${searchQueries.slice(0, 5).join(', ')}${searchQueries.length > 5 ? '...' : ''}`);
 
   // Kör första omgången med alla söktermer
-  let channels = await searchYouTubeChannels(searchQueries, 10);
+  let channels = await searchYouTubeChannels(searchQueries, 50);
   console.log(`[Search] YouTube API: ${channels.length} kanaler efter första sökning`);
 
   // Om vi fick för få resultat, lägg till breda fallback-söktermer
@@ -657,7 +657,7 @@ async function searchYouTube(foretag, nischLabels) {
 
     if (broadTerms.length > 0) {
       console.log(`[Search] YouTube: Bara ${channels.length} resultat — kör ${broadTerms.length} breda fallback-söktermer`);
-      const extraChannels = await searchYouTubeChannels(broadTerms, 10);
+      const extraChannels = await searchYouTubeChannels(broadTerms, 50);
       // Merge utan dubbletter
       const existingIds = new Set(channels.map(c => c.channelId));
       const newChannels = extraChannels.filter(c => !existingIds.has(c.channelId));

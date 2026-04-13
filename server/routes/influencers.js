@@ -60,7 +60,7 @@ router.post('/find', async (req, res) => {
 
     // Steg 2: YouTube Data API v3 hämtar RIKTIG, VERIFIERAD data
     console.log(`[Partnrr] Steg 2: Hämtar verifierad data från YouTube Data API v3...`);
-    const allChannels = await searchYouTubeChannels(searchQueries, 10);
+    const allChannels = await searchYouTubeChannels(searchQueries, 50);
 
     const filtered = allChannels;
     console.log(`[Partnrr] ${allChannels.length} kanaler hittade`);
@@ -591,7 +591,7 @@ router.post('/search-direct', async (req, res) => {
     searchPromises.push(
       (async () => {
         try {
-          const ytResults = await searchYouTubeChannels([cleanQuery], { maxPerQuery: 5 });
+          const ytResults = await searchYouTubeChannels([cleanQuery], 50);
           if (ytResults?.length > 0) {
             for (const yt of ytResults) {
               const emailResult = await findEmailForChannel(yt.kanalnamn || yt.namn);

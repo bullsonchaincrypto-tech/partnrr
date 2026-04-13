@@ -12,7 +12,7 @@ export async function searchAllPlatforms(searchQueries, options = {}) {
 
   // --- YouTube (verifierad API-data) ---
   console.log('[Partnrr] Söker YouTube-kanaler...');
-  const youtubeChannels = await searchYouTubeChannels(searchQueries, 5);
+  const youtubeChannels = await searchYouTubeChannels(searchQueries, 50);
   console.log(`[Partnrr] ${youtubeChannels.length} YouTube-kanaler hittade`);
 
   // Extrahera cross-platform-länkar från YouTube-beskrivningar

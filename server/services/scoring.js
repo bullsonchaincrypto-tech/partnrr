@@ -233,7 +233,7 @@ export async function generateMatchMotivation(influencer, companyProfile, scoreR
       body: JSON.stringify({
         model: 'claude-sonnet-4-20250514',
         max_tokens: 200,
-        system: 'Du skriver MYCKET korta motiveringar (MAX 90 tecken) på svenska för varför en influencer matchar ett företag. Var specifik. Ingen inledande fras. Börja direkt med insikten.',
+        system: 'Du skriver MYCKET korta motiveringar (MAX 90 tecken) på svenska för varför en influencer matchar ett företag. Börja ALDRIG med namn/kontonamn. Nämn ALDRIG antal följare. Fokusera på nisch-matchning och passform.',
         messages: [{
           role: 'user',
           content: `Skriv en motivering på MAX 90 tecken:\n\n${context}`,
@@ -285,7 +285,7 @@ async function scoreWithClaude(influencers, companyProfile, nischLabels = []) {
 
 GE VARJE INFLUENCER:
 1. match_score (0-100): Hur väl matchar influencern företagets nisch, publik och mål
-2. motivation (MAX 90 tecken, en kort mening på svenska): Varför denna score — var specifik och koncis
+2. motivation (MAX 90 tecken, en kort mening på svenska): Förklara VARFÖR profilen matchar eller inte matchar företaget — fokusera på nisch-relevans och passform
 
 BEDÖMNINGSKRITERIER:
 - Nisch-relevans (viktigast): Matchar influencerns innehåll företagets bransch och AI-identifierade nischer?
@@ -312,7 +312,11 @@ SCORING-GUIDE:
 Under 30: Värdelös — fel nisch och/eller inga följare
 
 Svara med ENBART en JSON-array. Varje element: { "index": 0, "match_score": 85, "motivation": "kort text max 90 tecken" }
-VIKTIGT: Motivation MÅSTE vara max 90 tecken. Skriv kort och kärnfullt.`;
+REGLER FÖR MOTIVATION:
+- MAX 90 tecken. Skriv kort och kärnfullt.
+- Börja ALDRIG med influencerns namn eller kontonamn — det syns redan i UI:t.
+- Nämn ALDRIG antal följare — det syns redan i UI:t.
+- Fokusera ENBART på WHY: nisch-matchning, innehållstyp, publikpassform.`;
 
   const userMessage = `${companyContext}
 

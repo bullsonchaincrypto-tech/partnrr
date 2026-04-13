@@ -272,13 +272,76 @@ export default function StepKontraktBrief({
           errors[msg.id] = err.message
         }
       }
-      setContractBlobs(blobs)
-      setContractErrors(errors)
+      setContractBlobs(prev => ({ ...prev, ...blobs }))
+      setContractErrors(prev => ({ ...prev, ...errors }))
       setContractsGenerated(true)
 
       setKontraktBrief(briefData)
       setKontaktperson(kontakt)
       setAttachContracts(true)
+    } catch (err) {
+      setGenError(err.message)
+    } finally {
+      setGenerating(false)
+    }
+  }
+
+  // Generera kontrakt för nya meddelanden som saknar blob
+  const handleGenerateMissing = async () => {
+    const missing = messages.filter(msg => !contractBlobs[msg.id])
+    if (missing.length === 0) return
+
+    setGenerating(true)
+    setGenError('')
+    const total = missing.length
+    setGenProgress({ current: 0, total })
+
+    const briefData = isSponsor ? {
+      vill_skapa: 'ja', typ: 'sponsor', kontaktperson: kontakt,
+      samarbetstyper, vad_ni_erbjuder: vadNiErbjuder, vad_ni_vill_ha: vadNiVillHa,
+      sponsor_pris: sponsorPris, sponsor_avtalstid: sponsorAvtalstid,
+      extra_villkor: extraVillkor, contracts_generated: true,
+    } : {
+      vill_skapa: 'ja', typ: 'influencer', kontaktperson: kontakt,
+      ersattning_per_video: ersattningPerVideo, max_videos: maxVideos,
+      provision_per_signup: provisionPerSignup, avtalstid,
+      deadline_dagar: deadlineDagar || null, extra_villkor: extraVillkor,
+      contracts_generated: true,
+    }
+
+    try {
+      const blobs = {}
+      const errors = {}
+      for (let i = 0; i < missing.length; i++) {
+        const msg = missing[i]
+        console.log(`[KontraktBrief] Genererar saknat kontrakt ${i+1}/${missing.length}: influencer=${msg.influencer_namn}`)
+        setGenProgress({ current: i + 1, total })
+        try {
+          const blob = await api.generateKontraktDirect({
+            kontaktperson: kontakt,
+            influencer: {
+              id: msg.influencer_id || msg.prospect_id,
+              namn: msg.influencer_namn || msg.prospect_namn,
+              kanalnamn: msg.kanalnamn,
+              plattform: msg.plattform,
+              kontakt_epost: msg.kontakt_epost || msg.prospect_epost,
+              referral_kod: msg.referral_kod,
+              bransch: msg.prospect_bransch || null,
+              hemsida: msg.hemsida || msg.kanalnamn || null,
+              telefon: msg.telefon || null,
+            },
+            foretag,
+            kontraktVillkor: briefData,
+          })
+          const url = URL.createObjectURL(blob)
+          blobs[msg.id] = url
+        } catch (err) {
+          console.error(`Kontrakt-fel för ${msg.influencer_namn}:`, err.message)
+          errors[msg.id] = err.message
+        }
+      }
+      setContractBlobs(prev => ({ ...prev, ...blobs }))
+      setContractErrors(prev => ({ ...prev, ...errors }))
     } catch (err) {
       setGenError(err.message)
     } finally {
@@ -763,9 +826,27 @@ export default function StepKontraktBrief({
               {/* Genererade kontrakt — lista */}
               {contractsGenerated && (
                 <div className="space-y-3">
-                  <h3 className="text-sm font-semibold text-gray-300 mb-2">
-                    {Object.keys(contractBlobs).length} kontrakt genererade
-                  </h3>
+                  {(() => {
+                    const missingCount = messages.filter(m => !contractBlobs[m.id]).length
+                    return (
+                      <>
+                        <h3 className="text-sm font-semibold text-gray-300 mb-2">
+                          {Object.keys(contractBlobs).length} av {messages.length} kontrakt genererade
+                          {missingCount > 0 && <span className="text-yellow-400 ml-2">({missingCount} saknas)</span>}
+                        </h3>
+                        {missingCount > 0 && !generating && (
+                          <button
+                            type="button"
+                            onClick={handleGenerateMissing}
+                            className="flex items-center gap-2 bg-purple-600 hover:bg-purple-700 text-white px-4 py-2 rounded-lg text-sm font-medium transition-colors mb-2"
+                          >
+                            <FileText className="w-4 h-4" />
+                            Skapa kontrakt för {missingCount} nya {missingCount === 1 ? 'influencer' : 'influencers'}
+                          </button>
+                        )}
+                      </>
+                    )
+                  })()}
 
                   {messages.map((msg) => {
                     const hasContract = !!contractBlobs[msg.id]
@@ -915,9 +996,27 @@ export default function StepKontraktBrief({
 
               {contractsGenerated && (
                 <div className="space-y-3">
-                  <h3 className="text-sm font-semibold text-gray-300 mb-2">
-                    {Object.keys(contractBlobs).length} avtal genererade
-                  </h3>
+                  {(() => {
+                    const missingCount = messages.filter(m => !contractBlobs[m.id]).length
+                    return (
+                      <>
+                        <h3 className="text-sm font-semibold text-gray-300 mb-2">
+                          {Object.keys(contractBlobs).length} av {messages.length} avtal genererade
+                          {missingCount > 0 && <span className="text-yellow-400 ml-2">({missingCount} saknas)</span>}
+                        </h3>
+                        {missingCount > 0 && !generating && (
+                          <button
+                            type="button"
+                            onClick={handleGenerateMissing}
+                            className="flex items-center gap-2 bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg text-sm font-medium transition-colors mb-2"
+                          >
+                            <FileText className="w-4 h-4" />
+                            Skapa avtal för {missingCount} nya {missingCount === 1 ? 'sponsor' : 'sponsorer'}
+                          </button>
+                        )}
+                      </>
+                    )
+                  })()}
                   {messages.map((msg) => {
                     const hasContract = !!contractBlobs[msg.id]
                     const name = msg.influencer_namn || msg.prospect_namn || 'Okänd'

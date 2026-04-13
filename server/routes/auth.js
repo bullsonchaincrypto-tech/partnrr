@@ -5,6 +5,9 @@ import { runSql, queryOne } from '../db/schema.js';
 
 const router = Router();
 
+// CLIENT_URL kan vara komma-separerad (för CORS). Använd bara den första som redirect.
+const clientRedirectUrl = (process.env.CLIENT_URL || 'http://localhost:5173').split(',')[0].trim();
+
 // ─── Unified auth status ─────────────────────────────────────
 router.get('/status', async (req, res) => {
   const active = await getActiveProvider();
@@ -32,10 +35,10 @@ router.get('/google/callback', async (req, res) => {
     } else {
       await runSql(`INSERT INTO email_config (id, provider, email) VALUES (1, 'gmail', ?)`, [result.email]);
     }
-    res.redirect(`${process.env.CLIENT_URL || 'http://localhost:5173'}?auth=success`);
+    res.redirect(`${clientRedirectUrl}?auth=success`);
   } catch (error) {
     console.error('OAuth callback error:', error);
-    res.redirect(`${process.env.CLIENT_URL || 'http://localhost:5173'}?auth=error`);
+    res.redirect(`${clientRedirectUrl}?auth=error`);
   }
 });
 
@@ -58,7 +61,7 @@ router.get('/microsoft/callback', async (req, res) => {
     const { code, error, error_description } = req.query;
     if (error) {
       console.error('[Auth/Microsoft] OAuth error:', error, error_description);
-      return res.redirect(`${process.env.CLIENT_URL || 'http://localhost:5173'}?auth=error&msg=${encodeURIComponent(error_description || error)}`);
+      return res.redirect(`${clientRedirectUrl}?auth=error&msg=${encodeURIComponent(error_description || error)}`);
     }
     if (!code) return res.status(400).send('Ingen kod mottagen');
 
@@ -79,7 +82,7 @@ router.get('/microsoft/callback', async (req, res) => {
     if (!tokenResp.ok) {
       const errText = await tokenResp.text();
       console.error('[Auth/Microsoft] Token exchange failed:', errText);
-      return res.redirect(`${process.env.CLIENT_URL || 'http://localhost:5173'}?auth=error`);
+      return res.redirect(`${clientRedirectUrl}?auth=error`);
     }
 
     const tokens = await tokenResp.json();
@@ -135,10 +138,10 @@ router.get('/microsoft/callback', async (req, res) => {
     }
 
     console.log(`[Auth/Microsoft] ✓ Ansluten: ${email} (${displayName})`);
-    res.redirect(`${process.env.CLIENT_URL || 'http://localhost:5173'}?auth=success`);
+    res.redirect(`${clientRedirectUrl}?auth=success`);
   } catch (error) {
     console.error('[Auth/Microsoft] Callback error:', error);
-    res.redirect(`${process.env.CLIENT_URL || 'http://localhost:5173'}?auth=error`);
+    res.redirect(`${clientRedirectUrl}?auth=error`);
   }
 });
 

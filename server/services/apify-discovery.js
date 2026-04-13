@@ -61,8 +61,11 @@ export async function discoverInfluencers(hashtags, platforms = ['instagram', 't
 
   const { maxResultsPerHashtag = 30, timeoutSecs = 120 } = options;
 
+  console.log(`[ApifyDiscovery] ========================================`);
   console.log(`[ApifyDiscovery] Söker influencers via hashtags: ${hashtags.join(', ')}`);
   console.log(`[ApifyDiscovery] Plattformar: ${platforms.join(', ')}, max ${maxResultsPerHashtag} resultat/hashtag`);
+  console.log(`[ApifyDiscovery] APIFY_API_TOKEN: ${process.env.APIFY_API_TOKEN ? '✅ satt (' + process.env.APIFY_API_TOKEN.slice(0, 8) + '...)' : '❌ SAKNAS'}`);
+  console.log(`[ApifyDiscovery] Actors: IG=${DISCOVERY_ACTORS.instagram}, TT=${DISCOVERY_ACTORS.tiktok}`);
 
   const results = { instagram: [], tiktok: [] };
 
@@ -269,31 +272,53 @@ async function discoverTikTok(hashtags, maxResults, timeoutSecs) {
 
 async function runApifyActor(actorId, input, timeoutSecs = 120) {
   const token = getToken();
-  const encodedId = actorId.replace('/', '~');
-
-  const url = `${APIFY_BASE}/acts/${encodedId}/run-sync-get-dataset-items?token=${token}&timeout=${timeoutSecs}`;
-
-  console.log(`[ApifyDiscovery] Kör actor ${actorId} med input: ${JSON.stringify(input).slice(0, 200)}...`);
-
-  const res = await fetch(url, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify(input),
-  });
-
-  if (!res.ok) {
-    const errText = await res.text();
-    throw new Error(`Apify ${res.status}: ${errText.slice(0, 300)}`);
+  if (!token) {
+    console.error(`[ApifyDiscovery] ❌ APIFY_API_TOKEN saknas — kan inte köra ${actorId}`);
+    return [];
   }
 
-  const data = await res.json();
-  const items = Array.isArray(data) ? data : (data.items || data.data || []);
+  const encodedId = actorId.replace('/', '~');
+  const url = `${APIFY_BASE}/acts/${encodedId}/run-sync-get-dataset-items?token=${token}&timeout=${timeoutSecs}`;
 
-  console.log(`[ApifyDiscovery] Actor ${actorId} klar, ${items.length} items`);
+  console.log(`[ApifyDiscovery] 🚀 Kör actor ${actorId}`);
+  console.log(`[ApifyDiscovery]   Input: ${JSON.stringify(input)}`);
+  console.log(`[ApifyDiscovery]   Timeout: ${timeoutSecs}s`);
 
-  trackApiCost({ service: 'apify', endpoint: `discovery_${actorId}`, details: `${items.length} items` });
+  const startTime = Date.now();
 
-  return items;
+  try {
+    const res = await fetch(url, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(input),
+    });
+
+    const elapsed = ((Date.now() - startTime) / 1000).toFixed(1);
+
+    if (!res.ok) {
+      const errText = await res.text();
+      console.error(`[ApifyDiscovery] ❌ Actor ${actorId} — HTTP ${res.status} efter ${elapsed}s`);
+      console.error(`[ApifyDiscovery]   Response: ${errText.slice(0, 500)}`);
+      throw new Error(`Apify ${res.status}: ${errText.slice(0, 300)}`);
+    }
+
+    const data = await res.json();
+    const items = Array.isArray(data) ? data : (data.items || data.data || []);
+
+    console.log(`[ApifyDiscovery] ✅ Actor ${actorId} klar — ${items.length} items på ${elapsed}s`);
+    if (items.length > 0) {
+      console.log(`[ApifyDiscovery]   Första item keys: ${Object.keys(items[0]).slice(0, 10).join(', ')}`);
+    }
+
+    trackApiCost({ service: 'apify', endpoint: `discovery_${actorId}`, details: `${items.length} items` });
+
+    return items;
+  } catch (err) {
+    const elapsed = ((Date.now() - startTime) / 1000).toFixed(1);
+    if (err.message?.includes('Apify')) throw err; // Redan loggat ovan
+    console.error(`[ApifyDiscovery] ❌ Actor ${actorId} — nätverksfel efter ${elapsed}s: ${err.message}`);
+    throw err;
+  }
 }
 
 /**

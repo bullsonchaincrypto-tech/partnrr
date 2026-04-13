@@ -40,10 +40,22 @@ import { startScheduler as startFollowupScheduler, getSettings as getFollowupSet
 const app = express();
 const PORT = process.env.PORT || 3001;
 
+// Allowed origins: env + sparkcollab.se + partnrr.vercel.app
+const allowedOrigins = new Set([
+  'http://localhost:5173',
+  'https://sparkcollab.se',
+  'https://www.sparkcollab.se',
+  'https://partnrr.vercel.app',
+  ...(process.env.CLIENT_URL ? process.env.CLIENT_URL.split(',').map(s => s.trim()) : []),
+]);
+
 app.use(cors({
-  origin: process.env.CLIENT_URL
-    ? process.env.CLIENT_URL.split(',').map(s => s.trim())
-    : 'http://localhost:5173',
+  origin: (incomingOrigin, cb) => {
+    // Allow requests with no origin (mobile apps, curl, etc.)
+    if (!incomingOrigin) return cb(null, true);
+    if (allowedOrigins.has(incomingOrigin)) return cb(null, true);
+    cb(new Error(`CORS: origin ${incomingOrigin} not allowed`));
+  },
   credentials: true,
 }));
 app.use(express.json());

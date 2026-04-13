@@ -338,6 +338,9 @@ export default function Step2HittaInfluencers({ foretag, outreachType, influence
       list = list.filter(inf => inf.kontakt_epost)
     } else if (filterNisch === '__no_email') {
       list = list.filter(inf => !inf.kontakt_epost)
+    } else if (filterNisch.startsWith('__platform_')) {
+      const plat = filterNisch.replace('__platform_', '')
+      list = list.filter(inf => (inf.plattform || '').toLowerCase().includes(plat))
     } else if (filterNisch) {
       list = list.filter(inf => (inf.nisch || '').includes(filterNisch))
     }
@@ -358,6 +361,10 @@ export default function Step2HittaInfluencers({ foretag, outreachType, influence
   const isAiResults = influencers.length > 0 && String(influencers[0]?.id).startsWith('ai-')
 
   const toggleOne = async (id) => {
+    // Blockera markering om profilen saknar e-post
+    const inf = influencers.find(i => i.id === id)
+    if (inf && !inf.kontakt_epost && !inf._isSponsor) return
+
     // Alltid toggla lokalt FÖRST — snabb respons i UI
     setInfluencers(prev => prev.map(i => i.id === id ? { ...i, vald: i.vald ? 0 : 1 } : i))
 
@@ -376,9 +383,13 @@ export default function Step2HittaInfluencers({ foretag, outreachType, influence
   }
 
   const selectAll = async (val) => {
-    // Alltid uppdatera lokalt FÖRST — snabb respons
+    // Alltid uppdatera lokalt FÖRST — snabb respons. Skippa profiler utan e-post.
     const visibleIds = new Set(displayList.map(i => i.id))
-    setInfluencers(prev => prev.map(i => visibleIds.has(i.id) ? { ...i, vald: val ? 1 : 0 } : i))
+    setInfluencers(prev => prev.map(i => {
+      if (!visibleIds.has(i.id)) return i
+      if (!i.kontakt_epost && !i._isSponsor && val) return i // kan inte markeras utan e-post
+      return { ...i, vald: val ? 1 : 0 }
+    }))
 
     // Synca till DB i bakgrunden
     if (!isAiResults && foretag?.id) {
@@ -579,7 +590,15 @@ export default function Step2HittaInfluencers({ foretag, outreachType, influence
                 >
                   <option value="">Alla ({influencers.length})</option>
                   <option value="__has_email">Med e-post ({withEmail})</option>
-                  <option value="__no_email">Ingen e-post ({influencers.length - withEmail})</option>
+                  <option value="__no_email">Utan e-post ({influencers.length - withEmail})</option>
+                  {!isSponsor && <option disabled>── Plattform ──</option>}
+                  {!isSponsor && ['youtube', 'tiktok', 'instagram'].map(p => {
+                    const count = influencers.filter(i => (i.plattform || '').toLowerCase().includes(p)).length
+                    if (count === 0) return null
+                    const label = p === 'youtube' ? 'YouTube' : p === 'tiktok' ? 'TikTok' : 'Instagram'
+                    return <option key={p} value={`__platform_${p}`}>{label} ({count})</option>
+                  })}
+                  {allCategories.length > 0 && <option disabled>── Nisch ──</option>}
                   {allCategories.map(cat => (
                     <option key={cat} value={cat}>{cat} ({influencers.filter(i => (i.nisch || '').includes(cat)).length})</option>
                   ))}
@@ -604,15 +623,19 @@ export default function Step2HittaInfluencers({ foretag, outreachType, influence
             {displayList.map((inf) => (
               <div key={inf.id}>
                 <div
-                  className={`flex items-center gap-2 px-2.5 py-1.5 rounded-lg border cursor-pointer transition-colors ${
-                    inf.vald
-                      ? 'border-purple-500/50 bg-purple-500/10'
-                      : 'border-gray-800/50 bg-gray-800/20 hover:border-gray-700'
+                  className={`flex items-center gap-2 px-2.5 py-1.5 rounded-lg border transition-colors ${
+                    !inf.kontakt_epost && !inf._isSponsor
+                      ? 'border-gray-800/30 bg-gray-900/30 opacity-60 cursor-default'
+                      : inf.vald
+                        ? 'border-purple-500/50 bg-purple-500/10 cursor-pointer'
+                        : 'border-gray-800/50 bg-gray-800/20 hover:border-gray-700 cursor-pointer'
                   }`}
                   onClick={() => toggleOne(inf.id)}
                 >
                   <div className={`w-4 h-4 rounded border flex items-center justify-center flex-shrink-0 ${
-                    inf.vald ? 'bg-purple-600 border-purple-600' : 'border-gray-600'
+                    !inf.kontakt_epost && !inf._isSponsor
+                      ? 'border-gray-700/50 bg-gray-800/30'
+                      : inf.vald ? 'bg-purple-600 border-purple-600' : 'border-gray-600'
                   }`}>
                     {inf.vald ? <Check className="w-2.5 h-2.5 text-white" /> : null}
                   </div>
@@ -719,6 +742,13 @@ export default function Step2HittaInfluencers({ foretag, outreachType, influence
                         <div className="text-xs font-medium text-white leading-tight">{inf.foljare}</div>
                         <div className="text-[9px] text-gray-500 leading-tight">{(inf.plattform || '').toLowerCase().includes('youtube') ? 'pren.' : 'följare'}</div>
                       </div>
+                    )}
+
+                    {/* Ingen e-post-varning */}
+                    {!inf.kontakt_epost && !inf._isSponsor && (
+                      <span className="text-[9px] px-1.5 py-0.5 rounded bg-red-500/10 text-red-400/80 border border-red-500/20 whitespace-nowrap">
+                        Ingen e-post
+                      </span>
                     )}
 
                     <button

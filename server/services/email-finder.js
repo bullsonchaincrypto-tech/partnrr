@@ -11,17 +11,18 @@ const resolveMx = promisify(dns.resolveMx);
  * Hitta e-postadress för en YouTube-kanal automatiskt.
  * VERSION 6 — Optimerad: SerpAPI + MX-validering + sociala länkar.
  *
- * Waterfall med early exit (3 steg):
+ * Waterfall med early exit (2 steg):
  * 1. YouTube-beskrivningen — regex på text vi redan har (instant, gratis)
  * 2. Apify Google Search (eller SerpAPI som fallback) — riktiga Google-sökresultat
- * 3. YouTube Channel Email Scraper — Apify, scrapar About-sidan (DYR, sista alternativ)
+ *
+ * Om ingen e-post hittas → användaren hänvisas till att kolla YouTube About-sidan
+ * manuellt och mata in e-post i UI:t.
  *
  * Alla hittade e-poster MX-valideras innan de returneras.
  */
 
 const CONFIDENCE = {
   youtube_description: 'high',
-  youtube_about_scraper: 'high',
   serpapi_snippet: 'high',
   serpapi_page: 'high',
   apify_google_snippet: 'high',
@@ -33,9 +34,8 @@ const CONFIDENCE = {
 const CACHE_TTL_MS = 30 * 24 * 60 * 60 * 1000;
 
 export async function findEmailForChannel(channelInfo) {
-  const { kanalnamn, namn, beskrivning, kontakt_info, plattform } = channelInfo;
+  const { kanalnamn, namn, beskrivning, kontakt_info } = channelInfo;
   const handle = (kanalnamn || '').replace(/^@/, '');
-  const isYoutube = !plattform || plattform.toLowerCase() === 'youtube';
 
   // CACHE med TTL
   try {
@@ -84,16 +84,6 @@ export async function findEmailForChannel(channelInfo) {
     const serpResult = await searchWithSerpAPI(handle, { namn });
     if (serpResult) {
       const result = await found(serpResult.email, serpResult.method);
-      if (result) return result;
-    }
-  }
-
-  // ── Steg 3: YouTube Channel Email Scraper — SISTA alternativ (dyr) ──
-  // Bara för YouTube-kanaler, bara om inget annat hittade e-post
-  if (handle && isYoutube && await isApifyConfigured()) {
-    const ytEmailResult = await searchWithYouTubeEmailScraper(handle);
-    if (ytEmailResult) {
-      const result = await found(ytEmailResult.email, 'youtube_about_scraper');
       if (result) return result;
     }
   }
@@ -247,60 +237,6 @@ async function searchWithApifyGoogle(handle, extra = {}) {
     return null;
   }
 }
-
-// ═══════════════════════════════════════════════
-// YOUTUBE EMAIL SCRAPER — APIFY ABOUT-SIDA
-// ═══════════════════════════════════════════════
-
-/**
- * Scrapa YouTube-kanalens About-sida via Apify YouTube Email Scraper.
- * Actor: futurizerusn/youtube-email-scraper
- *
- * Denna actor kan hämta business-email som visas på About-sidan
- * (bakom CAPTCHA — ej tillgänglig via YouTube Data API).
- *
- * Input: channelUrls — en lista med YouTube-kanal-URL:er
- * Output: [{ channelUrl, emails: [...], ... }]
- *
- * Returnerar { email, method } eller null.
- */
-async function searchWithYouTubeEmailScraper(handle) {
-  console.log(`[E-post] 🎬 YouTube Channel Email Scraper: söker @${handle}...`);
-
-  try {
-    // dataovercoffee/Youtube-Channel-Business-Email-Scraper
-    const items = await runApifyActor('dataovercoffee/Youtube-Channel-Business-Email-Scraper', {
-      channels: [`@${handle}`],
-    }, 60); // 60 sek timeout
-
-    if (!items || items.length === 0) {
-      console.log(`[E-post] 🎬 YT Channel Email Scraper: inga resultat för @${handle}`);
-      return null;
-    }
-
-    for (const item of items) {
-      const possibleEmails = [
-        item.email,
-        item.businessEmail,
-        item.contactEmail,
-        ...(item.emails || []),
-      ].filter(Boolean);
-
-      const email = possibleEmails.length > 0 ? extractEmails(possibleEmails.join(' ')) : extractEmails(JSON.stringify(item));
-      if (email) {
-        console.log(`[E-post] 🎬 YT Channel Email Scraper: hittade ${email} för @${handle}`);
-        return { email, method: 'youtube_about_scraper', source: `https://www.youtube.com/@${handle}` };
-      }
-    }
-
-    console.log(`[E-post] 🎬 YT Channel Email Scraper: ingen e-post för @${handle}`);
-    return null;
-  } catch (err) {
-    console.error(`[E-post] YT Channel Email Scraper fel för @${handle}: ${err.message}`);
-    return null;
-  }
-}
-
 
 // ═══════════════════════════════════════════════
 // SERPAPI — FALLBACK E-POSTSÖKNING

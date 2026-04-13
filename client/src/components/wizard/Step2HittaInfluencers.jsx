@@ -60,6 +60,8 @@ export default function Step2HittaInfluencers({ foretag, outreachType, influence
   const [sortBy, setSortBy] = useState('score_desc')
   const [filterNisch, setFilterNisch] = useState('')
   const [expandedId, setExpandedId] = useState(null)
+  const [editingEmailId, setEditingEmailId] = useState(null)
+  const [editingEmailValue, setEditingEmailValue] = useState('')
   const [selectedPlatforms, setSelectedPlatforms] = useState(['youtube', 'instagram', 'tiktok'])
   const [searchMeta, setSearchMeta] = useState(null)
   const [directSearch, setDirectSearch] = useState('')
@@ -744,11 +746,51 @@ export default function Step2HittaInfluencers({ foretag, outreachType, influence
                       </div>
                     )}
 
-                    {/* Ingen e-post-varning */}
+                    {/* Ingen e-post — klickbar för manuell inmatning */}
                     {!inf.kontakt_epost && !inf._isSponsor && (
-                      <span className="text-[9px] px-1.5 py-0.5 rounded bg-red-500/10 text-red-400/80 border border-red-500/20 whitespace-nowrap">
-                        Ingen e-post
-                      </span>
+                      editingEmailId === inf.id ? (
+                        <form
+                          className="flex items-center gap-1"
+                          onSubmit={async (e) => {
+                            e.preventDefault()
+                            e.stopPropagation()
+                            const email = editingEmailValue.trim()
+                            if (!email || !email.includes('@')) return
+                            try {
+                              await api.saveEmail(inf.id, email)
+                              setInfluencers(prev => prev.map(i => i.id === inf.id ? { ...i, kontakt_epost: email } : i))
+                              setEditingEmailId(null)
+                              setEditingEmailValue('')
+                            } catch (err) {
+                              console.error('Kunde inte spara e-post:', err)
+                            }
+                          }}
+                        >
+                          <input
+                            type="email"
+                            value={editingEmailValue}
+                            onChange={(e) => setEditingEmailValue(e.target.value)}
+                            onClick={(e) => e.stopPropagation()}
+                            placeholder="namn@example.com"
+                            autoFocus
+                            className="text-[10px] w-40 px-1.5 py-0.5 rounded bg-gray-800 text-white border border-purple-500/50 focus:outline-none focus:border-purple-400"
+                          />
+                          <button type="submit" onClick={(e) => e.stopPropagation()} className="text-[9px] px-1.5 py-0.5 rounded bg-green-500/20 text-green-400 border border-green-500/30 hover:bg-green-500/30">
+                            Spara
+                          </button>
+                          <button type="button" onClick={(e) => { e.stopPropagation(); setEditingEmailId(null); setEditingEmailValue('') }} className="text-[9px] px-1 py-0.5 text-gray-500 hover:text-gray-300">
+                            ✕
+                          </button>
+                        </form>
+                      ) : (
+                        <button
+                          onClick={(e) => { e.stopPropagation(); setEditingEmailId(inf.id); setEditingEmailValue('') }}
+                          title={inf.plattform?.toLowerCase().includes('youtube') ? 'Kolla kanalens About-sida (Mer info) för e-post' : 'Klicka för att lägga till e-post manuellt'}
+                          className="text-[9px] px-1.5 py-0.5 rounded bg-red-500/10 text-red-400/80 border border-red-500/20 whitespace-nowrap hover:bg-red-500/20 hover:text-red-300 cursor-pointer transition-colors"
+                        >
+                          Ingen e-post
+                        </button>
+                      )
                     )}
 
                     <button
@@ -811,8 +853,12 @@ export default function Step2HittaInfluencers({ foretag, outreachType, influence
                               {inf.videoCount > 0 && (
                                 <p className="text-gray-400"><span className="text-gray-500">Videos:</span> {formatNumber(inf.videoCount)}</p>
                               )}
-                              {inf.kontakt_epost && (
+                              {inf.kontakt_epost ? (
                                 <p className="text-green-400"><span className="text-gray-500">E-post:</span> {inf.kontakt_epost}</p>
+                              ) : inf.plattform?.toLowerCase().includes('youtube') ? (
+                                <p className="text-yellow-400/70 text-[10px]"><span className="text-gray-500">E-post:</span> Saknas — kolla kanalens <a href={`${getChannelUrl(inf.kanalnamn, inf.plattform)}/about`} target="_blank" rel="noopener noreferrer" className="underline text-blue-400 hover:text-blue-300">About / Mer info</a>-sida</p>
+                              ) : (
+                                <p className="text-yellow-400/70 text-[10px]"><span className="text-gray-500">E-post:</span> Saknas</p>
                               )}
                               <p className="text-gray-400"><span className="text-gray-500">Källa:</span> {
                                 inf.datakalla === 'youtube_api' ? '✅ YouTube API' :

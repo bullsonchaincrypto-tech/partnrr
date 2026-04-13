@@ -32,6 +32,7 @@ export const findAllEmails = (foretagId) => request(`/influencers/foretag/${fore
 export const bulkSaveInfluencers = (foretagId, influencers) => request('/influencers/bulk-save', { method: 'POST', body: JSON.stringify({ foretag_id: foretagId, influencers }) });
 export const syncInfluencerSelection = (foretagId, selectedIds) => request(`/influencers/foretag/${foretagId}/sync-selection`, { method: 'PUT', body: JSON.stringify({ selectedIds }) });
 export const manualImportInfluencer = (data) => request('/influencers/manual-import', { method: 'POST', body: JSON.stringify(data) });
+export const saveEmail = (influencerId, email) => request('/email-finder/save', { method: 'POST', body: JSON.stringify({ influencer_id: influencerId, email, method: 'manual', confidence: 'high' }) });
 
 // Outreach
 export const getOutreach = (foretagId) => request(`/outreach/foretag/${foretagId}`);

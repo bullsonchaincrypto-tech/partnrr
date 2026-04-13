@@ -124,9 +124,10 @@ async function discoverInstagram(hashtags, maxResults, timeoutSecs) {
 
   console.log(`[ApifyDiscovery] Instagram hashtag-URLs: ${directUrls.join(', ')}`);
 
-  // Begränsa till 5 posts per hashtag → 25 totalt max (5 hashtags × 5 posts)
-  // Sparar pengar — vi behöver bara unika creators, inte massa posts
-  const resultsPerHashtag = Math.min(maxResults, 5);
+  // Hämta 8 posts per hashtag (5 × 8 = 40 items) för att kompensera duplikater
+  // och posts som filtreras bort (0 childPosts + 0 comments).
+  // Efter filtrering + deduplicering → ~25 unika creators.
+  const resultsPerHashtag = Math.min(maxResults, 8);
 
   const items = await runApifyActor(
     DISCOVERY_ACTORS.instagram,
@@ -214,9 +215,10 @@ async function discoverTikTok(hashtags, maxResults, timeoutSecs) {
 
   console.log(`[ApifyDiscovery] TikTok hashtags: ${cleanHashtags.join(', ')}`);
 
-  // Begränsa till 5 videos per hashtag → 25 totalt max (5 hashtags × 5 videos)
-  // Sparar pengar och ger ändå tillräckligt med unika creators
-  const resultsPerHashtag = Math.min(maxResults, 5);
+  // Hämta 8 videos per hashtag (5 × 8 = 40 items) för att kompensera duplikater.
+  // TikTok-scrapern returnerar videos, inte konton — samma konto kan dyka upp
+  // flera gånger. Med ~30% duplikatrate ger 40 items ≈ 25-28 unika creators.
+  const resultsPerHashtag = Math.min(maxResults, 8);
 
   const items = await runApifyActor(
     DISCOVERY_ACTORS.tiktok,

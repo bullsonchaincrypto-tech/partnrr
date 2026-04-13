@@ -219,6 +219,10 @@ async function enrichTikTokProfiles(usernames) {
           ACTORS.tiktok,
           {
             profiles: batch.map(u => u.replace(/^@/, '')),
+            resultsPerPage: 1,    // Vi behöver bara profildata, inte alla videos
+            shouldDownloadCovers: false,
+            shouldDownloadVideos: false,
+            shouldDownloadSubtitles: false,
           },
           TIMEOUT_SECS
         );

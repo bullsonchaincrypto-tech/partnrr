@@ -191,45 +191,20 @@ router.post('/influencers', async (req, res) => {
     console.log(`[Search] ${allResults.length} unika profiler efter merge`);
 
     // ============================================================
-    // FAS 3: Scoring pipeline (INNAN enrichment — billigare)
-    // Claude scorear baserat på AI-data, SerpAPI och Discovery-resultat
-    // ============================================================
-    console.log(`[Search] Kör scoring-pipeline (${allResults.length} profiler)...`);
-    const scored = await scoreAndRankInfluencers(allResults, companyProfile, {
-      generateMotivations: true,
-      topN: 5,
-      nischLabels: nischLabels || [],
-    });
-
-    // ============================================================
-    // FAS 3.5: Filtrera — behåll bara relevanta profiler
-    // ============================================================
-    const MIN_SCORE = 20;
-    let finalResults = scored.filter(r => (r.match_score || 0) >= MIN_SCORE);
-    console.log(`[Search] Score-filter: ${scored.length} → ${finalResults.length} (≥${MIN_SCORE}%)`);
-
-    // Fallback: om inga resultat klarar tröskeln, returnera topp 30 sorterade efter score
-    if (finalResults.length === 0 && scored.length > 0) {
-      finalResults = scored.slice(0, 30);
-      console.log(`[Search] Fallback: returnerar topp ${finalResults.length} resultat utan tröskel`);
-    }
-
-    // ============================================================
-    // FAS 4: Apify Enrichment — BARA för profiler Claude valde
-    // Kör Profile Scraper enbart på de ~30 som klarat scoring.
-    // Sparar ~70% av Apify-kostnaden jämfört med att enricha alla.
+    // FAS 3: Apify Enrichment — verifiera followers + bio
+    // Körs på allResults som redan är Claudes urval (~30 profiler)
     // ============================================================
     if (isApifyConfigured()) {
-      const needsEnrichment = finalResults.filter(
+      const needsEnrichment = allResults.filter(
         r => !r.verifierad &&
              ['instagram', 'tiktok'].includes((r.platform || r.plattform || '').toLowerCase())
       );
       if (needsEnrichment.length > 0) {
-        console.log(`[Search] Enrichar ${needsEnrichment.length} utvalda profiler via Apify (av ${allResults.length} totalt — ${Math.round((1 - needsEnrichment.length / allResults.length) * 100)}% sparad)...`);
+        console.log(`[Search] Enrichar ${needsEnrichment.length} profiler via Apify...`);
         console.log(`[Search] Handles: ${needsEnrichment.map(r => `@${r.handle || r.kanalnamn} (${r.platform})`).join(', ')}`);
         try {
-          finalResults = await enrichInfluencers(finalResults);
-          const enriched = finalResults.filter(r => r.datakalla?.startsWith('apify_'));
+          allResults = await enrichInfluencers(allResults);
+          const enriched = allResults.filter(r => r.datakalla?.startsWith('apify_'));
           sources.apify_enriched = enriched.length;
           console.log(`[Search] Apify enrichade ${enriched.length}/${needsEnrichment.length} profiler`);
           enriched.forEach(r => console.log(`[Search]   @${r.handle || r.kanalnamn}: ${r.followers || 0} followers, bio: ${r.bio ? 'JA' : 'NEJ'}`));
@@ -238,18 +213,18 @@ router.post('/influencers', async (req, res) => {
           sources.apify_enriched = 0;
         }
       } else {
-        console.log(`[Search] Ingen enrichment behövs (alla redan verifierade)`);
+        console.log(`[Search] Ingen enrichment behövs`);
       }
     } else {
       console.log(`[Search] ⚠️ APIFY_API_TOKEN ej konfigurerat — profiler enrichas INTE`);
     }
 
     // ============================================================
-    // FAS 5: Sök e-post (BARA för utvalda profiler utan e-post)
+    // FAS 4: Sök e-post (för profiler utan e-post)
     // ============================================================
-    const needEmail = finalResults.filter(r => !r.kontakt_epost);
+    const needEmail = allResults.filter(r => !r.kontakt_epost);
     if (needEmail.length > 0) {
-      console.log(`[Search] Söker e-post för ${needEmail.length} utvalda profiler...`);
+      console.log(`[Search] Söker e-post för ${needEmail.length} profiler...`);
       try {
         const emailResults = await findEmailsForChannels(
           needEmail.map(r => ({
@@ -265,9 +240,9 @@ router.post('/influencers', async (req, res) => {
         let emailsFound = 0;
         for (let i = 0; i < needEmail.length; i++) {
           if (emailResults[i]?.email) {
-            const idx = finalResults.findIndex(r => r === needEmail[i]);
+            const idx = allResults.findIndex(r => r === needEmail[i]);
             if (idx >= 0) {
-              finalResults[idx].kontakt_epost = emailResults[i].email;
+              allResults[idx].kontakt_epost = emailResults[i].email;
               emailsFound++;
             }
           }
@@ -276,6 +251,28 @@ router.post('/influencers', async (req, res) => {
       } catch (err) {
         console.error('[Search] Email search error:', err.message);
       }
+    }
+
+    // ============================================================
+    // FAS 5: Scoring pipeline (med riktig followers-data)
+    // ============================================================
+    console.log(`[Search] Kör scoring-pipeline...`);
+    const scored = await scoreAndRankInfluencers(allResults, companyProfile, {
+      generateMotivations: true,
+      topN: 5,
+      nischLabels: nischLabels || [],
+    });
+
+    // ============================================================
+    // FAS 6: Filtrera bort irrelevanta resultat
+    // ============================================================
+    const MIN_SCORE = 20;
+    let finalResults = scored.filter(r => (r.match_score || 0) >= MIN_SCORE);
+    console.log(`[Search] Score-filter: ${scored.length} → ${finalResults.length} (≥${MIN_SCORE}%)`);
+
+    if (finalResults.length === 0 && scored.length > 0) {
+      finalResults = scored.slice(0, 30);
+      console.log(`[Search] Fallback: returnerar topp ${finalResults.length} resultat utan tröskel`);
     }
 
     if (filters) {

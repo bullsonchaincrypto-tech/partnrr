@@ -158,7 +158,7 @@ router.post('/influencers', async (req, res) => {
     );
 
     if (nonYoutubePlatforms.length > 0 && !hasNonYoutubeResults) {
-      console.log(`[Search] Steg 1+3: AI-sökning (SerpAPI + Apify Discovery → Claude)...`);
+      console.log(`[Search] Steg 1+3: AI-sökning (Apify Discovery → Claude)...`);
       try {
         const aiInfluencers = await searchInfluencersAI({
           companyName: foretag.namn,
@@ -183,7 +183,7 @@ router.post('/influencers', async (req, res) => {
             kontakt_epost: inf.kontakt_epost || null,
             kontakt_info: inf.kontakt_metod || null,
             nisch: inf.nisch || '',
-            datakalla: 'ai_web_search',
+            datakalla: 'apify_discovery_ai',
             verifierad: false,
             ai_score: inf.ai_score || 50,
             ai_motivation: inf.ai_motivation || '',

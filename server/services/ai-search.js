@@ -517,78 +517,53 @@ Svara med ENBART en JSON-array av 5 strängar, ingen annan text.`
 }
 
 // ============================================================
-// INFLUENCER-SÖKNING: Multi-engine SerpAPI → Sonnet
+// INFLUENCER-SÖKNING: Apify Discovery → Sonnet (SerpAPI pausad)
 // ============================================================
 
 export async function searchInfluencersAI({ companyName, industry, nischer, platforms, budget, audience_age, goal, previousCollabs, beskrivning, erbjudande_typ, syfte, apifyDiscoveryData, excludeHandles, prebuiltQueries }) {
   const platformStr = (platforms || ['youtube']).join(', ');
   const nischStr = (nischer || []).join(', ');
 
-  const { shortVideoQuery, googleQuery } = buildSearchQueries({ companyName, beskrivning, nischer, platforms });
+  // ── SerpAPI pausad — enbart Apify Discovery → Claude-analys ──
+  console.log(`[AI-Search] Apify Discovery → Claude-analys (SerpAPI pausad)`);
 
-  // ── STEG 1: Parallella SerpAPI-sökningar (2 queries) ──
-  console.log(`[AI-Search] Steg 1: Multi-engine sökning...`);
-  console.log(`  [Short Videos] "${shortVideoQuery}"`);
-  console.log(`  [Google]        "${googleQuery}"`);
+  // Formatera Apify discovery-data (creators hittade via hashtag-sökning)
+  let apifyData = '';
+  const igCount = apifyDiscoveryData?.instagram?.length || 0;
+  const ttCount = apifyDiscoveryData?.tiktok?.length || 0;
+  const totalDiscovery = igCount + ttCount;
 
-  const [shortVideoResults, googleResults] = await Promise.all([
-    searchShortVideos(shortVideoQuery),
-    searchGoogle(googleQuery),
-  ]);
+  if (apifyDiscoveryData && totalDiscovery > 0) {
+    apifyData = formatDiscoveryForClaude(apifyDiscoveryData);
+    console.log(`[AI-Search] Apify discovery-data: ${igCount} IG + ${ttCount} TT creators`);
+  }
 
-  const totalResults = shortVideoResults.length + googleResults.length;
-  const serpWorked = totalResults > 0;
+  if (!apifyData) {
+    console.log(`[AI-Search] ⚠️ Ingen Apify discovery-data — kan inte söka utan data`);
+    return [];
+  }
 
-  // ── STEG 2: Sonnet analyserar (om SerpAPI gav resultat) ──
-  if (serpWorked) {
-    console.log(`[AI-Search] SerpAPI: ${shortVideoResults.length} short videos + ${googleResults.length} organic = ${totalResults} totalt`);
+  const condensed = apifyData.slice(0, 12000);
 
-    // Formatera Short Videos som strukturerad data
-    const svData = shortVideoResults.length > 0
-      ? 'SHORT VIDEOS (TikTok/Instagram Reels/YouTube Shorts):\n' +
-        shortVideoResults.map(r => `  ${r.channel} [${r.source}] — "${r.title}" (${r.link})`).join('\n')
-      : '';
-
-    // Formatera Google-resultat
-    const gsData = googleResults.length > 0
-      ? 'GOOGLE-SÖKRESULTAT:\n' +
-        googleResults.map(r => `  ${r.title} | ${r.snippet} | ${r.url}`).join('\n')
-      : '';
-
-    // Formatera Apify discovery-data (creators hittade via hashtag-sökning)
-    let apifyData = '';
-    if (apifyDiscoveryData && (apifyDiscoveryData.instagram?.length > 0 || apifyDiscoveryData.tiktok?.length > 0)) {
-      apifyData = formatDiscoveryForClaude(apifyDiscoveryData);
-      console.log(`[AI-Search] Inkluderar Apify discovery-data: ${apifyDiscoveryData.instagram?.length || 0} IG + ${apifyDiscoveryData.tiktok?.length || 0} TT creators`);
-    }
-
-    const condensed = [svData, gsData, apifyData].filter(Boolean).join('\n\n').slice(0, 12000);
-
-    const systemPrompt = `Du är en expert på influencer-marknadsföring i Sverige. Du får sökresultat från tre källor:
-1. Google Short Videos (TikTok/Instagram Reels/YouTube Shorts)
-2. Google Search (profiler, listor, artiklar)
-3. Apify Discovery (RIKTIGA creators hittade via hashtag-sökning på Instagram/TikTok — dessa är VERIFIERADE handles!)
+  const systemPrompt = `Du är en expert på influencer-marknadsföring i Sverige. Du får en lista med RIKTIGA creators som hittats via hashtag-sökning på Instagram och TikTok genom Apify Discovery.
 
 UPPGIFT:
-Analysera resultaten och identifiera svenska influencers som matchar företaget.
+Analysera listan och identifiera svenska influencers som matchar företaget.
 Returnera ENBART en JSON-array — ingen annan text.
 
 STRIKT MATCHNINGSKRAV:
+- Alla handles i listan är VERIFIERADE — de existerar på riktigt
 - Matcha influencers som är relevanta för EXAKT det företaget erbjuder
 - Om företaget handlar om fantasy fotboll → hitta fotbollsanalytiker, fantasy sports-kreatörer, tipsters
-- SKIPPA generella gaming/esport-profiler som inte matchar det specifika erbjudandet
-- Short Videos-resultaten ger KANALNAMN och PLATTFORM direkt — använd dessa!
-- APIFY DISCOVERY-resultat är RIKTIGA handles från Instagram/TikTok — prioritera dessa högt!
-  De har redan verifierats via hashtaggar som matchar företagets nisch.
-  Inkludera dem om de skapar relevant innehåll.
-- Inkludera BARA profiler du hittar bevis för i sökresultaten
-- Ange BARA kanalnamn som nämns i resultaten — hitta ALDRIG PÅ kanalnamn
-- Följarantal: ange BARA om det nämns, annars null
+- SKIPPA generella profiler som inte matchar det specifika erbjudandet
+- Inkludera ALLA profiler som skapar relevant innehåll för företagets nisch
+- Följarantal: ange BARA om det nämns i datan, annars null
 - Hellre 15 träffsäkra resultat än 20 dåliga
+- Uteslut uppenbart icke-influencer-konton (t.ex. företagskonton som säljer produkter, butiker, kedjor)
 
 Svara med ENBART en JSON-array, inget annat.`;
 
-    const userMessage = `FÖRETAG: ${companyName}
+  const userMessage = `FÖRETAG: ${companyName}
 BESKRIVNING: ${beskrivning || 'Ej angiven'}
 BRANSCH: ${industry || nischStr || 'gaming'}
 PLATTFORMAR: ${platformStr}
@@ -597,7 +572,7 @@ ${goal ? `MÅL: ${goal}` : ''}
 
 ${condensed}
 
-Baserat på resultaten ovan, extrahera upp till 20 SVENSKA influencers.
+Baserat på Apify Discovery-resultaten ovan, välj upp till 20 SVENSKA influencers som passar ${companyName}.
 VIKTIGT: Inkludera BARA profiler som skapar innehåll PÅ SVENSKA eller riktar sig till en SVENSK publik.
 Uteslut internationella/engelskspråkiga profiler även om de är relevanta ämnesvis.
 Returnera JSON-array:
@@ -605,56 +580,10 @@ Returnera JSON-array:
   {
     "namn": "Influencerns riktiga namn eller kanalnamn",
     "kanalnamn": "@kanalnamn",
-    "plattform": "instagram|tiktok|youtube",
-    "foljare": 50000 eller null,
-    "nisch": "t.ex. fantasy fotboll, fotbollsanalys",
-    "profil_beskrivning": "Kort beskrivning baserat på sökresultaten",
-    "kontakt_epost": "email@example.com eller null",
-    "ai_score": 85,
-    "ai_motivation": "Varför denna influencer passar ${companyName}"
-  }
-]
-
-ENBART JSON. Inga kommentarer.`;
-
-    console.log(`[AI-Search] Steg 2: Sonnet analyserar ${totalResults} resultat...`);
-    const raw = await callClaude(systemPrompt, userMessage, 5000);
-    const influencers = parseJSON(raw);
-
-    console.log(`[AI-Search] ✅ ${influencers.length} influencers (Short Videos + Google → Sonnet)`);
-    return normalizeResults(influencers);
-  }
-
-  // ── FALLBACK: Claude web_search (om SerpAPI misslyckades helt) ──
-  console.log(`[AI-Search] ⚠️ SerpAPI misslyckades — fallback till Claude web_search`);
-
-  const fallbackSystemPrompt = `Du är en expert på influencer-marknadsföring i Sverige. Använd web_search för att hitta relevanta svenska influencers.
-
-STRIKT MATCHNINGSKRAV:
-- Matcha influencers som är relevanta för EXAKT det företaget erbjuder
-- Om företaget handlar om fantasy fotboll → hitta fotbollsanalytiker, fantasy sports-kreatörer, tipsters
-- SKIPPA generella gaming/esport-profiler som inte matchar
-- Hellre 10 träffsäkra resultat än 20 dåliga
-
-Svara med ENBART en JSON-array — ingen annan text.`;
-
-  const fallbackUserMessage = `FÖRETAG: ${companyName}
-BESKRIVNING: ${beskrivning || 'Ej angiven'}
-BRANSCH: ${industry || nischStr || 'gaming'}
-PLATTFORMAR: ${platformStr}
-
-Sök webben och hitta upp till 20 SVENSKA influencers som passar detta företag.
-VIKTIGT: Inkludera BARA profiler som skapar innehåll PÅ SVENSKA eller riktar sig till en SVENSK publik.
-Uteslut internationella/engelskspråkiga profiler.
-Returnera JSON-array:
-[
-  {
-    "namn": "Influencerns riktiga namn",
-    "kanalnamn": "@kanalnamn",
     "plattform": "instagram|tiktok",
     "foljare": 50000 eller null,
-    "nisch": "t.ex. fantasy fotboll",
-    "profil_beskrivning": "Kort beskrivning",
+    "nisch": "t.ex. smart home, teknik",
+    "profil_beskrivning": "Kort beskrivning baserat på discovery-datan",
     "kontakt_epost": "email@example.com eller null",
     "ai_score": 85,
     "ai_motivation": "Varför denna influencer passar ${companyName}"
@@ -663,10 +592,11 @@ Returnera JSON-array:
 
 ENBART JSON. Inga kommentarer.`;
 
-  const raw = await callClaudeWithWebSearch(fallbackSystemPrompt, fallbackUserMessage, 8000, { maxSearches: 3 });
+  console.log(`[AI-Search] Claude analyserar ${totalDiscovery} Apify-creators...`);
+  const raw = await callClaude(systemPrompt, userMessage, 5000);
   const influencers = parseJSON(raw);
 
-  console.log(`[AI-Search] ✅ ${influencers.length} influencers (Claude web_search fallback)`);
+  console.log(`[AI-Search] ✅ ${influencers.length} influencers (Apify Discovery → Sonnet)`);
   return normalizeResults(influencers);
 }
 

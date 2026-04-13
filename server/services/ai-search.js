@@ -473,18 +473,18 @@ Beskrivning: ${beskrivning}
 Generera exakt 5 hashtags som SVENSKA influencers inom denna bransch FAKTISKT använder på Instagram och TikTok.
 
 REGLER:
+- ALLA hashtags ska vara på SVENSKA — vi söker efter SVENSKA influencers
 - Hashtagsen ska vara POPULÄRA nog att ge resultat (inte hyper-nischade)
-- Blanda svenska och engelska hashtags (influencers använder båda)
-- Fokusera på hashtags som KREATÖRER/INFLUENCERS använder, inte företag
-- Tänk: vilka hashtags sätter en svensk tech-reviewer/livsstilsinfluencer på sina inlägg?
+- Fokusera på hashtags som SVENSKA KREATÖRER/INFLUENCERS faktiskt använder
+- Tänk: vilka hashtags sätter en svensk influencer i denna nisch på sina inlägg?
 - INGA generiska hashtags som "sverige" eller "influencer"
 - Returnera UTAN #-tecken
 
 Exempel för ett företag som säljer träningskläder:
-["träning", "gymlife", "fitnesssverige", "träningsinspo", "workoutmotivation"]
+["träning", "träningsinspo", "svenskträning", "hälsoliv", "sportmode"]
 
 Exempel för ett företag som säljer hemelektronik:
-["smarthome", "techreview", "hemautomation", "gadgets", "techsverige"]
+["smartahem", "teknikprylar", "hemelektronik", "tekniktips", "smarthem"]
 
 Svara med ENBART en JSON-array av 5 strängar, ingen annan text.`
       }],

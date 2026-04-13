@@ -11,19 +11,23 @@ const resolveMx = promisify(dns.resolveMx);
  * Hitta e-postadress för en YouTube-kanal automatiskt.
  * VERSION 6 — Optimerad: SerpAPI + MX-validering + sociala länkar.
  *
- * Waterfall med early exit (4 steg):
- * 1. YouTube-beskrivningen — regex på text vi redan har (instant, gratis)
- * 2. SerpAPI — riktiga Google-sökresultat (2-3 queries, stegvis eskalering)
- * 3. Sociala profillänkar — Instagram, hemsidor från beskrivningen
- * 4. DuckDuckGo + Bing (bara om SerpAPI-nyckel saknas)
+ * Waterfall med early exit (5 steg):
+ * 1.   YouTube-beskrivningen — regex på text vi redan har (instant, gratis)
+ * 1.5  YouTube Email Scraper — Apify actor som scrapar About-sidan (bakom CAPTCHA)
+ * 2.   Apify Google Search (eller SerpAPI som fallback) — riktiga Google-sökresultat
+ * 3.   Sociala profillänkar — Instagram, hemsidor från beskrivningen
+ * 4.   DuckDuckGo + Bing (bara om SerpAPI-nyckel saknas)
  *
  * Alla hittade e-poster MX-valideras innan de returneras.
  */
 
 const CONFIDENCE = {
   youtube_description: 'high',
+  youtube_about_scraper: 'high',
   serpapi_snippet: 'high',
   serpapi_page: 'high',
+  apify_google_snippet: 'high',
+  apify_google_page: 'high',
   duckduckgo: 'medium',
   bing: 'medium',
   social_instagram: 'medium',
@@ -74,6 +78,15 @@ export async function findEmailForChannel(channelInfo) {
   if (email) {
     const result = await found(email, 'youtube_description');
     if (result) return result;
+  }
+
+  // ── Steg 1.5: YouTube Email Scraper — scrapa About-sidan (bakom CAPTCHA) ──
+  if (handle && await isApifyConfigured()) {
+    const ytEmailResult = await searchWithYouTubeEmailScraper(handle);
+    if (ytEmailResult) {
+      const result = await found(ytEmailResult.email, 'youtube_about_scraper');
+      if (result) return result;
+    }
   }
 
   // ── Steg 2: Apify Google Search — riktiga Google-sökresultat ──
@@ -258,6 +271,75 @@ async function searchWithApifyGoogle(handle, extra = {}) {
     return null;
   }
 }
+
+// ═══════════════════════════════════════════════
+// YOUTUBE EMAIL SCRAPER — APIFY ABOUT-SIDA
+// ═══════════════════════════════════════════════
+
+/**
+ * Scrapa YouTube-kanalens About-sida via Apify YouTube Email Scraper.
+ * Actor: futurizerusn/youtube-email-scraper
+ *
+ * Denna actor kan hämta business-email som visas på About-sidan
+ * (bakom CAPTCHA — ej tillgänglig via YouTube Data API).
+ *
+ * Input: channelUrls — en lista med YouTube-kanal-URL:er
+ * Output: [{ channelUrl, emails: [...], ... }]
+ *
+ * Returnerar { email, method } eller null.
+ */
+async function searchWithYouTubeEmailScraper(handle) {
+  const channelUrl = `https://www.youtube.com/@${handle}`;
+
+  console.log(`[E-post] 🎬 YouTube Email Scraper: söker About-sida för @${handle}...`);
+
+  try {
+    const items = await runApifyActor('futurizerusn/youtube-email-scraper', {
+      channelUrls: [channelUrl],
+      maxChannels: 1,
+    }, 60); // 60 sek timeout
+
+    if (!items || items.length === 0) {
+      console.log(`[E-post] 🎬 YouTube Email Scraper: inga resultat för @${handle}`);
+      return null;
+    }
+
+    // Actor returnerar items med email-fält i olika format
+    for (const item of items) {
+      // Kolla vanliga fältnamn som actorn kan returnera
+      const possibleEmails = [
+        item.email,
+        item.businessEmail,
+        item.contactEmail,
+        ...(item.emails || []),
+        ...(item.socialLinks?.emails || []),
+      ].filter(Boolean);
+
+      for (const rawEmail of possibleEmails) {
+        const email = extractEmails(rawEmail);
+        if (email) {
+          console.log(`[E-post] 🎬 YouTube Email Scraper: hittade ${email} för @${handle}`);
+          return { email, method: 'youtube_about_scraper', source: channelUrl };
+        }
+      }
+
+      // Fallback: sök i all text-data från resultatet
+      const allText = JSON.stringify(item);
+      const fallbackEmail = extractEmails(allText);
+      if (fallbackEmail) {
+        console.log(`[E-post] 🎬 YouTube Email Scraper (fallback): hittade ${fallbackEmail} för @${handle}`);
+        return { email: fallbackEmail, method: 'youtube_about_scraper', source: channelUrl };
+      }
+    }
+
+    console.log(`[E-post] 🎬 YouTube Email Scraper: ingen e-post i resultat för @${handle}`);
+    return null;
+  } catch (err) {
+    console.error(`[E-post] YouTube Email Scraper fel för @${handle}: ${err.message}`);
+    return null;
+  }
+}
+
 
 // ═══════════════════════════════════════════════
 // SERPAPI — FALLBACK E-POSTSÖKNING

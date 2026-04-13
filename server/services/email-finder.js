@@ -33,8 +33,9 @@ const CONFIDENCE = {
 const CACHE_TTL_MS = 30 * 24 * 60 * 60 * 1000;
 
 export async function findEmailForChannel(channelInfo) {
-  const { kanalnamn, namn, beskrivning, kontakt_info } = channelInfo;
+  const { kanalnamn, namn, beskrivning, kontakt_info, plattform } = channelInfo;
   const handle = (kanalnamn || '').replace(/^@/, '');
+  const isYoutube = !plattform || plattform.toLowerCase() === 'youtube';
 
   // CACHE med TTL
   try {
@@ -72,7 +73,8 @@ export async function findEmailForChannel(channelInfo) {
   }
 
   // ── Steg 1.5: YouTube Email Scraper — scrapa About-sidan (bakom CAPTCHA) ──
-  if (handle && await isApifyConfigured()) {
+  // Bara för YouTube-kanaler (IG/TT har inte About-sida)
+  if (handle && isYoutube && await isApifyConfigured()) {
     const ytEmailResult = await searchWithYouTubeEmailScraper(handle);
     if (ytEmailResult) {
       const result = await found(ytEmailResult.email, 'youtube_about_scraper');
@@ -102,22 +104,83 @@ export async function findEmailForChannel(channelInfo) {
 
 /**
  * Kör e-postsökning för flera kanaler parallellt.
+ *
+ * Steg 1: Batch YouTube Email Scraper — en enda Apify-run för alla YT-kanaler
+ * Steg 2: Per-kanal waterfall (regex → Google Search) för resten
  */
 export async function findEmailsForChannels(channels, concurrency = 8) {
+  // ── Pre-steg: Batch YouTube Email Scraper för alla YT-kanaler ──
+  const ytEmailMap = new Map(); // handle → email
+  if (await isApifyConfigured()) {
+    const ytChannels = channels.filter(ch => {
+      const pl = (ch.plattform || '').toLowerCase();
+      return !pl || pl === 'youtube';
+    });
+
+    if (ytChannels.length > 0) {
+      console.log(`[E-post] 🎬 Batch YouTube Email Scraper: ${ytChannels.length} kanaler...`);
+      try {
+        const handles = ytChannels.map(ch => (ch.kanalnamn || '').replace(/^@/, ''));
+        const channelUrls = handles.map(h => `https://www.youtube.com/@${h}`);
+
+        const items = await runApifyActor('futurizerush/youtube-email-scraper', {
+          channelUrls,
+          maxResults: channelUrls.length,
+        }, 120); // 120 sek timeout för hela batchen
+
+        if (items && items.length > 0) {
+          for (const item of items) {
+            // Försök matcha tillbaka till handle
+            const possibleEmails = [
+              item.email,
+              item.businessEmail,
+              item.contactEmail,
+              ...(item.emails || []),
+              ...(item.socialLinks?.emails || []),
+            ].filter(Boolean);
+
+            const email = possibleEmails.length > 0 ? extractEmails(possibleEmails.join(' ')) : extractEmails(JSON.stringify(item));
+
+            if (email) {
+              // Matcha mot handle från URL
+              const urlMatch = (item.channelUrl || item.url || '').match(/@([^/?\s]+)/);
+              if (urlMatch) {
+                ytEmailMap.set(urlMatch[1].toLowerCase(), email);
+                console.log(`[E-post] 🎬 Batch YT Email: @${urlMatch[1]} → ${email}`);
+              }
+            }
+          }
+          console.log(`[E-post] 🎬 Batch YouTube Email Scraper: ${ytEmailMap.size}/${ytChannels.length} e-poster hittade`);
+        }
+      } catch (err) {
+        console.error(`[E-post] 🎬 Batch YouTube Email Scraper fel: ${err.message}`);
+      }
+    }
+  }
+
+  // ── Per-kanal waterfall (med ytEmailMap som pre-cache) ──
   const results = [];
 
   for (let i = 0; i < channels.length; i += concurrency) {
     const batch = channels.slice(i, i + concurrency);
     const batchResults = await Promise.all(
-      batch.map(ch =>
-        withTimeout(
+      batch.map(ch => {
+        const handle = (ch.kanalnamn || '').replace(/^@/, '').toLowerCase();
+        const ytEmail = ytEmailMap.get(handle);
+
+        // Om batch-scraper redan hittade e-post, returnera direkt
+        if (ytEmail) {
+          return Promise.resolve({ email: ytEmail, method: 'youtube_about_scraper', confidence: 'high', mx_valid: true });
+        }
+
+        return withTimeout(
           findEmailForChannel(ch),
-          25000
+          45000
         ).catch(err => {
           console.error(`[E-post] Timeout/error ${ch.kanalnamn}:`, err.message);
           return { email: null, method: null, confidence: null, error: err.message };
-        })
-      )
+        });
+      })
     );
 
     for (let j = 0; j < batch.length; j++) {
@@ -266,9 +329,9 @@ async function searchWithYouTubeEmailScraper(handle) {
   console.log(`[E-post] 🎬 YouTube Email Scraper: söker About-sida för @${handle}...`);
 
   try {
-    const items = await runApifyActor('futurizerusn/youtube-email-scraper', {
+    const items = await runApifyActor('futurizerush/youtube-email-scraper', {
       channelUrls: [channelUrl],
-      maxChannels: 1,
+      maxResults: 1,
     }, 60); // 60 sek timeout
 
     if (!items || items.length === 0) {

@@ -233,10 +233,10 @@ export async function generateMatchMotivation(influencer, companyProfile, scoreR
       body: JSON.stringify({
         model: 'claude-sonnet-4-20250514',
         max_tokens: 200,
-        system: 'Du skriver korta (max 2 meningar) motiveringar på svenska för varför en influencer matchar ett företag. Var specifik och datadrivet — nämn konkreta siffror. Ingen inledande fras som "Denna influencer...". Börja direkt med insikten.',
+        system: 'Du skriver MYCKET korta motiveringar (MAX 90 tecken) på svenska för varför en influencer matchar ett företag. Var specifik. Ingen inledande fras. Börja direkt med insikten.',
         messages: [{
           role: 'user',
-          content: `Skriv en 2-menings motivering:\n\n${context}`,
+          content: `Skriv en motivering på MAX 90 tecken:\n\n${context}`,
         }],
       }),
     });
@@ -285,7 +285,7 @@ async function scoreWithClaude(influencers, companyProfile, nischLabels = []) {
 
 GE VARJE INFLUENCER:
 1. match_score (0-100): Hur väl matchar influencern företagets nisch, publik och mål
-2. motivation (1-2 meningar på svenska): Varför denna score — var specifik
+2. motivation (MAX 90 tecken, en kort mening på svenska): Varför denna score — var specifik och koncis
 
 BEDÖMNINGSKRITERIER:
 - Nisch-relevans (viktigast): Matchar influencerns innehåll företagets bransch och AI-identifierade nischer?
@@ -311,7 +311,8 @@ SCORING-GUIDE:
 30-49:  Dålig match — inte relevant ELLER under 1K följare
 Under 30: Värdelös — fel nisch och/eller inga följare
 
-Svara med ENBART en JSON-array. Varje element: { "index": 0, "match_score": 85, "motivation": "..." }`;
+Svara med ENBART en JSON-array. Varje element: { "index": 0, "match_score": 85, "motivation": "kort text max 90 tecken" }
+VIKTIGT: Motivation MÅSTE vara max 90 tecken. Skriv kort och kärnfullt.`;
 
   const userMessage = `${companyContext}
 

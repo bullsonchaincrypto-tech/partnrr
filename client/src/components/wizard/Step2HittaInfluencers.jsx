@@ -689,11 +689,11 @@ export default function Step2HittaInfluencers({ foretag, outreachType, influence
                         <span className="text-[10px] text-gray-500">{inf.nisch}</span>
                       )}
                     </div>
-                    {/* AI-motivering — karaktärsbegränsad så hela syns utan avklipp */}
+                    {/* AI-motivering — visas i sin helhet (begränsad vid generering) */}
                     {inf.ai_motivation && (
                       <p className="text-[11px] text-purple-400/70 leading-tight mt-0.5">
                         <span className="text-purple-400/50 mr-0.5">✨</span>
-                        {inf.ai_motivation.length > 120 ? inf.ai_motivation.slice(0, 120) + '…' : inf.ai_motivation}
+                        {inf.ai_motivation}
                       </p>
                     )}
                   </div>

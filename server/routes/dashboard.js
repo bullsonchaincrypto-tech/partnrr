@@ -229,7 +229,7 @@ router.post('/deep-analyze', async (req, res) => {
 // GET /api/dashboard/daily-summary — Hämta daglig sammanfattning (för "Idag"-vyn)
 router.get('/daily-summary', async (req, res) => {
   try {
-    const summary = generateDailySummary();
+    const summary = await generateDailySummary();
     res.json(summary);
   } catch (error) {
     console.error('Daily summary error:', error);

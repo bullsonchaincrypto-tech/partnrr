@@ -38,7 +38,7 @@ export default function DailySummaryCard() {
   }
 
   if (loading) return null
-  if (!summary) return null
+  if (!summary || !summary.stats) return null
 
   const hasActions = summary.actionItems?.length > 0
 

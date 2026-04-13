@@ -185,13 +185,13 @@ router.post('/influencers', async (req, res) => {
     }
 
     // ============================================================
-    // FAS 2: Merge & deduplicate
+    // FAS 3: Merge & deduplicate
     // ============================================================
     allResults = mergeAndDeduplicate(allResults);
     console.log(`[Search] ${allResults.length} unika profiler efter merge`);
 
     // ============================================================
-    // FAS 3: Apify Enrichment — verifiera followers + bio
+    // FAS 4: Apify Enrichment — verifiera followers + bio
     // Körs på allResults som redan är Claudes urval (~30 profiler)
     // ============================================================
     if (isApifyConfigured()) {
@@ -220,41 +220,8 @@ router.post('/influencers', async (req, res) => {
     }
 
     // ============================================================
-    // FAS 4: Sök e-post (för profiler utan e-post)
-    // ============================================================
-    const needEmail = allResults.filter(r => !r.kontakt_epost);
-    if (needEmail.length > 0) {
-      console.log(`[Search] Söker e-post för ${needEmail.length} profiler...`);
-      try {
-        const emailResults = await findEmailsForChannels(
-          needEmail.map(r => ({
-            kanalnamn: r.handle || r.kanalnamn,
-            namn: r.name || r.namn || '',
-            beskrivning: r.bio || r.beskrivning || '',
-            kontakt_info: '',
-            plattform: r.platform || r.plattform || '',
-          })),
-          Math.min(needEmail.length, 15)
-        );
-
-        let emailsFound = 0;
-        for (let i = 0; i < needEmail.length; i++) {
-          if (emailResults[i]?.email) {
-            const idx = allResults.findIndex(r => r === needEmail[i]);
-            if (idx >= 0) {
-              allResults[idx].kontakt_epost = emailResults[i].email;
-              emailsFound++;
-            }
-          }
-        }
-        console.log(`[Search] E-post hittade: ${emailsFound}/${needEmail.length}`);
-      } catch (err) {
-        console.error('[Search] Email search error:', err.message);
-      }
-    }
-
-    // ============================================================
     // FAS 5: Scoring pipeline (med riktig followers-data)
+    // E-postsökning EFTER scoring — SerpAPI bara på utvalda profiler
     // ============================================================
     console.log(`[Search] Kör scoring-pipeline...`);
     const scored = await scoreAndRankInfluencers(allResults, companyProfile, {
@@ -291,7 +258,41 @@ router.post('/influencers', async (req, res) => {
     }
 
     // ============================================================
-    // FAS 6: Spara till DB
+    // FAS 7: Sök e-post via SerpAPI (BARA på profiler som klarat scoring + filter)
+    // ============================================================
+    const needEmail = finalResults.filter(r => !r.kontakt_epost);
+    if (needEmail.length > 0) {
+      console.log(`[Search] Söker e-post för ${needEmail.length}/${finalResults.length} profiler (efter scoring)...`);
+      try {
+        const emailResults = await findEmailsForChannels(
+          needEmail.map(r => ({
+            kanalnamn: r.handle || r.kanalnamn,
+            namn: r.name || r.namn || '',
+            beskrivning: r.bio || r.beskrivning || '',
+            kontakt_info: '',
+            plattform: r.platform || r.plattform || '',
+          })),
+          Math.min(needEmail.length, 15)
+        );
+
+        let emailsFound = 0;
+        for (let i = 0; i < needEmail.length; i++) {
+          if (emailResults[i]?.email) {
+            const idx = finalResults.findIndex(r => r === needEmail[i]);
+            if (idx >= 0) {
+              finalResults[idx].kontakt_epost = emailResults[i].email;
+              emailsFound++;
+            }
+          }
+        }
+        console.log(`[Search] E-post hittade: ${emailsFound}/${needEmail.length}`);
+      } catch (err) {
+        console.error('[Search] Email search error:', err.message);
+      }
+    }
+
+    // ============================================================
+    // FAS 8: Spara till DB
     // ============================================================
     await runSql('DELETE FROM influencers WHERE foretag_id = ?', [foretag.id]);
 

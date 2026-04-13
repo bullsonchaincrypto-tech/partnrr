@@ -7,7 +7,7 @@ const youtube = google.youtube('v3');
  * Sök YouTube-kanaler med riktiga API-data.
  * Returnerar verifierade kanaldata — inga gissningar.
  */
-export async function searchYouTubeChannels(searchQueries, maxResultsPerQuery = 5) {
+export async function searchYouTubeChannels(searchQueries, maxResultsPerQuery = 50) {
   const apiKey = process.env.YOUTUBE_API_KEY;
   if (!apiKey) throw new Error('YOUTUBE_API_KEY saknas i .env — aktivera YouTube Data API v3 i Google Cloud Console och skapa en API-nyckel.');
 

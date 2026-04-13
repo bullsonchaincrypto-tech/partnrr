@@ -497,18 +497,21 @@ STRIKT MATCHNINGSKRAV:
 - Om företaget handlar om fantasy fotboll → hitta fotbollsanalytiker, fantasy sports-kreatörer, tipsters
 - Om företaget säljer kläder → hitta mode-influencers, stilbloggare
 - SKIPPA profiler som inte matchar det specifika erbjudandet — en fitness-influencer passar INTE ett matföretag
-- Short Videos-resultaten ger KANALNAMN och PLATTFORM direkt — använd dessa!
-- Apify Discovery ger RIKTIGA Instagram/TikTok-handles som är aktiva i relevanta hashtags
-- Inkludera BARA profiler du hittar bevis för i sökresultaten
-- Ange BARA kanalnamn som nämns i resultaten — hitta ALDRIG PÅ kanalnamn
 - Hellre 5 träffsäkra resultat än 20 dåliga — NISCH-MATCHNING ÄR VIKTIGARE ÄN KVANTITET
+
+ABSOLUT VIKTIGAST — KANALNAMN:
+⚠️ Du får ENBART ange kanalnamn (@handle) som ORDAGRANT syns i sökresultaten.
+⚠️ Om ett sökresultat nämner en person men INTE visar deras exakta Instagram/TikTok-handle → SKIPPA den personen helt.
+⚠️ GISSA ALDRIG ett kanalnamn. Om du ser "Hillevi Arkel" i en artikel men inte ser "@hilleviarkel_mat" → inkludera INTE henne.
+⚠️ Short Videos-resultaten och Apify Discovery ger EXAKTA handles — använd dessa direkt.
+⚠️ Google-sökresultat som bara nämner namn utan @handle → SKIPPA.
+⚠️ Varje kanalnamn du returnerar MÅSTE finnas ordagrant i datan du fick.
 
 VIKTIGT OM DATA:
 - Följarantal: ange BARA om det EXAKT nämns i sökresultaten, annars null
-- profil_beskrivning: ange BARA text som DIREKT citeras i sökresultaten. HITTA ALDRIG PÅ beskrivningar.
-  Om du inte har exakt text från profilen, sätt till null. Apify hämtar riktig bio senare.
+- profil_beskrivning: BARA exakt citat, annars null (Apify hämtar riktig bio senare)
 - GISSA ALDRIG innehåll — om du inte ser det i sökresultaten, sätt null
-- Behandla ALLA datakällor (SerpAPI, Apify) med SAMMA prioritet — bedöm varje profil på egna meriter
+- Behandla ALLA datakällor (SerpAPI, Apify) med SAMMA prioritet
 
 Svara med ENBART en JSON-array, inget annat.`;
 

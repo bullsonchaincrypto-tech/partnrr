@@ -291,22 +291,25 @@ BEDÖMNINGSKRITERIER:
 - Nisch-relevans (viktigast): Matchar influencerns innehåll företagets bransch och AI-identifierade nischer?
 - Plattforms-passform: Rätt plattform för företagets målgrupp?
 - Autenticitet: Har profilen riktig data (followers, bio) eller bara AI-uppskattning?
-- Storlek — bedöm utifrån kategori (alla storlekar kan vara värdefulla):
-    Nano (1K–10K): Hög engagemang, nischad publik, billigt — bra för konvertering i smal nisch
+- Storlek — bedöm utifrån kategori:
+    Nano (1K–10K): Hög engagemang, nischad publik — bra för konvertering
     Mikro (10K–50K): Bra balans mellan räckvidd och engagemang — ofta bäst ROI
     Mellanstor (50K–200K): Bred räckvidd med bibehållen relevans
     Stor (200K–500K): Hög räckvidd, bra för varumärkeskännedom
-    Mega (500K+): Massiv räckvidd men lägre engagemang — bäst för breda kampanjer
-    Under 1K: Troligen ny eller inaktiv — sänk score om nisch inte är extremt träffsäker
+    Mega (500K+): Massiv räckvidd men lägre engagemang
+    Under 1K: STRAFFAS HÅRT. Troligen ny, inaktiv eller felaktigt konto. Max score 30.
+    Under 50 följare: STRAFFAS EXTREMT. Max score 15. Dessa konton är i princip värdelösa.
+    0 följare eller null: Max score 10. Profilen kunde inte verifieras.
 - Svenska profiler som riktar sig till svensk publik → bonus
 
 SCORING-GUIDE:
-90-100: Perfekt match — exakt rätt nisch, verifierad profil, rätt storlek
-80-89:  Mycket bra — rätt nisch, bra storlek
+90-100: Perfekt match — exakt rätt nisch, verifierad profil (1K+ följare), rätt storlek
+80-89:  Mycket bra — rätt nisch, bra storlek (1K+ följare)
 70-79:  Bra match — relaterad nisch, bra potential
 60-69:  OK match — delvis relevant, kräver mer utredning
 50-59:  Svag match — lös koppling till branschen
-Under 50: Dålig match — inte relevant
+30-49:  Dålig match — inte relevant ELLER under 1K följare
+Under 30: Värdelös — fel nisch och/eller inga följare
 
 Svara med ENBART en JSON-array. Varje element: { "index": 0, "match_score": 85, "motivation": "..." }`;
 

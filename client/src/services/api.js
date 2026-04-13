@@ -261,6 +261,7 @@ export const saveCompanyProfile = (id, data) => request(`/foretag/${id}/profile`
 // Intelligent sökning
 export const searchInfluencers = (company_profile_id, platforms, filters, exclude_handles) => request('/search/influencers', { method: 'POST', body: JSON.stringify({ company_profile_id, platforms, filters, exclude_handles }) });
 export const filterSearchResults = (data) => request('/search/influencers/filter', { method: 'POST', body: JSON.stringify(data) });
+export const rescoreInfluencers = (company_profile_id, influencers) => request('/search/rescore', { method: 'POST', body: JSON.stringify({ company_profile_id, influencers }) });
 export const getInfluencerProfile = (id) => request(`/search/influencer/${id}/profile`);
 export const searchInfluencerDirect = (query, foretagId) => request('/influencers/search-direct', { method: 'POST', body: JSON.stringify({ query, foretagId }) });
 export const searchSponsorDirect = (query, foretagId) => request('/sponsors/search-direct', { method: 'POST', body: JSON.stringify({ query, foretagId }) });

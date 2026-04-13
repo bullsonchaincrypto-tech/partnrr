@@ -167,6 +167,29 @@ export default function Step2HittaInfluencers({ foretag, outreachType, influence
     }
   }
 
+  // Re-scora alla influencers i en enda Claude-batch för konsistenta scores
+  const rescoreAll = async (allInfluencers, foretagId) => {
+    try {
+      console.log(`[Steg2] Re-scorear ${allInfluencers.length} influencers för konsistenta scores...`)
+      const result = await api.rescoreInfluencers(foretagId, allInfluencers)
+      if (result.scores?.length > 0) {
+        const scoreMap = new Map(result.scores.map(s => [s.id, s]))
+        setInfluencers(prev => prev.map(inf => {
+          const updated = scoreMap.get(inf.id)
+          if (!updated) return inf
+          return {
+            ...inf,
+            match_score: updated.match_score,
+            ai_motivation: updated.ai_motivation || inf.ai_motivation,
+          }
+        }))
+        console.log(`[Steg2] ✅ Re-scoring klar — ${result.scores.length} uppdaterade`)
+      }
+    } catch (err) {
+      console.warn(`[Steg2] Re-scoring misslyckades (ej kritiskt):`, err.message)
+    }
+  }
+
   const handleFind = async ({ append = false } = {}) => {
     if (!foretag?.id) {
       setError('Företagsprofil saknas. Gå tillbaka till Steg 1.')
@@ -251,13 +274,16 @@ export default function Step2HittaInfluencers({ foretag, outreachType, influence
             }))
             results.sort((a, b) => (b.match_score || 0) - (a.match_score || 0))
             if (append) {
-              // "Hitta fler" — append utan att ta bort befintliga (dedup)
+              // "Hitta fler" — append utan att ta bort befintliga (dedup), sen re-scora ALLA
               setInfluencers(prev => {
                 if (prev.length === 0) return results
                 const existingKeys = new Set(prev.map(i => `${(i.kanalnamn || i.namn || '').toLowerCase()}_${(i.plattform || '').toLowerCase()}`))
                 const newResults = results.filter(r => !existingKeys.has(`${(r.kanalnamn || r.namn || '').toLowerCase()}_${(r.plattform || '').toLowerCase()}`))
                 if (newResults.length === 0) return prev
-                return [...prev, ...newResults]
+                const combined = [...prev, ...newResults]
+                // Re-scora ALLA i bakgrunden så scores blir jämförbara
+                rescoreAll(combined, foretag.id)
+                return combined
               })
             } else {
               // Ny sökning — ersätt alla pipeline-resultat (behåll manuellt sökta)
@@ -663,11 +689,11 @@ export default function Step2HittaInfluencers({ foretag, outreachType, influence
                         <span className="text-[10px] text-gray-500">{inf.nisch}</span>
                       )}
                     </div>
-                    {/* AI-motivering — begränsad bredd så den inte krockar med score/följare */}
+                    {/* AI-motivering — karaktärsbegränsad så hela syns utan avklipp */}
                     {inf.ai_motivation && (
-                      <p className="text-[11px] text-purple-400/70 truncate leading-tight mt-0.5" style={{ maxWidth: 'min(70%, 500px)' }}>
+                      <p className="text-[11px] text-purple-400/70 leading-tight mt-0.5">
                         <span className="text-purple-400/50 mr-0.5">✨</span>
-                        {inf.ai_motivation}
+                        {inf.ai_motivation.length > 120 ? inf.ai_motivation.slice(0, 120) + '…' : inf.ai_motivation}
                       </p>
                     )}
                   </div>

@@ -392,6 +392,70 @@ router.post('/influencers/filter', async (req, res) => {
 
 
 /**
+ * POST /api/search/rescore — Re-scora ALLA influencers i en enda Claude-batch
+ *
+ * Anropas efter "Hitta fler" för att ge konsistenta scores
+ * när gamla + nya resultat blandas.
+ */
+router.post('/rescore', async (req, res) => {
+  try {
+    const { company_profile_id, influencers: infData } = req.body;
+
+    if (!infData?.length) {
+      return res.status(400).json({ error: 'Inga influencers att re-scora' });
+    }
+
+    const foretag = await queryOne('SELECT * FROM foretag WHERE id = ?', [Number(company_profile_id)]);
+    if (!foretag) return res.status(404).json({ error: 'Företag hittades inte' });
+
+    let companyProfile;
+    try {
+      companyProfile = foretag.company_profile ? JSON.parse(foretag.company_profile) : {};
+    } catch { companyProfile = {}; }
+
+    const nischLabels = companyProfile.nisch_labels || [];
+
+    // Konvertera frontend-data till scoring-format
+    const forScoring = infData.map(inf => ({
+      name: inf.namn || inf.name,
+      handle: (inf.kanalnamn || inf.handle || '').replace(/^@+/, ''),
+      platform: inf.plattform || inf.platform || '',
+      followers: inf.foljare_exakt || parseInt(inf.foljare) || 0,
+      niches: inf.nisch ? inf.nisch.split(',').map(s => s.trim()) : [],
+      nisch: inf.nisch || '',
+      bio: inf.beskrivning || inf.bio || '',
+      datakalla: inf.datakalla || '',
+      kontakt_epost: inf.kontakt_epost || null,
+      ai_score: inf.ai_score || null,
+      _frontendId: inf.id, // behåll frontend-id för mapping
+    }));
+
+    console.log(`[Rescore] Re-scorear ${forScoring.length} influencers för ${foretag.namn}...`);
+
+    const scored = await scoreAndRankInfluencers(forScoring, companyProfile, {
+      generateMotivations: true,
+      topN: 5,
+      nischLabels,
+    });
+
+    // Mappa tillbaka scores till frontend-ids
+    const scoreMap = scored.map(inf => ({
+      id: inf._frontendId,
+      match_score: inf.match_score || 0,
+      ai_motivation: inf.ai_motivation || null,
+    }));
+
+    console.log(`[Rescore] ✅ Klar — ${scoreMap.length} influencers re-scorade`);
+
+    res.json({ scores: scoreMap });
+  } catch (error) {
+    console.error('[Rescore] Error:', error);
+    res.status(500).json({ error: error.message });
+  }
+});
+
+
+/**
  * GET /api/search/influencer/:id/profile — detaljerad profil
  */
 router.get('/influencer/:id/profile', async (req, res) => {

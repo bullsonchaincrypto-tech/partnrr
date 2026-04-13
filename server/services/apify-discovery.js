@@ -25,8 +25,8 @@ const DISCOVERY_ACTORS = {
   tiktok: 'clockworks/tiktok-scraper',
 };
 
-// Max 25 items per plattform (5 items/hashtag × 5 hashtags = 25)
-const MAX_CREATORS_PER_PLATFORM = 25;
+// Max 10 items per plattform (1 item/hashtag × 10 hashtags = 10)
+const MAX_CREATORS_PER_PLATFORM = 10;
 
 /**
  * Rensa trasiga unicode-surrogat ur en sträng.
@@ -118,14 +118,15 @@ export async function discoverInfluencers(hashtags, platforms = ['instagram', 't
 async function discoverInstagram(hashtags, maxResults, timeoutSecs) {
   // Bygg hashtag-URLs för Instagram
   // Använd alla 5 hashtags från Claude för bredare träffyta
-  const directUrls = hashtags.slice(0, 5).map(tag =>
+  // Använd alla 10 hashtags — 1 post per hashtag = 10 items, alla unika creators
+  const directUrls = hashtags.slice(0, 10).map(tag =>
     `https://www.instagram.com/explore/tags/${encodeURIComponent(tag.replace(/^#/, ''))}/`
   );
 
-  console.log(`[ApifyDiscovery] Instagram hashtag-URLs: ${directUrls.join(', ')}`);
+  console.log(`[ApifyDiscovery] Instagram hashtag-URLs (${directUrls.length}): ${directUrls.join(', ')}`);
 
-  // 5 posts per hashtag × 5 hashtags = 25 items max
-  const resultsPerHashtag = 5;
+  // 1 post per hashtag × 10 hashtags = 10 items — varje hashtag ger en unik creator
+  const resultsPerHashtag = 1;
 
   const items = await runApifyActor(
     DISCOVERY_ACTORS.instagram,
@@ -209,12 +210,13 @@ async function discoverInstagram(hashtags, maxResults, timeoutSecs) {
 
 async function discoverTikTok(hashtags, maxResults, timeoutSecs) {
   // clockworks/tiktok-scraper tar hashtags som array — använd alla 5 från Claude
-  const cleanHashtags = hashtags.slice(0, 5).map(tag => tag.replace(/^#/, ''));
+  // Använd alla 10 hashtags — 1 video per hashtag = 10 items, alla unika creators
+  const cleanHashtags = hashtags.slice(0, 10).map(tag => tag.replace(/^#/, ''));
 
-  console.log(`[ApifyDiscovery] TikTok hashtags: ${cleanHashtags.join(', ')}`);
+  console.log(`[ApifyDiscovery] TikTok hashtags (${cleanHashtags.length}): ${cleanHashtags.join(', ')}`);
 
-  // 5 videos per hashtag × 5 hashtags = 25 items max
-  const resultsPerHashtag = 5;
+  // 1 video per hashtag × 10 hashtags = 10 items — varje hashtag ger en unik creator
+  const resultsPerHashtag = 1;
 
   const items = await runApifyActor(
     DISCOVERY_ACTORS.tiktok,

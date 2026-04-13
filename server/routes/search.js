@@ -137,7 +137,7 @@ router.post('/influencers', async (req, res) => {
         apifyDiscoveryData = await discoverInfluencers(
           allHashtags,
           nonYoutubePlatforms,
-          { maxResultsPerHashtag: 10, timeoutSecs: 120 }
+          { maxResultsPerHashtag: 1, timeoutSecs: 120 }
         );
         sources.apify_ig_discovery = apifyDiscoveryData.instagram?.length || 0;
         sources.apify_tt_discovery = apifyDiscoveryData.tiktok?.length || 0;

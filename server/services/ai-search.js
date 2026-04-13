@@ -471,23 +471,26 @@ export async function generateDiscoveryHashtags(beskrivning, companyName) {
 Företag: ${companyName}
 Beskrivning: ${beskrivning}
 
-Generera exakt 5 hashtags som SVENSKA influencers inom denna bransch FAKTISKT använder på Instagram och TikTok.
+Generera exakt 10 UNIKA och VARIERADE hashtags som SVENSKA influencers inom denna bransch FAKTISKT använder på Instagram och TikTok.
 
 REGLER:
 - ALLA hashtags ska vara på SVENSKA — vi söker efter SVENSKA influencers
 - Hashtagsen ska vara POPULÄRA nog att ge resultat (inte hyper-nischade)
 - Fokusera på hashtags som SVENSKA KREATÖRER/INFLUENCERS faktiskt använder
 - Tänk: vilka hashtags sätter en svensk influencer i denna nisch på sina inlägg?
+- VARJE hashtag ska vara TILLRÄCKLIGT ANNORLUNDA för att ge OLIKA creators
+  (inte bara varianter av samma ord, t.ex. "smarthem" och "smarthome" ger samma resultat)
+- Blanda breda nisch-hashtags med mer specifika sub-nisch-hashtags
 - INGA generiska hashtags som "sverige" eller "influencer"
 - Returnera UTAN #-tecken
 
 Exempel för ett företag som säljer träningskläder:
-["träning", "träningsinspo", "svenskträning", "hälsoliv", "sportmode"]
+["träning", "träningsinspo", "gymlivet", "hälsoliv", "sportmode", "yogasverige", "löpning", "hemmaträning", "fitnessmotivation", "aktivliv"]
 
 Exempel för ett företag som säljer hemelektronik:
-["smartahem", "teknikprylar", "hemelektronik", "tekniktips", "smarthem"]
+["smartahem", "teknikprylar", "hemelektronik", "tekniktips", "smarthem", "hemautomation", "unboxingsverige", "gadgets", "teknikrecension", "digitalthemma"]
 
-Svara med ENBART en JSON-array av 5 strängar, ingen annan text.`
+Svara med ENBART en JSON-array av 10 strängar, ingen annan text.`
       }],
     });
 
@@ -506,7 +509,7 @@ Svara med ENBART en JSON-array av 5 strängar, ingen annan text.`
     const cleaned = tags
       .filter(t => typeof t === 'string' && t.length > 2)
       .map(t => t.replace(/^#/, '').trim().toLowerCase())
-      .slice(0, 5);
+      .slice(0, 10);
 
     console.log(`[AI-Search] Discovery-hashtags (${cleaned.length}): ${cleaned.join(', ')}`);
     return cleaned;

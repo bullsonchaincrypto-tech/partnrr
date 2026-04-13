@@ -123,30 +123,30 @@ export async function findEmailsForChannels(channels, concurrency = 8) {
         const handles = ytChannels.map(ch => (ch.kanalnamn || '').replace(/^@/, ''));
         const channelUrls = handles.map(h => `https://www.youtube.com/@${h}`);
 
-        const items = await runApifyActor('futurizerush/youtube-email-scraper', {
-          channelUrls,
-          maxResults: channelUrls.length,
+        // dataovercoffee/Youtube-Channel-Business-Email-Scraper
+        // Input: channels — array med @handles eller URLs
+        const items = await runApifyActor('dataovercoffee/Youtube-Channel-Business-Email-Scraper', {
+          channels: handles.map(h => `@${h}`),
         }, 120); // 120 sek timeout för hela batchen
 
         if (items && items.length > 0) {
           for (const item of items) {
-            // Försök matcha tillbaka till handle
+            // Extrahera e-post från resultatet
             const possibleEmails = [
               item.email,
               item.businessEmail,
               item.contactEmail,
               ...(item.emails || []),
-              ...(item.socialLinks?.emails || []),
             ].filter(Boolean);
 
             const email = possibleEmails.length > 0 ? extractEmails(possibleEmails.join(' ')) : extractEmails(JSON.stringify(item));
 
             if (email) {
-              // Matcha mot handle från URL
-              const urlMatch = (item.channelUrl || item.url || '').match(/@([^/?\s]+)/);
-              if (urlMatch) {
-                ytEmailMap.set(urlMatch[1].toLowerCase(), email);
-                console.log(`[E-post] 🎬 Batch YT Email: @${urlMatch[1]} → ${email}`);
+              // Matcha mot handle från channel-data
+              const handleMatch = (item.channel || item.channelUrl || item.url || item.handle || '').match(/@([^/?\s]+)/);
+              if (handleMatch) {
+                ytEmailMap.set(handleMatch[1].toLowerCase(), email);
+                console.log(`[E-post] 🎬 Batch YT Email: @${handleMatch[1]} → ${email}`);
               }
             }
           }
@@ -324,53 +324,38 @@ async function searchWithApifyGoogle(handle, extra = {}) {
  * Returnerar { email, method } eller null.
  */
 async function searchWithYouTubeEmailScraper(handle) {
-  const channelUrl = `https://www.youtube.com/@${handle}`;
-
-  console.log(`[E-post] 🎬 YouTube Email Scraper: söker About-sida för @${handle}...`);
+  console.log(`[E-post] 🎬 YouTube Channel Email Scraper: söker @${handle}...`);
 
   try {
-    const items = await runApifyActor('futurizerush/youtube-email-scraper', {
-      channelUrls: [channelUrl],
-      maxResults: 1,
+    // dataovercoffee/Youtube-Channel-Business-Email-Scraper
+    const items = await runApifyActor('dataovercoffee/Youtube-Channel-Business-Email-Scraper', {
+      channels: [`@${handle}`],
     }, 60); // 60 sek timeout
 
     if (!items || items.length === 0) {
-      console.log(`[E-post] 🎬 YouTube Email Scraper: inga resultat för @${handle}`);
+      console.log(`[E-post] 🎬 YT Channel Email Scraper: inga resultat för @${handle}`);
       return null;
     }
 
-    // Actor returnerar items med email-fält i olika format
     for (const item of items) {
-      // Kolla vanliga fältnamn som actorn kan returnera
       const possibleEmails = [
         item.email,
         item.businessEmail,
         item.contactEmail,
         ...(item.emails || []),
-        ...(item.socialLinks?.emails || []),
       ].filter(Boolean);
 
-      for (const rawEmail of possibleEmails) {
-        const email = extractEmails(rawEmail);
-        if (email) {
-          console.log(`[E-post] 🎬 YouTube Email Scraper: hittade ${email} för @${handle}`);
-          return { email, method: 'youtube_about_scraper', source: channelUrl };
-        }
-      }
-
-      // Fallback: sök i all text-data från resultatet
-      const allText = JSON.stringify(item);
-      const fallbackEmail = extractEmails(allText);
-      if (fallbackEmail) {
-        console.log(`[E-post] 🎬 YouTube Email Scraper (fallback): hittade ${fallbackEmail} för @${handle}`);
-        return { email: fallbackEmail, method: 'youtube_about_scraper', source: channelUrl };
+      const email = possibleEmails.length > 0 ? extractEmails(possibleEmails.join(' ')) : extractEmails(JSON.stringify(item));
+      if (email) {
+        console.log(`[E-post] 🎬 YT Channel Email Scraper: hittade ${email} för @${handle}`);
+        return { email, method: 'youtube_about_scraper', source: `https://www.youtube.com/@${handle}` };
       }
     }
 
-    console.log(`[E-post] 🎬 YouTube Email Scraper: ingen e-post i resultat för @${handle}`);
+    console.log(`[E-post] 🎬 YT Channel Email Scraper: ingen e-post för @${handle}`);
     return null;
   } catch (err) {
-    console.error(`[E-post] YouTube Email Scraper fel för @${handle}: ${err.message}`);
+    console.error(`[E-post] YT Channel Email Scraper fel för @${handle}: ${err.message}`);
     return null;
   }
 }

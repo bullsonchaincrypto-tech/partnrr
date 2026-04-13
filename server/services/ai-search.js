@@ -26,6 +26,7 @@
 import Anthropic from '@anthropic-ai/sdk';
 import fetch from 'node-fetch';
 import { trackApiCost } from './cost-tracker.js';
+import { runApifyActor, isApifyConfigured } from './social-enrichment.js';
 
 const MODEL_DEFAULT = 'claude-sonnet-4-6';
 
@@ -300,7 +301,7 @@ async function searchGoogle(query) {
 
   if (!data) return [];
 
-  const results = (data.organic_results || []).slice(0, 10).map(item => ({
+  const results = (data.organic_results || []).slice(0, 8).map(item => ({
     type: 'organic',
     title: item.title || '',
     snippet: item.snippet || '',
@@ -312,149 +313,52 @@ async function searchGoogle(query) {
 }
 
 /**
- * STEG 0: AI tolkar företagets beskrivning och genererar optimala söktermer.
- * Returnerar { shortVideoQuery, googleQuery, nischKeywords }.
- *
- * Detta ersätter den statiska nisch-mappningen — Claude förstår alla branscher
- * och genererar exakt rätt söktermer oavsett hur beskrivningen formuleras.
+ * Bygg optimerade sökfrågor baserat på företagsprofil.
+ * Returnerar { shortVideoQuery, googleQuery }.
  */
-export async function buildSearchQueries({ companyName, beskrivning, nischer, platforms }) {
+function buildSearchQueries({ companyName, beskrivning, nischer, platforms }) {
+  const nischStr = (nischer || []).join(' ');
   const platformList = (platforms || ['instagram']).map(p => p.toLowerCase());
-  const nischStr = (nischer || []).join(', ');
 
-  // ── AI-genererade söktermer (primär väg) ──
-  let nischKeywords = '';
-  try {
-    const systemPrompt = `Du är en sökterms-expert. Givet en företagsbeskrivning, generera de BÄSTA Google-söktermerna OCH Instagram/TikTok-hashtags för att hitta svenska influencers som passar företaget.
-
-REGLER:
-- Svara med ENBART ett JSON-objekt, ingen annan text
-- "nisch_keywords" = 3-6 nyckelord som beskriver vilken typ av influencer som passar (svenska termer)
-- "short_video_query" = en Google Short Videos-sökfråga (max 8 ord) för att hitta TikTok/Instagram Reels-kreatörer
-- "google_queries" = array med 2-3 Google-sökfrågor med site:-operatorer för att hitta profiler
-- "discovery_hashtags" = array med 4-6 Instagram/TikTok-hashtags som SVENSKA influencers i denna nisch faktiskt använder
-- Fokusera på den EXAKTA branschen — inte breda termer
-- Tänk: vilka typer av influencers skulle ett sådant företag vilja samarbeta med?
-
-REGLER FÖR HASHTAGS (discovery_hashtags):
-- Hashtags MÅSTE vara svenska eller Sverige-specifika — ALDRIG generiska engelska som "grooming", "fashion", "fitness"
-- Använd hashtags som svenska influencers faktiskt postar med
-- Inkludera ALLTID minst 2 hashtags med "sverige", "svensk", eller en svensk stad
-- Undvik hashtags som används globalt utan svensk koppling (#grooming ger japanska posts, #fashion ger amerikanska posts)
-- Bra mönster: #[nisch]sverige, #svensk[nisch], #[nisch]stockholm, #[nisch]blogg
-
-EXEMPEL:
-Beskrivning: "Vi säljer smarta produkter inom hemelektronik"
-→ nisch_keywords: "tech elektronik gadgets unboxing recension prylar"
-→ short_video_query: "svenska tech gadgets elektronik review"
-→ google_queries: ["site:instagram.com svenska tech influencer gadgets elektronik", "site:tiktok.com svensk tech review prylar unboxing"]
-→ discovery_hashtags: ["techsverige", "svensktech", "prylarsverige", "smartahemsverige", "elektronikrecension"]
-
-Beskrivning: "Ekologiska kryddor och marinader"
-→ nisch_keywords: "mat matlagning recept kryddor foodie"
-→ short_video_query: "svenska matlagning kryddor recept influencer"
-→ google_queries: ["site:instagram.com svensk matbloggare foodie kryddor", "site:tiktok.com svenska matlagning recept foodie"]
-→ discovery_hashtags: ["matlagningsverige", "svenskmatblogg", "receptsverige", "foodiesverige", "svenskmat"]
-
-Beskrivning: "Hundfoder och hundtillbehör"
-→ discovery_hashtags: ["hundisverige", "svenskhund", "hundlivstockholm", "hundälskare", "hundtillbehorsverige"]`;
-
-    const userMessage = `FÖRETAG: ${companyName}
-BESKRIVNING: ${beskrivning || 'Ej angiven'}
-BRANSCH: ${nischStr || 'Ej angiven'}
-PLATTFORMAR: ${platformList.join(', ')}
-
-Generera optimala söktermer. Svara med ENBART JSON:
-{
-  "nisch_keywords": "...",
-  "short_video_query": "...",
-  "google_queries": ["...", "..."],
-  "discovery_hashtags": ["svensknisch1", "nischsverige2", "..."]
-}`;
-
-    console.log(`[AI-Search] Steg 0: AI genererar söktermer för "${beskrivning?.slice(0, 80) || companyName}"...`);
-    const raw = await callClaude(systemPrompt, userMessage, 500, { model: MODEL_DEFAULT });
-    const parsed = parseJSON(raw);
-
-    if (parsed.nisch_keywords) {
-      nischKeywords = parsed.nisch_keywords;
-
-      // Bygg queries från AI-svaret
-      const shortVideoQuery = parsed.short_video_query || `svenska ${nischKeywords} influencer`;
-
-      // Google queries — använd AI-genererade eller bygg från nisch_keywords
-      let googleQuery = '';
-      if (parsed.google_queries?.length > 0) {
-        // Filtrera till bara de plattformar användaren valt
-        const relevantQueries = parsed.google_queries.filter(q => {
-          if (platformList.includes('instagram') && q.includes('instagram.com')) return true;
-          if (platformList.includes('tiktok') && q.includes('tiktok.com')) return true;
-          return false;
-        });
-        googleQuery = relevantQueries[0] || parsed.google_queries[0] || '';
-      }
-
-      if (!googleQuery) {
-        // Fallback: bygg Google query manuellt
-        const siteOps = platformList.map(p => {
-          if (p === 'instagram') return 'site:instagram.com';
-          if (p === 'tiktok') return 'site:tiktok.com';
-          return '';
-        }).filter(Boolean);
-        googleQuery = siteOps.length > 0
-          ? `(${siteOps.join(' OR ')}) svenska ${nischKeywords} influencer 2025`
-          : `svenska ${nischKeywords} influencer ${platformList.join(' ')} 2025`;
-      }
-
-      const discoveryHashtags = parsed.discovery_hashtags || [];
-
-      console.log(`[AI-Search] ✅ AI-genererade termer: "${nischKeywords}"`);
-      console.log(`[AI-Search]    Short Videos: "${shortVideoQuery}"`);
-      console.log(`[AI-Search]    Google: "${googleQuery}"`);
-      console.log(`[AI-Search]    Discovery hashtags: ${discoveryHashtags.join(', ') || 'inga'}`);
-
-      return { shortVideoQuery, googleQuery, nischKeywords, discoveryHashtags };
+  // Nischspecifika nyckelord
+  let nischKeywords = nischStr || companyName;
+  if (beskrivning) {
+    const kw = beskrivning.toLowerCase();
+    if (kw.includes('fantasy') || kw.includes('fotboll') || kw.includes('sport')) {
+      nischKeywords = 'fantasy fotboll sport tips';
+    } else if (kw.includes('gaming') || kw.includes('spel')) {
+      nischKeywords = 'gaming spel';
+    } else if (kw.includes('betting') || kw.includes('odds')) {
+      nischKeywords = 'betting odds tips';
     }
-  } catch (err) {
-    console.warn(`[AI-Search] ⚠️ AI-söktermsgenerering misslyckades: ${err.message} — faller tillbaka på statisk mappning`);
   }
 
-  // ── Fallback: statisk nisch-extraktion (om AI misslyckas) ──
-  if (!nischKeywords) {
-    if (beskrivning) {
-      const stopwords = new Set(['vi', 'och', 'i', 'på', 'för', 'med', 'som', 'är', 'ett', 'en', 'av', 'till', 'det', 'att', 'den', 'de', 'har', 'vara', 'vill', 'ska', 'kan', 'inte', 'alla', 'från', 'vår', 'våra', 'sin', 'sina', 'sitt', 'gör', 'säljer', 'samarbeta', 'unga', 'vuxna', 'företag', 'produkter', 'inom']);
-      const words = beskrivning.toLowerCase().replace(/[^a-zåäö\s-]/g, '').split(/\s+/).filter(w => w.length > 3 && !stopwords.has(w));
-      nischKeywords = words.slice(0, 5).join(' ') || companyName;
-    } else {
-      nischKeywords = nischStr || companyName;
-    }
-    console.log(`[AI-Search] Fallback söktermer: "${nischKeywords}"`);
-  }
-
+  // Short Videos query — söker TikTok/Reels/Shorts automatiskt
   const shortVideoQuery = `svenska ${nischKeywords} influencer`;
+
+  // Google query med site:-operatorer för den valda plattformen
   const siteOps = platformList.map(p => {
     if (p === 'instagram') return 'site:instagram.com';
     if (p === 'tiktok') return 'site:tiktok.com';
     return '';
   }).filter(Boolean);
-  const googleQuery = siteOps.length > 0
-    ? `(${siteOps.join(' OR ')}) svenska ${nischKeywords} influencer 2025`
-    : `svenska ${nischKeywords} influencer ${platformList.join(' ')} 2025`;
 
-  // Fallback hashtags: svensk + nisch-keyword
-  const fallbackHashtags = nischKeywords.split(' ').slice(0, 3).map(w => `svensk${w}`);
-  return { shortVideoQuery, googleQuery, nischKeywords, discoveryHashtags: fallbackHashtags };
+  const googleQuery = siteOps.length > 0
+    ? `(${siteOps.join(' OR ')}) svenska ${nischKeywords} influencer 2024 2025`
+    : `svenska ${nischKeywords} influencer ${platformList.join(' ')} 2024 2025`;
+
+  return { shortVideoQuery, googleQuery };
 }
 
 // ============================================================
 // INFLUENCER-SÖKNING: Multi-engine SerpAPI → Sonnet
 // ============================================================
 
-export async function searchInfluencersAI({ companyName, industry, nischer, platforms, budget, audience_age, goal, previousCollabs, beskrivning, erbjudande_typ, syfte, apifyDiscoveryData, excludeHandles = [], prebuiltQueries = null }) {
+export async function searchInfluencersAI({ companyName, industry, nischer, platforms, budget, audience_age, goal, previousCollabs, beskrivning, erbjudande_typ, syfte }) {
   const platformStr = (platforms || ['youtube']).join(', ');
   const nischStr = (nischer || []).join(', ');
 
-  const { shortVideoQuery, googleQuery, nischKeywords } = prebuiltQueries || await buildSearchQueries({ companyName, beskrivning, nischer, platforms });
+  const { shortVideoQuery, googleQuery } = buildSearchQueries({ companyName, beskrivning, nischer, platforms });
 
   // ── STEG 1: Parallella SerpAPI-sökningar (2 queries) ──
   console.log(`[AI-Search] Steg 1: Multi-engine sökning...`);
@@ -469,15 +373,9 @@ export async function searchInfluencersAI({ companyName, industry, nischer, plat
   const totalResults = shortVideoResults.length + googleResults.length;
   const serpWorked = totalResults > 0;
 
-  // ── STEG 2+3: Sonnet analyserar SerpAPI + Apify discovery ──
-  const hasApifyData = apifyDiscoveryData && (apifyDiscoveryData.instagram?.length > 0 || apifyDiscoveryData.tiktok?.length > 0);
-  const hasAnyData = serpWorked || hasApifyData;
-
-  if (hasAnyData) {
+  // ── STEG 2: Sonnet analyserar (om SerpAPI gav resultat) ──
+  if (serpWorked) {
     console.log(`[AI-Search] SerpAPI: ${shortVideoResults.length} short videos + ${googleResults.length} organic = ${totalResults} totalt`);
-    if (hasApifyData) {
-      console.log(`[AI-Search] Apify Discovery: ${apifyDiscoveryData.instagram?.length || 0} IG + ${apifyDiscoveryData.tiktok?.length || 0} TT creators`);
-    }
 
     // Formatera Short Videos som strukturerad data
     const svData = shortVideoResults.length > 0
@@ -491,52 +389,25 @@ export async function searchInfluencersAI({ companyName, industry, nischer, plat
         googleResults.map(r => `  ${r.title} | ${r.snippet} | ${r.url}`).join('\n')
       : '';
 
-    // Formatera Apify discovery-resultat
-    let apifyData = '';
-    if (hasApifyData) {
-      const { formatDiscoveryForClaude } = await import('./apify-discovery.js');
-      apifyData = formatDiscoveryForClaude(apifyDiscoveryData);
-    }
+    const condensed = [svData, gsData].filter(Boolean).join('\n\n').slice(0, 8000);
 
-    const condensed = [svData, gsData, apifyData].filter(Boolean).join('\n\n').slice(0, 10000);
-
-    const systemPrompt = `Du är en expert på influencer-marknadsföring i Sverige. Du får data från FLERA KÄLLOR:
-1. Google Short Videos (TikTok/Instagram Reels/YouTube Shorts)
-2. Google-sökresultat (profiler, listor, artiklar)
-3. Apify Instagram Discovery (creators hittade via hashtag-sökning på Instagram)
-4. Apify TikTok Discovery (creators hittade via hashtag-sökning på TikTok)
+    const systemPrompt = `Du är en expert på influencer-marknadsföring i Sverige. Du får sökresultat från Google och Google Short Videos (TikTok/Instagram Reels/YouTube Shorts).
 
 UPPGIFT:
-Analysera ALLA resultat och identifiera de BÄSTA svenska influencers som matchar företaget.
+Analysera resultaten och identifiera svenska influencers som matchar företaget.
 Returnera ENBART en JSON-array — ingen annan text.
 
 STRIKT MATCHNINGSKRAV:
 - Matcha influencers som är relevanta för EXAKT det företaget erbjuder
-- Om företaget säljer kryddor/mat → hitta matbloggare, foodie-influencers, kock-profiler
 - Om företaget handlar om fantasy fotboll → hitta fotbollsanalytiker, fantasy sports-kreatörer, tipsters
-- Om företaget säljer kläder → hitta mode-influencers, stilbloggare
-- SKIPPA profiler som inte matchar det specifika erbjudandet — en fitness-influencer passar INTE ett matföretag
-- Hellre 5 träffsäkra resultat än 20 dåliga — NISCH-MATCHNING ÄR VIKTIGARE ÄN KVANTITET
-
-ABSOLUT VIKTIGAST — KANALNAMN:
-⚠️ Du får ENBART ange kanalnamn (@handle) som ORDAGRANT syns i sökresultaten.
-⚠️ Om ett sökresultat nämner en person men INTE visar deras exakta Instagram/TikTok-handle → SKIPPA den personen helt.
-⚠️ GISSA ALDRIG ett kanalnamn. Om du ser "Hillevi Arkel" i en artikel men inte ser "@hilleviarkel_mat" → inkludera INTE henne.
-⚠️ Short Videos-resultaten och Apify Discovery ger EXAKTA handles — använd dessa direkt.
-⚠️ Google-sökresultat som bara nämner namn utan @handle → SKIPPA.
-⚠️ Varje kanalnamn du returnerar MÅSTE finnas ordagrant i datan du fick.
-
-VIKTIGT OM DATA:
-- Följarantal: ange BARA om det EXAKT nämns i sökresultaten, annars null
-- profil_beskrivning: BARA exakt citat, annars null (Apify hämtar riktig bio senare)
-- GISSA ALDRIG innehåll — om du inte ser det i sökresultaten, sätt null
-- Behandla ALLA datakällor (SerpAPI, Apify) med SAMMA prioritet
+- SKIPPA generella gaming/esport-profiler som inte matchar det specifika erbjudandet
+- Short Videos-resultaten ger KANALNAMN och PLATTFORM direkt — använd dessa!
+- Inkludera BARA profiler du hittar bevis för i sökresultaten
+- Ange BARA kanalnamn som nämns i resultaten — hitta ALDRIG PÅ kanalnamn
+- Följarantal: ange BARA om det nämns, annars null
+- Hellre 10 träffsäkra resultat än 20 dåliga
 
 Svara med ENBART en JSON-array, inget annat.`;
-
-    const excludeSection = excludeHandles.length > 0
-      ? `\nREDAN HITTADE (EXKLUDERA DESSA — inkludera INTE dessa eller varianter av deras handles):\n${excludeHandles.map(h => `  - @${h}`).join('\n')}\n`
-      : '';
 
     const userMessage = `FÖRETAG: ${companyName}
 BESKRIVNING: ${beskrivning || 'Ej angiven'}
@@ -544,11 +415,11 @@ BRANSCH: ${industry || nischStr || 'gaming'}
 PLATTFORMAR: ${platformStr}
 ${budget ? `BUDGET: ${budget}` : ''}
 ${goal ? `MÅL: ${goal}` : ''}
-${excludeSection}
+
 ${condensed}
 
-Baserat på resultaten ovan, extrahera upp till 30 SVENSKA influencers.
-${excludeHandles.length > 0 ? 'VIKTIGT: Exkludera ALLA profiler listade ovan under "REDAN HITTADE". Hitta NYA profiler som INTE finns i den listan. Inkludera inte heller varianter av deras kanalnamn (t.ex. om @wettersol redan finns, inkludera inte @wettersolab).\n' : ''}VIKTIGT: Inkludera BARA profiler som skapar innehåll PÅ SVENSKA eller riktar sig till en SVENSK publik.
+Baserat på resultaten ovan, extrahera upp till 20 SVENSKA influencers.
+VIKTIGT: Inkludera BARA profiler som skapar innehåll PÅ SVENSKA eller riktar sig till en SVENSK publik.
 Uteslut internationella/engelskspråkiga profiler även om de är relevanta ämnesvis.
 Returnera JSON-array:
 [
@@ -556,28 +427,22 @@ Returnera JSON-array:
     "namn": "Influencerns riktiga namn eller kanalnamn",
     "kanalnamn": "@kanalnamn",
     "plattform": "instagram|tiktok|youtube",
-    "foljare": null,
-    "nisch": "t.ex. tech elektronik, matlagning",
-    "profil_beskrivning": null,
-    "kontakt_epost": null,
+    "foljare": 50000 eller null,
+    "nisch": "t.ex. fantasy fotboll, fotbollsanalys",
+    "profil_beskrivning": "Kort beskrivning baserat på sökresultaten",
+    "kontakt_epost": "email@example.com eller null",
     "ai_score": 85,
     "ai_motivation": "Varför denna influencer passar ${companyName}"
   }
 ]
 
-REGLER FÖR FÄLTEN:
-- foljare: BARA exakt siffra om den står i sökresultaten, annars ALLTID null
-- profil_beskrivning: BARA exakt citat från sökresultaten, annars ALLTID null (Apify hämtar sen)
-- kontakt_epost: BARA om den syns i sökresultaten, annars null
-
 ENBART JSON. Inga kommentarer.`;
 
-    const allDataCount = totalResults + (apifyDiscoveryData?.instagram?.length || 0) + (apifyDiscoveryData?.tiktok?.length || 0);
-    console.log(`[AI-Search] Steg 3: Sonnet analyserar ${allDataCount} datapunkter (SerpAPI + Apify)...`);
+    console.log(`[AI-Search] Steg 2: Sonnet analyserar ${totalResults} resultat...`);
     const raw = await callClaude(systemPrompt, userMessage, 5000);
     const influencers = parseJSON(raw);
 
-    console.log(`[AI-Search] ✅ ${influencers.length} influencers (SerpAPI + Apify Discovery → Sonnet)`);
+    console.log(`[AI-Search] ✅ ${influencers.length} influencers (Short Videos + Google → Sonnet)`);
     return normalizeResults(influencers);
   }
 
@@ -588,24 +453,19 @@ ENBART JSON. Inga kommentarer.`;
 
 STRIKT MATCHNINGSKRAV:
 - Matcha influencers som är relevanta för EXAKT det företaget erbjuder
-- Om företaget säljer mat/kryddor → hitta matbloggare, foodie-influencers, kock-profiler
-- Om företaget handlar om fantasy fotboll → hitta fotbollsanalytiker, tipsters
-- SKIPPA profiler som inte matchar nischen — en fitness-influencer passar INTE ett matföretag
-- Hellre 5 träffsäkra resultat än 20 dåliga — NISCH-MATCHNING ÄR VIKTIGAST
+- Om företaget handlar om fantasy fotboll → hitta fotbollsanalytiker, fantasy sports-kreatörer, tipsters
+- SKIPPA generella gaming/esport-profiler som inte matchar
+- Hellre 10 träffsäkra resultat än 20 dåliga
 
 Svara med ENBART en JSON-array — ingen annan text.`;
-
-  const fallbackExclude = excludeHandles.length > 0
-    ? `\nREDAN HITTADE (EXKLUDERA):\n${excludeHandles.map(h => `  - @${h}`).join('\n')}\n`
-    : '';
 
   const fallbackUserMessage = `FÖRETAG: ${companyName}
 BESKRIVNING: ${beskrivning || 'Ej angiven'}
 BRANSCH: ${industry || nischStr || 'gaming'}
 PLATTFORMAR: ${platformStr}
-${fallbackExclude}
-Sök webben och hitta upp till 30 SVENSKA influencers som passar detta företag.
-${excludeHandles.length > 0 ? 'VIKTIGT: Hitta NYA profiler — exkludera alla listade under "REDAN HITTADE" och varianter av deras kanalnamn.\n' : ''}VIKTIGT: Inkludera BARA profiler som skapar innehåll PÅ SVENSKA eller riktar sig till en SVENSK publik.
+
+Sök webben och hitta upp till 20 SVENSKA influencers som passar detta företag.
+VIKTIGT: Inkludera BARA profiler som skapar innehåll PÅ SVENSKA eller riktar sig till en SVENSK publik.
 Uteslut internationella/engelskspråkiga profiler.
 Returnera JSON-array:
 [
@@ -629,23 +489,6 @@ ENBART JSON. Inga kommentarer.`;
 
   console.log(`[AI-Search] ✅ ${influencers.length} influencers (Claude web_search fallback)`);
   return normalizeResults(influencers);
-}
-
-/**
- * Exporterad helper: Generera AI-drivna nisch-keywords som andra moduler (t.ex. YouTube-sökning) kan använda.
- * Returnerar en array av söktermer.
- */
-export async function generateNischKeywords(beskrivning, companyName) {
-  try {
-    const result = await buildSearchQueries({ companyName: companyName || '', beskrivning, nischer: [], platforms: ['youtube'] });
-    if (result.nischKeywords) {
-      // Splitta keywords till en array av labels
-      return result.nischKeywords.split(/\s+/).filter(w => w.length > 2);
-    }
-  } catch (err) {
-    console.warn('[AI-Search] generateNischKeywords misslyckades:', err.message);
-  }
-  return [];
 }
 
 function normalizeResults(influencers) {
@@ -787,10 +630,7 @@ ${beskrivning_text ? `Användarens beskrivning av företaget (OBS: detta är rå
 
 Din uppgift: Formulera EN professionell mening som presenterar företaget. Basera dig på informationen ovan men skriv om den till korrekt, professionell svenska. Kopiera INTE användarens text ordagrant — förbättra den.
 Skriv ALDRIG ord som "lag", "team", "app", "plattform", "community" om företaget om det inte tydligt framgår av beskrivningen.
-Om ingen beskrivning finns, skriv bara: "Vi på ${foretag.namn} söker influencers för ett betalt samarbete."
-
-VIKTIG REGEL — GISSA ALDRIG OM INFLUENCERNS CONTENT:
-Du har INGEN information om vad influencern faktiskt publicerar. Hitta INTE PÅ detaljer som "dina träningsvideos", "dina podcastavsnitt", "ditt tekniska innehåll" etc. Skriv istället en generell hälsning som nämner kanalnamnet utan att gissa på specifikt content.`;
+Om ingen beskrivning finns, skriv bara: "Vi på ${foretag.namn} söker influencers för ett betalt samarbete."`;
 
   let erbjudandeBlock = '';
   if (brief?.erbjudande) {
@@ -826,14 +666,13 @@ ${ctaBlock}
 ${extraBlock}
 
 KRAV — följ dessa EXAKT:
-1. Börja med en kort hälsning som nämner influencerns kanalnamn (max 1 mening). VIKTIGT: Hitta INTE PÅ specifika detaljer om deras content — du vet INTE vad de gör på sin kanal. Skriv ALDRIG saker som "dina träningsvideos", "dina podcastavsnitt", "ditt tekniska innehåll" etc. om det inte TYDLIGT framgår av deras kanalnamn. Skriv istället något generellt som "Vi har hittat din kanal X och tror att det finns potential för ett samarbete."
+1. Börja med en kort personlig kommentar om influencerns kanal (max 1 mening)
 2. Presentera företaget professionellt baserat på informationen i systempromten (formulera själv, kopiera INTE användarens text)
 3. Förklara KONKRET vad vi vill att influencern gör (se CTA ovan)
 4. Skriv ut ersättningen TYDLIGT med siffror
 5. Avsluta med ett tydligt nästa steg
-6. Avsluta brödtexten med "Låter detta intressant? Svara gärna så skickar jag mer information!" eller liknande — INKLUDERA INTE signatur/avsändare, den läggs till automatiskt
+6. Signatur: Mvh, ${kontakt}, ${foretag.namn}, ${foretag.epost || ''}
 7. Max 150 ord totalt
-8. GISSA ALDRIG — om du inte vet något säkert, utelämna det. Det är bättre att vara generell än att hitta på fel information.
 
 Returnera BARA meddelandet formaterat så här:
 ÄMNE: [ämnesrad]
@@ -841,16 +680,7 @@ Returnera BARA meddelandet formaterat så här:
 [brödtext]`;
 
   const raw = await callClaude(systemPrompt, userMessage, 1000);
-
-  // Bygg signatur programmatiskt — ALDRIG AI-genererad
-  const signaturDelar = ['Mvh,', kontakt];
-  if (foretag.namn) signaturDelar.push(foretag.namn);
-  if (foretag.epost) signaturDelar.push(foretag.epost);
-  const signatur = signaturDelar.join('\n');
-
-  // Ta bort eventuell AI-genererad signatur och ersätt med den riktiga
-  const cleaned = raw.trim().replace(/\n*(Mvh|Med vänlig hälsning|Vänligen|Hälsningar),?\n[\s\S]*$/i, '');
-  return cleaned.trimEnd() + '\n\n' + signatur;
+  return raw.trim();
 }
 
 export async function generateSubject({ influencer, foretag, outreachType }) {
@@ -895,11 +725,17 @@ Sök webben efter deras senaste content och svara med JSON:
  * Returnerar strukturerad data: namn, webbplats, telefon, betyg, typ, adress.
  */
 export async function searchGoogleMaps(query, location = 'Sverige') {
+  // Primär: Apify Google Maps Scraper
+  if (await isApifyConfigured()) {
+    return await searchGoogleMapsViaApify(query, location);
+  }
+
+  // Fallback: SerpAPI
   const data = await serpApiQuery({
     engine: 'google_maps',
     q: query,
     hl: 'sv',
-    ll: '@62.0,15.0,5z',  // Centrerat på Sverige
+    ll: '@62.0,15.0,5z',
     type: 'search',
   }, 'gmaps');
 
@@ -920,6 +756,57 @@ export async function searchGoogleMaps(query, location = 'Sverige') {
     place_id: r.place_id || '',
     thumbnail: r.thumbnail || '',
   }));
+}
+
+/**
+ * Sök Google Maps via Apify Google Maps Scraper.
+ * Actor: compass/crawler-google-places (ID: nwua9Gu5YrADL7ZDj)
+ *
+ * Returnerar samma format som SerpAPI-versionen.
+ */
+async function searchGoogleMapsViaApify(query, location = 'Sweden') {
+  console.log(`[GoogleMaps] Apify: söker "${query}" i ${location}...`);
+
+  try {
+    const items = await runApifyActor('compass/crawler-google-places', {
+      searchStringsArray: [query],
+      locationQuery: location,
+      maxCrawledPlacesPerSearch: 10,
+      language: 'sv',
+      includeWebResults: false,
+      scrapeContacts: false,
+      scrapeDirectories: false,
+      scrapeReviewsPersonalData: false,
+      scrapePlaceDetailPage: false,
+      scrapeImageAuthors: false,
+      scrapeTableReservationProvider: false,
+      scrapeSocialMediaProfiles: {
+        facebooks: false,
+        instagrams: false,
+        tiktoks: false,
+        twitters: false,
+        youtubes: false,
+      },
+    }, 120); // 120 sek timeout
+
+    console.log(`[GoogleMaps] Apify: ${items.length} resultat för "${query}"`);
+
+    return items.map(r => ({
+      namn: r.title || r.name || '',
+      adress: r.address || r.street || '',
+      telefon: r.phone || r.phoneUnformatted || '',
+      hemsida: r.website || r.url || '',
+      betyg: r.totalScore || r.rating || null,
+      recensioner: r.reviewsCount || r.reviews || 0,
+      typ: r.categoryName || (r.categories ? r.categories.join(', ') : '') || '',
+      beskrivning: r.description || '',
+      place_id: r.placeId || '',
+      thumbnail: r.imageUrl || r.thumbnail || '',
+    }));
+  } catch (err) {
+    console.error(`[GoogleMaps] Apify fel för "${query}": ${err.message}`);
+    return [];
+  }
 }
 
 /**
@@ -967,17 +854,79 @@ Returnera BARA JSON-arrayen.`
 
   console.log(`[GoogleMaps] Söktermer: ${searchTerms.join(', ')}`);
 
-  // Steg 2: Sök Google Maps för varje term
+  // Steg 2: Sök Google Maps — Apify batch (alla termer i en run) eller SerpAPI (per term)
   const allResults = [];
   const seenNames = new Set();
 
-  for (const term of searchTerms.slice(0, 12)) {
-    const results = await searchGoogleMaps(term);
-    for (const r of results) {
-      const key = r.namn.toLowerCase().trim();
-      if (!seenNames.has(key)) {
+  if (await isApifyConfigured()) {
+    // APIFY: Skicka ALLA söktermer i EN run (billigare och snabbare)
+    console.log(`[GoogleMaps] Apify batch: ${searchTerms.length} söktermer i en run...`);
+    try {
+      const items = await runApifyActor('compass/crawler-google-places', {
+        searchStringsArray: searchTerms.slice(0, 12),
+        locationQuery: 'Sweden',
+        maxCrawledPlacesPerSearch: 5,
+        language: 'sv',
+        includeWebResults: false,
+        scrapeContacts: false,
+        scrapeDirectories: false,
+        scrapeReviewsPersonalData: false,
+        scrapePlaceDetailPage: false,
+        scrapeImageAuthors: false,
+        scrapeTableReservationProvider: false,
+        scrapeSocialMediaProfiles: {
+          facebooks: false,
+          instagrams: false,
+          tiktoks: false,
+          twitters: false,
+          youtubes: false,
+        },
+      }, 180); // 180 sek timeout för batch
+
+      for (const r of items) {
+        const namn = r.title || r.name || '';
+        const key = namn.toLowerCase().trim();
+        if (!key || seenNames.has(key)) continue;
         seenNames.add(key);
-        allResults.push({ ...r, sokterm: term });
+        allResults.push({
+          namn,
+          adress: r.address || r.street || '',
+          telefon: r.phone || r.phoneUnformatted || '',
+          hemsida: r.website || r.url || '',
+          betyg: r.totalScore || r.rating || null,
+          recensioner: r.reviewsCount || r.reviews || 0,
+          typ: r.categoryName || (r.categories ? r.categories.join(', ') : '') || '',
+          beskrivning: r.description || '',
+          place_id: r.placeId || '',
+          thumbnail: r.imageUrl || r.thumbnail || '',
+          sokterm: r.searchString || '',
+        });
+      }
+      console.log(`[GoogleMaps] Apify batch: ${items.length} raw → ${allResults.length} unika företag`);
+    } catch (err) {
+      console.error(`[GoogleMaps] Apify batch misslyckades: ${err.message}, faller tillbaka på per-term-sökning`);
+      // Fallback: kör per term
+      for (const term of searchTerms.slice(0, 12)) {
+        const results = await searchGoogleMaps(term);
+        for (const r of results) {
+          const key = r.namn.toLowerCase().trim();
+          if (!seenNames.has(key)) {
+            seenNames.add(key);
+            allResults.push({ ...r, sokterm: term });
+          }
+        }
+      }
+    }
+  } else {
+    // SerpAPI fallback: kör per term
+    for (const term of searchTerms.slice(0, 12)) {
+      const results = await searchGoogleMaps(term);
+      for (const r of results) {
+        const key = r.namn.toLowerCase().trim();
+        if (!seenNames.has(key)) {
+          seenNames.add(key);
+          allResults.push({ ...r, sokterm: term });
+        }
       }
     }
   }

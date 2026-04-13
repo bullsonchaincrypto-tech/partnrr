@@ -1,7 +1,7 @@
 import { Router } from 'express';
 import { queryAll, queryOne, runSql } from '../db/schema.js';
 import { findSponsorProspects, generateSponsorPitch } from '../services/anthropic.js';
-import { findSponsorsViaGoogleMaps } from '../services/ai-search.js';
+import { findSponsorsViaGoogleMaps, searchGoogleMaps } from '../services/ai-search.js';
 import { sendEmail } from '../services/email-service.js';
 
 const router = Router();
@@ -15,14 +15,12 @@ router.get('/prospects/:foretagId', async (req, res) => {
 // AI: Find sponsor prospects
 router.post('/prospects/find', async (req, res) => {
   try {
-    const { foretagId, exclude_names } = req.body;
+    const { foretagId } = req.body;
     const foretag = await queryOne('SELECT * FROM foretag WHERE id = ?', [foretagId]);
     if (!foretag) return res.status(404).json({ error: 'Foretag hittades inte' });
 
-    const isAppend = exclude_names?.length > 0;
-
     // Steg 1: Sök Google Maps efter riktiga företag
-    console.log(`[Sponsors] Söker Google Maps för "${foretag.namn}"...${isAppend ? ` (exkluderar ${exclude_names.length} redan hittade)` : ''}`);
+    console.log(`[Sponsors] Söker Google Maps för "${foretag.namn}"...`);
     let googleMapsResults = [];
     try {
       googleMapsResults = await findSponsorsViaGoogleMaps(foretag.namn, foretag.beskrivning);
@@ -32,26 +30,13 @@ router.post('/prospects/find', async (req, res) => {
     }
 
     // Steg 2: Claude rankar och filtrerar (med Google Maps-data som underlag)
-    const prospects = await findSponsorProspects(foretag.namn, foretag.bransch, foretag.beskrivning, googleMapsResults, exclude_names || []);
+    const prospects = await findSponsorProspects(foretag.namn, foretag.bransch, foretag.beskrivning, googleMapsResults);
 
-    // Vid "Hitta fler" — radera INTE befintliga prospects, bara lägg till nya
-    if (!isAppend) {
-      await runSql('DELETE FROM sponsor_prospects WHERE foretag_id = ?', [foretagId]);
-    }
+    await runSql('DELETE FROM sponsor_prospects WHERE foretag_id = ?', [foretagId]);
 
-    // Filtrera bort prospects utan namn + redan befintliga (vid append)
-    // Max 25 sponsorer per sökning
-    const MAX_SPONSOR_RESULTS = 25;
-    let validProspects = prospects.filter(p => p.namn && p.namn.trim()).slice(0, MAX_SPONSOR_RESULTS);
-    if (isAppend) {
-      const existingSet = new Set(exclude_names.map(n => n.toLowerCase()));
-      const before = validProspects.length;
-      validProspects = validProspects.filter(p => !existingSet.has(p.namn.trim().toLowerCase()));
-      if (before > validProspects.length) {
-        console.log(`[Sponsors] Dedup: ${before} → ${validProspects.length} (${before - validProspects.length} dubbletter borttagna)`);
-      }
-    }
-    console.log(`[Sponsors] ${validProspects.length} nya prospects att spara`);
+    // Filtrera bort prospects utan namn (krävs av NOT NULL constraint)
+    const validProspects = prospects.filter(p => p.namn && p.namn.trim());
+    console.log(`[Sponsors] ${validProspects.length}/${prospects.length} prospects har giltigt namn`);
 
     for (const p of validProspects) {
       await runSql(
@@ -83,74 +68,6 @@ router.put('/prospects/:foretagId/select-all', async (req, res) => {
   await runSql('UPDATE sponsor_prospects SET vald = ? WHERE foretag_id = ?', [selected ? 1 : 0, Number(req.params.foretagId)]);
   const rows = await queryAll('SELECT * FROM sponsor_prospects WHERE foretag_id = ?', [Number(req.params.foretagId)]);
   res.json(rows);
-});
-
-// PUT /api/sponsors/prospects/:foretagId/sync-selection — synka vald-status från frontend till DB
-router.put('/prospects/:foretagId/sync-selection', async (req, res) => {
-  try {
-    const foretagId = Number(req.params.foretagId);
-    const { selectedIds } = req.body;
-    if (!foretagId) return res.status(400).json({ error: 'foretagId krävs' });
-
-    // Sätt alla till ej valda
-    await runSql('UPDATE sponsor_prospects SET vald = 0 WHERE foretag_id = ?', [foretagId]);
-
-    // Markera de valda
-    if (selectedIds?.length > 0) {
-      const placeholders = selectedIds.map(() => '?').join(',');
-      await runSql(
-        `UPDATE sponsor_prospects SET vald = 1 WHERE foretag_id = ? AND id IN (${placeholders})`,
-        [foretagId, ...selectedIds.map(Number)]
-      );
-    }
-
-    const rows = await queryAll('SELECT * FROM sponsor_prospects WHERE foretag_id = ? ORDER BY id ASC', [foretagId]);
-    console.log(`[Sponsors] Sync selection: ${rows.filter(r => r.vald).length}/${rows.length} valda för företag ${foretagId}`);
-    res.json(rows);
-  } catch (error) {
-    console.error('Sync selection error:', error);
-    res.status(500).json({ error: error.message });
-  }
-});
-
-// POST /api/sponsors/prospects/bulk-save — spara AI-sökta sponsors till DB
-router.post('/prospects/bulk-save', async (req, res) => {
-  try {
-    const { foretag_id, prospects } = req.body;
-    if (!foretag_id || !prospects?.length) {
-      return res.status(400).json({ error: 'foretag_id och prospects krävs' });
-    }
-
-    // Ta bort gamla prospects för detta företag
-    await runSql('DELETE FROM sponsor_prospects WHERE foretag_id = ?', [foretag_id]);
-
-    for (const p of prospects) {
-      await runSql(
-        `INSERT INTO sponsor_prospects (foretag_id, namn, kontaktperson, epost, bransch, instagram_handle, hemsida, telefon, betyg, kalla, vald)
-         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-        [
-          foretag_id,
-          p.namn || '',
-          p.kontaktperson || null,
-          p.kontakt_epost || p.epost || null,
-          p.bransch || p.nisch || null,
-          p.instagram_handle || p.kanalnamn || null,
-          p.hemsida || null,
-          p.telefon || null,
-          p.betyg || null,
-          p.kalla || 'ai',
-          p.vald ? 1 : 0,
-        ]
-      );
-    }
-
-    const dbRows = await queryAll('SELECT * FROM sponsor_prospects WHERE foretag_id = ? ORDER BY id ASC', [foretag_id]);
-    console.log(`[Sponsors] Sparade ${dbRows.length} AI-sponsors till DB (${dbRows.filter(r => r.vald).length} valda)`);
-    res.json(dbRows);
-  } catch (error) {
-    console.error('Sponsor bulk save error:', error);
-    res.status(500).json({ error: error.message });
-  }
 });
 
 // Generate sponsor pitches
@@ -381,34 +298,26 @@ router.post('/search-direct', async (req, res) => {
     console.log(`[Sponsor Search] Direkt-sök: "${query}" för ${foretag.namn}`);
     const results = [];
 
-    // 1. Sök via Google Maps (SerpAPI) om nyckel finns
-    const serpKey = process.env.SERPAPI_KEY;
-    if (serpKey) {
-      try {
-        const searchUrl = `https://serpapi.com/search.json?engine=google_maps&q=${encodeURIComponent(query + ' Sverige')}&hl=sv&google_domain=google.se&api_key=${serpKey}`;
-        const response = await fetch(searchUrl);
-        const data = await response.json();
-
-        if (data.local_results?.length > 0) {
-          for (const place of data.local_results.slice(0, 10)) {
-            results.push({
-              id: `gm-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`,
-              namn: place.title || '',
-              kontaktperson: '',
-              epost: '',
-              bransch: place.type || place.types?.join(', ') || '',
-              hemsida: place.website || '',
-              telefon: place.phone || '',
-              betyg: place.rating ? String(place.rating) : null,
-              kalla: 'google_maps',
-              vald: 0,
-            });
-          }
-          console.log(`[Sponsor Search] Google Maps: ${data.local_results.length} resultat`);
-        }
-      } catch (gmErr) {
-        console.warn(`[Sponsor Search] Google Maps misslyckades: ${gmErr.message}`);
+    // 1. Sök via Google Maps (Apify primär, SerpAPI fallback)
+    try {
+      const mapsResults = await searchGoogleMaps(query + ' Sverige');
+      for (const place of mapsResults.slice(0, 10)) {
+        results.push({
+          id: `gm-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`,
+          namn: place.namn || '',
+          kontaktperson: '',
+          epost: '',
+          bransch: place.typ || '',
+          hemsida: place.hemsida || '',
+          telefon: place.telefon || '',
+          betyg: place.betyg ? String(place.betyg) : null,
+          kalla: 'google_maps',
+          vald: 0,
+        });
       }
+      console.log(`[Sponsor Search] Google Maps: ${mapsResults.length} resultat`);
+    } catch (gmErr) {
+      console.warn(`[Sponsor Search] Google Maps misslyckades: ${gmErr.message}`);
     }
 
     // 2. Om inga Google Maps-resultat, använd AI

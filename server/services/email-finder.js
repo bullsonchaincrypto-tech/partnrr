@@ -3,6 +3,7 @@ import dns from 'dns';
 import { promisify } from 'util';
 import { queryOne, runSql, queryAll } from '../db/schema.js';
 import { trackApiCost } from './cost-tracker.js';
+import { runApifyActor, isApifyConfigured } from './social-enrichment.js';
 
 const resolveMx = promisify(dns.resolveMx);
 
@@ -75,8 +76,15 @@ export async function findEmailForChannel(channelInfo) {
     if (result) return result;
   }
 
-  // ── Steg 2: SerpAPI — riktiga Google-sökresultat ──
-  if (handle && process.env.SERPAPI_KEY) {
+  // ── Steg 2: Apify Google Search — riktiga Google-sökresultat ──
+  if (handle && await isApifyConfigured()) {
+    const apifyResult = await searchWithApifyGoogle(handle, { namn });
+    if (apifyResult) {
+      const result = await found(apifyResult.email, apifyResult.method);
+      if (result) return result;
+    }
+  } else if (handle && process.env.SERPAPI_KEY) {
+    // Fallback: SerpAPI om Apify inte är konfigurerat
     const serpResult = await searchWithSerpAPI(handle, { namn });
     if (serpResult) {
       const result = await found(serpResult.email, serpResult.method);
@@ -170,7 +178,89 @@ async function validateMx(email) {
 
 
 // ═══════════════════════════════════════════════
-// SERPAPI — RIKTIGA GOOGLE-SÖKRESULTAT
+// APIFY GOOGLE SEARCH — PRIMÄR E-POSTSÖKNING
+// ═══════════════════════════════════════════════
+
+/**
+ * Sök via Apify Google Search Results Scraper.
+ * Använder samma söktermer som SerpAPI men via Apify istället.
+ * Actor: apify/google-search-scraper (ID: nFJndFXA5zjCTuudP)
+ *
+ * Alla queries körs i en enda actor-run (billigare än separata anrop).
+ * Returnerar { email, method } eller null.
+ */
+async function searchWithApifyGoogle(handle, extra = {}) {
+  const { namn } = extra;
+  const queries = buildSmartQueries(handle, namn);
+
+  console.log(`[E-post] 🔍 Apify Google Search: söker "${handle}"${namn ? ` (${namn})` : ''} med ${queries.length} queries...`);
+
+  try {
+    // Kör alla queries i en enda Apify-run (en rad per query)
+    const items = await runApifyActor('apify/google-search-scraper', {
+      queries: queries.join('\n'),
+      maxPagesPerQuery: 1,
+      resultsPerPage: 10,
+      countryCode: 'se',
+      languageCode: 'sv',
+      includeUnfilteredResults: false,
+      saveHtml: false,
+      mobileResults: false,
+    }, 90); // 90 sek timeout
+
+    // Extrahera e-post från organicResults i snippets/titlar
+    for (const item of items) {
+      const organicResults = item.organicResults || [];
+      for (const result of organicResults) {
+        const text = `${result.title || ''} ${result.description || ''} ${result.snippet || ''}`;
+        const email = extractEmails(text);
+        if (email) {
+          console.log(`[E-post] 🔍 Apify snippet-träff: ${email}`);
+          return { email, method: 'apify_google_snippet', source: result.url || result.link };
+        }
+      }
+    }
+
+    // Om ingen snippet-träff: följ topp 3 URLs (gratis, ingen API-kostnad)
+    const urls = [];
+    const seenDomains = new Set();
+    const skipDomains = ['youtube.com', 'youtu.be', 'reddit.com', 'wikipedia.org', 'twitch.tv', 'imdb.com', 'pinterest.com', 'quora.com'];
+
+    for (const item of items) {
+      for (const result of (item.organicResults || [])) {
+        const url = result.url || result.link;
+        if (!url) continue;
+        if (skipDomains.some(d => url.includes(d))) continue;
+        try {
+          const domain = new URL(url).hostname;
+          if (seenDomains.has(domain)) continue;
+          seenDomains.add(domain);
+        } catch { continue; }
+        urls.push(url);
+        if (urls.length >= 5) break;
+      }
+      if (urls.length >= 5) break;
+    }
+
+    if (urls.length > 0) {
+      console.log(`[E-post] 🔍 Apify: följer ${urls.length} länk(ar)...`);
+      const pageHit = await followUrls(urls.slice(0, 3));
+      if (pageHit) {
+        console.log(`[E-post] 🔍 Apify sida-träff: ${pageHit.email} (${pageHit.source})`);
+        return { email: pageHit.email, method: 'apify_google_page', source: pageHit.source };
+      }
+    }
+
+    console.log(`[E-post] 🔍 Apify Google Search: ingen e-post hittad för "${handle}"`);
+    return null;
+  } catch (err) {
+    console.error(`[E-post] Apify Google Search fel för "${handle}": ${err.message}`);
+    return null;
+  }
+}
+
+// ═══════════════════════════════════════════════
+// SERPAPI — FALLBACK E-POSTSÖKNING
 // ═══════════════════════════════════════════════
 
 /**
@@ -637,11 +727,6 @@ function extractEmails(text) {
     'tailwindcss.com', 'react.dev',
     'iana.org', 'creativecommons.org',
     'serpapi.com',
-    // Analytics, stats & tool platforms (ej influencer-mejl)
-    'playboard.co', 'socialblade.com', 'noxinfluencer.com',
-    'hypeauditor.com', 'tubular.io', 'vidiq.com',
-    'channelcrawler.com', 'statsheep.com',
-    'recaptcha@', 'captcha@',
   ];
 
   const filtered = [...new Set(matches)].filter(email => {

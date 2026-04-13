@@ -362,14 +362,7 @@ ${beskrivning ? `Användarens beskrivning av företaget (OBS: detta är råtext 
 
 Din uppgift: Formulera EN professionell mening som presenterar företaget. Basera dig på informationen ovan men skriv om den till korrekt, professionell svenska. Kopiera INTE användarens text ordagrant — förbättra den.
 Skriv ALDRIG ord som "lag", "team", "app", "plattform", "community" om företaget om det inte tydligt framgår av beskrivningen.
-Om ingen beskrivning finns, skriv bara: "Vi på ${foretag.namn} söker influencers för ett betalt samarbete."
-
-KRITISKT — ANTI-FABRICERING:
-- Hitta ALDRIG PÅ siffror, priser, värden, statistik eller fakta som INTE ges explicit i prompten
-- Om ersättningen nämner "premium", "gratis tillgång" eller liknande utan pris — skriv ALDRIG ett kronbelopp/värde för det
-- Skriv BARA de siffror som faktiskt anges i erbjudandet (t.ex. "300 SEK per video")
-- Gissa ALDRIG vad något är "värt" — om inget pris anges, nämn bara förmånen utan belopp
-- Om du inte vet något — UTELÄMNA det, hitta inte på`;
+Om ingen beskrivning finns, skriv bara: "Vi på ${foretag.namn} söker influencers för ett betalt samarbete."`;
 
 
   // Bygg erbjudande-sektion baserat på brief
@@ -404,28 +397,17 @@ KRAV — följ dessa EXAKT:
 1. Börja med en kort personlig kommentar om influencerns kanal (max 1 mening)
 2. Presentera företaget professionellt baserat på informationen i systempromten (formulera själv, kopiera INTE användarens text)
 3. Förklara KONKRET vad vi vill att influencern gör (se CTA ovan)
-4. Skriv ut ersättningen TYDLIGT med siffror — men BARA siffror som anges ovan. Hitta ALDRIG PÅ belopp, värden eller priser som inte finns i erbjudandet.
-5. Om erbjudandet nämner förmåner utan pris (t.ex. "gratis premium"), nämn förmånen men SKRIV INTE ett påhittat kronvärde
-6. Avsluta med ett tydligt nästa steg
-7. Avsluta brödtexten med "Låter detta intressant? Svara gärna så skickar jag mer information!" eller liknande — INKLUDERA INTE signatur/avsändare, den läggs till automatiskt
-8. Max 150 ord totalt
+4. Skriv ut ersättningen TYDLIGT med siffror
+5. Avsluta med ett tydligt nästa steg
+6. Signatur: Mvh, ${kontakt}, ${foretag.namn}, ${foretag.epost || ''}
+7. Max 150 ord totalt
 
 Returnera BARA meddelandet (ämne och brödtext), formaterat så här:
 ÄMNE: [ämnesrad]
 ---
 [brödtext]`;
 
-  const aiResponse = await callClaude(system, prompt);
-
-  // Bygg signatur programmatiskt — ALDRIG AI-genererad
-  const signaturDelar = ['Mvh,', kontakt];
-  if (foretag.namn) signaturDelar.push(foretag.namn);
-  if (foretag.epost) signaturDelar.push(foretag.epost);
-  const signatur = signaturDelar.join('\n');
-
-  // Ta bort eventuell AI-genererad signatur (Mvh, etc.) och ersätt med den riktiga
-  const cleaned = aiResponse.replace(/\n*(Mvh|Med vänlig hälsning|Vänligen|Hälsningar),?\n[\s\S]*$/i, '');
-  return cleaned.trimEnd() + '\n\n' + signatur;
+  return await callClaude(system, prompt);
 }
 
 export async function generateFollowUp(influencer, originalMessage, stepNumber = 1) {
@@ -490,7 +472,7 @@ Ge 3-5 konkreta förbättringsförslag på svenska.`;
   return await callClaude(system, prompt);
 }
 
-export async function findSponsorProspects(foretagNamn, bransch, beskrivning, googleMapsResults = [], excludeNames = []) {
+export async function findSponsorProspects(foretagNamn, bransch, beskrivning, googleMapsResults = []) {
   const system = `Du är en expert på svenska företag och sponsorpartnerskap.
 Du ska alltid svara med giltig JSON, inget annat.`;
 
@@ -508,22 +490,20 @@ Du ska alltid svara med giltig JSON, inget annat.`;
     mapsContext = `\n\nHär är RIKTIGA företag som hittats via Google Maps. Prioritera dessa framför påhittade förslag:
 ${mapsList}
 
-Välj de 25 mest relevanta från listan ovan. Om du hittar färre än 25 relevanta, fyll på med egna förslag.
+Välj de mest relevanta från listan ovan (max 25). Returnera ENBART företag från Google Maps-listan — hitta ALDRIG på egna förslag.
 För varje företag från Google Maps, behåll deras riktiga kontaktuppgifter (hemsida, telefon).
-Gissa e-post baserat på domännamnet (t.ex. info@foretag.se).`;
+Gissa e-post baserat på domännamnet (t.ex. info@foretag.se).
+Alla företag ska ha kalla: "google_maps".`;
   }
 
-  const excludeSection = excludeNames.length > 0
-    ? `\nREDAN HITTADE FÖRETAG (EXKLUDERA DESSA — föreslå INTE dessa igen):\n${excludeNames.map(n => `  - ${n}`).join('\n')}\n`
-    : '';
+  const prompt = googleMapsResults.length > 0
+    ? `Ranka och berika följande Google Maps-företag som potentiella kampanjsponsorer för ${companyContext}.
 
-  const prompt = `Hitta 25 svenska företag som passar som kampanjsponsorer för ${companyContext}.
-
-Basera dina förslag på vad företaget FAKTISKT gör — hitta sponsorer vars målgrupp matchar.
+Basera din rankning på hur väl varje företag matchar som sponsor — vars målgrupp överlappar.
 ${beskrivning ? `Företagets beskrivning: "${beskrivning}"` : ''}
 ${mapsContext}
-${excludeSection}
-${excludeNames.length > 0 ? 'VIKTIGT: Föreslå ENBART NYA företag som INTE finns i listan "REDAN HITTADE" ovan. Hitta andra relevanta företag.\n' : ''}Tänk på företag inom: sportrelaterade varumärken, energidrycker, sportappar, betting/odds, tech, lifestyle, kläder — men BARA om de är relevanta för företagets nisch.
+
+VIKTIGT: Returnera ENBART företag från Google Maps-listan ovan. Hitta ALDRIG på egna företag.
 
 Returnera en JSON-array med exakt detta format:
 [
@@ -536,7 +516,30 @@ Returnera en JSON-array med exakt detta format:
     "hemsida": "https://foretag.se",
     "telefon": "Telefonnummer eller null",
     "betyg": "Google-betyg eller null",
-    "kalla": "google_maps eller ai"
+    "kalla": "google_maps"
+  }
+]
+
+Returnera BARA JSON-arrayen, inget annat.`
+    : `Hitta 25 svenska företag som passar som kampanjsponsorer för ${companyContext}.
+
+Basera dina förslag på vad företaget FAKTISKT gör — hitta sponsorer vars målgrupp matchar.
+${beskrivning ? `Företagets beskrivning: "${beskrivning}"` : ''}
+
+Tänk på företag inom: sportrelaterade varumärken, energidrycker, sportappar, betting/odds, tech, lifestyle, kläder — men BARA om de är relevanta för företagets nisch.
+
+Returnera en JSON-array med exakt detta format:
+[
+  {
+    "namn": "Företagsnamn",
+    "kontaktperson": "Namn om känt, annars null",
+    "epost": "info@foretag.se eller null",
+    "bransch": "Kort branschbeskrivning",
+    "instagram_handle": "@handle eller null",
+    "hemsida": "https://foretag.se",
+    "telefon": "Telefonnummer eller null",
+    "betyg": "Google-betyg eller null",
+    "kalla": "ai"
   }
 ]
 

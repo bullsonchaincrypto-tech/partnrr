@@ -30,7 +30,7 @@ const ACTORS = {
 /**
  * Kolla om Apify är konfigurerat
  */
-export function isApifyConfigured() {
+export async function isApifyConfigured() {
   return !!process.env.APIFY_API_TOKEN;
 }
 
@@ -52,7 +52,6 @@ function getToken() {
  */
 export async function enrichInfluencers(influencers) {
   if (!isApifyConfigured() || !influencers?.length) {
-    console.log(`[Enrichment] Skipping: configured=${isApifyConfigured()}, profiles=${influencers?.length || 0}`);
     return influencers;
   }
 
@@ -103,21 +102,15 @@ export async function enrichSingleProfile(handle, platform) {
   const pl = platform.toLowerCase();
 
   try {
-    let result = null;
     if (pl === 'instagram') {
       const results = await enrichInstagramProfiles([cleanHandle]);
-      result = results[0] || null;
-    } else if (pl === 'tiktok') {
+      return results[0] || null;
+    }
+    if (pl === 'tiktok') {
       const results = await enrichTikTokProfiles([cleanHandle]);
-      result = results[0] || null;
+      return results[0] || null;
     }
-
-    // Returnera null om profilen saknar riktig data (spökprofil)
-    if (result && !result.followers && !result.bio) {
-      console.log(`[Enrichment] @${cleanHandle} (${platform}): profil tom — returnerar null`);
-      return null;
-    }
-    return result;
+    return null;
   } catch (err) {
     console.error(`[Enrichment] Error for @${cleanHandle} on ${platform}:`, err.message);
     return null;
@@ -151,8 +144,6 @@ async function enrichInstagramProfiles(usernames) {
           ACTORS.instagram,
           {
             usernames: batch.map(u => u.replace(/^@/, '')),
-            resultsLimit: 1,          // Bara profildata, inga posts
-            addParentData: false,
           },
           TIMEOUT_SECS
         );
@@ -221,10 +212,6 @@ async function enrichTikTokProfiles(usernames) {
           ACTORS.tiktok,
           {
             profiles: batch.map(u => u.replace(/^@/, '')),
-            resultsPerPage: 1,    // Vi behöver bara profildata, inte alla videos
-            shouldDownloadCovers: false,
-            shouldDownloadVideos: false,
-            shouldDownloadSubtitles: false,
           },
           TIMEOUT_SECS
         );
@@ -383,7 +370,7 @@ function extractTikTokProfile(item) {
  *   POST /v2/acts/{actorId}/run-sync-get-dataset-items
  *   → Startar actor, väntar på resultat, returnerar dataset-items
  */
-async function runApifyActor(actorId, input, timeoutSecs = 60) {
+export async function runApifyActor(actorId, input, timeoutSecs = 60) {
   const token = getToken();
 
   // Encode actor ID (username/name → username~name)
@@ -470,15 +457,6 @@ function formatFollowers(count) {
  */
 function mergeEnrichment(original, enriched) {
   const followerCount = enriched.followers || original.foljare_exakt || original.followers || 0;
-
-  // Apify returnerade profilen men den kan vara tom/privat/borttagen.
-  // Verifiera bara om vi faktiskt fick meningsfull data (followers > 0 eller bio finns).
-  const hasRealData = followerCount > 0 || !!enriched.bio;
-
-  if (!hasRealData) {
-    console.log(`[Enrichment] ⚠️ Spökprofil: @${enriched.username || original.handle} returnerades av Apify men har 0 followers och ingen bio — markeras EJ som verifierad`);
-  }
-
   return {
     ...original,
     // Verifierad data överskriver
@@ -495,10 +473,9 @@ function mergeEnrichment(original, enriched) {
     posts_count: enriched.posts_count || original.posts_count,
     kontakt_info: enriched.website || original.kontakt_info,
 
-    // Meta — bara verifierad om Apify hade riktig data
-    verifierad: hasRealData,
-    datakalla: original.datakalla || (hasRealData ? `apify_${enriched.platform}` : 'ai_estimated'),
-    enrichment_kalla: hasRealData ? `apify_${enriched.platform}` : null,
+    // Meta
+    verifierad: true,
+    datakalla: `apify_${enriched.platform}`,
     is_verified_platform: enriched.is_verified,
     is_business: enriched.is_business,
     category: enriched.category || original.category,

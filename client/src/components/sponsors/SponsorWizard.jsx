@@ -139,6 +139,7 @@ export default function SponsorWizard() {
             </h2>
             <p className="text-gray-400 mb-4">
               AI söker svenska företag som passar som sponsorer för <span className="text-blue-400 font-medium">{foretag?.namn}</span>.
+              <span className="text-gray-500"> Sökningen kan ta 1–2 minuter.</span>
             </p>
             <button onClick={handleFindProspects} disabled={loading}
               className="flex items-center gap-2 bg-blue-600 hover:bg-blue-700 disabled:opacity-50 text-white px-6 py-2.5 rounded-lg font-medium transition-colors mb-6">

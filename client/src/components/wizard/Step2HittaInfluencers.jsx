@@ -463,7 +463,8 @@ export default function Step2HittaInfluencers({ foretag, outreachType, influence
           Hitta {isSponsor ? 'sponsorer' : 'influencers'} automatiskt med AI
         </button>
         <p className="text-center text-xs text-gray-500">
-          AI analyserar {foretag?.namn || 'ditt företag'} och hittar de mest relevanta {isSponsor ? 'sponsorerna' : 'influencers'} automatiskt
+          AI analyserar {foretag?.namn || 'ditt företag'} och hittar de mest relevanta {isSponsor ? 'sponsorerna' : 'influencers'} automatiskt.
+          Sökningen kan ta 1–2 minuter.
         </p>
 
         {/* Divider */}

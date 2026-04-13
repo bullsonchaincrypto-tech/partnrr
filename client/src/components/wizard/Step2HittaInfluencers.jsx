@@ -816,9 +816,20 @@ export default function Step2HittaInfluencers({ foretag, outreachType, influence
                               )}
                               <p className="text-gray-400"><span className="text-gray-500">Källa:</span> {
                                 inf.datakalla === 'youtube_api' ? '✅ YouTube API' :
+                                inf.datakalla === 'ai_serp_search' ? '🔍 SerpAPI + AI' :
+                                inf.datakalla === 'ai_web_search' ? '🌐 AI Web Search' :
+                                inf.datakalla?.startsWith('apify_ig_discovery') ? '📸 Apify IG Discovery' :
+                                inf.datakalla?.startsWith('apify_tt_discovery') ? '🎵 Apify TT Discovery' :
                                 inf.datakalla?.startsWith('apify_') ? '✅ Apify' :
+                                inf.datakalla === 'serpapi_direct' ? '🔍 SerpAPI' :
                                 inf.datakalla || 'YouTube API'
                               }</p>
+                              {inf.enrichment_kalla && (
+                                <p className="text-gray-400"><span className="text-gray-500">Verifierad via:</span> {
+                                  inf.enrichment_kalla.startsWith('apify_') ? '✅ Apify Profile Scraper' :
+                                  inf.enrichment_kalla
+                                }</p>
+                              )}
                             </>
                           )}
                         </div>

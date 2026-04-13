@@ -497,7 +497,8 @@ function mergeEnrichment(original, enriched) {
 
     // Meta — bara verifierad om Apify hade riktig data
     verifierad: hasRealData,
-    datakalla: hasRealData ? `apify_${enriched.platform}` : (original.datakalla || 'ai_estimated'),
+    datakalla: original.datakalla || (hasRealData ? `apify_${enriched.platform}` : 'ai_estimated'),
+    enrichment_kalla: hasRealData ? `apify_${enriched.platform}` : null,
     is_verified_platform: enriched.is_verified,
     is_business: enriched.is_business,
     category: enriched.category || original.category,

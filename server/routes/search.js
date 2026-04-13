@@ -337,6 +337,7 @@ router.post('/influencers', async (req, res) => {
         thumbnail: inf.avatar_url || inf.thumbnail || null,
         beskrivning: inf.bio || inf.beskrivning || null,
         datakalla: inf.datakalla || 'youtube_api',
+        enrichment_kalla: inf.enrichment_kalla || null,
         verifierad: inf.verifierad ?? (inf.datakalla === 'youtube_api'),
         videoCount: inf.videoCount || inf.posts_count || 0,
         viewCount: inf.viewCount || 0,
@@ -423,6 +424,7 @@ router.post('/rescore', async (req, res) => {
       nisch: inf.nisch || '',
       bio: inf.beskrivning || inf.bio || '',
       datakalla: inf.datakalla || '',
+      enrichment_kalla: inf.enrichment_kalla || null,
       kontakt_epost: inf.kontakt_epost || null,
       ai_score: inf.ai_score || null,
       _frontendId: inf.id, // behåll frontend-id för mapping

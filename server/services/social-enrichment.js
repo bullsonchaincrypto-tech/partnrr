@@ -212,6 +212,12 @@ async function enrichTikTokProfiles(usernames) {
           ACTORS.tiktok,
           {
             profiles: batch.map(u => u.replace(/^@/, '')),
+            resultsPerPage: 1,        // Bara 1 video per profil — vi behöver bara profildata
+            maxProfilesPerQuery: 1,   // Begränsa till 1 resultat per profil
+            shouldDownloadVideos: false,
+            shouldDownloadCovers: false,
+            shouldDownloadSubtitles: false,
+            shouldDownloadSlideshowImages: false,
           },
           TIMEOUT_SECS
         );

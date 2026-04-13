@@ -40,7 +40,9 @@ router.post('/prospects/find', async (req, res) => {
     }
 
     // Filtrera bort prospects utan namn + redan befintliga (vid append)
-    let validProspects = prospects.filter(p => p.namn && p.namn.trim());
+    // Max 25 sponsorer per sökning
+    const MAX_SPONSOR_RESULTS = 25;
+    let validProspects = prospects.filter(p => p.namn && p.namn.trim()).slice(0, MAX_SPONSOR_RESULTS);
     if (isAppend) {
       const existingSet = new Set(exclude_names.map(n => n.toLowerCase()));
       const before = validProspects.length;

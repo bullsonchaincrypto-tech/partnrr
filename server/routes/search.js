@@ -207,6 +207,17 @@ router.post('/influencers', async (req, res) => {
     console.log(`[Search] ${allResults.length} unika profiler efter merge`);
 
     // ============================================================
+    // FAS 3.5: Begränsa till max 25 profiler FÖRE enrichment
+    // Sortera på ai_score (bäst först) så enrichment bara körs på toppen
+    // ============================================================
+    const MAX_PROFILES = 25;
+    if (allResults.length > MAX_PROFILES) {
+      allResults.sort((a, b) => (b.ai_score || 0) - (a.ai_score || 0));
+      console.log(`[Search] Klipper ${allResults.length} → ${MAX_PROFILES} profiler (topp AI-score behålls)`);
+      allResults = allResults.slice(0, MAX_PROFILES);
+    }
+
+    // ============================================================
     // FAS 4: Apify Enrichment — verifiera followers + bio
     // Körs på allResults som redan är Claudes urval (~30 profiler)
     // ============================================================
@@ -233,6 +244,38 @@ router.post('/influencers', async (req, res) => {
       }
     } else {
       console.log(`[Search] ⚠️ APIFY_API_TOKEN ej konfigurerat — profiler enrichas INTE`);
+    }
+
+    // ============================================================
+    // FAS 4.5: Filtrera bort profiler med helt tom Apify-data
+    // Om Apify returnerade undefined på ALLT → profilen kunde inte verifieras
+    // ============================================================
+    const beforeGarbageFilter = allResults.length;
+    allResults = allResults.filter(r => {
+      // Gäller bara Apify-discovery-profiler (IG/TT) som enrichats
+      const platform = (r.platform || r.plattform || '').toLowerCase();
+      if (!['instagram', 'tiktok'].includes(platform)) return true;
+
+      // Om profilen har verifierad data (YouTube API, etc), behåll alltid
+      if (r.verifierad) return true;
+
+      // Om Apify enrichade profilen men returnerade ALLT som undefined/null/0
+      // → profilen finns inte eller är privat → filtrera bort
+      const hasFollowers = r.followers != null && r.followers > 0;
+      const hasBio = !!r.bio && r.bio !== 'undefined';
+      const hasPosts = (r.posts_count || r.videoCount || 0) > 0;
+      const hasName = !!r.full_name || (!!r.name && r.name !== r.handle);
+
+      // Om INGEN av dessa finns → garbage profile
+      if (!hasFollowers && !hasBio && !hasPosts && !hasName) {
+        console.log(`[Search] ⛔ Filtrerar bort @${r.handle || r.kanalnamn} (${platform}) — all Apify-data undefined`);
+        return false;
+      }
+
+      return true;
+    });
+    if (beforeGarbageFilter !== allResults.length) {
+      console.log(`[Search] Garbage-filter: ${beforeGarbageFilter} → ${allResults.length} (${beforeGarbageFilter - allResults.length} borttagna)`);
     }
 
     // ============================================================
@@ -288,7 +331,7 @@ router.post('/influencers', async (req, res) => {
             kontakt_info: '',
             plattform: r.platform || r.plattform || '',
           })),
-          Math.min(needEmail.length, 15)
+          needEmail.length
         );
 
         let emailsFound = 0;

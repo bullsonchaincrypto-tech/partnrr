@@ -11,12 +11,14 @@ import fetch from 'node-fetch';
  * - engagement_rate, audience_demographics, estimated_price_sek, growth_rate_30d
  *
  * PRINCIP: AI-hittade influencers har redan valts ut av AI som relevanta,
- * så scoring ska bekräfta och rangordna — inte straffa för saknad data.
+ * men scoring MÅSTE straffa profiler med 0 eller väldigt få följare.
+ * En profil utan följare kan aldrig vara värdefull oavsett nisch-matchning.
  */
 
 const WEIGHTS = {
-  ai_assessment: 0.55,
-  niche_relevance: 0.45,
+  ai_assessment: 0.45,
+  niche_relevance: 0.35,
+  follower_credibility: 0.20,
 };
 
 // Semantiska nisch-grupper — termer som hör ihop matchas korsvis
@@ -55,6 +57,10 @@ export async function filterInfluencers(influencers, companyProfile) {
       return false;
     }
 
+    // OBS: Vi filtrerar INTE bort 0-follower-profiler här — de behålls men
+    // straffas hårt i scoring (max 10 poäng). Detta ger transparens i resultaten
+    // istället för att de bara försvinner.
+
     return true;
   });
 }
@@ -74,14 +80,22 @@ export async function scoreInfluencer(influencer, companyProfile) {
   scores.niche_relevance = calculateNicheScore(influencer, companyProfile);
   details.niche_relevance = `Nisch-matchning: ${scores.niche_relevance}/100`;
 
+  // 3. FÖLJAR-TROVÄRDIGHET (0-100) — straffar profiler med 0 eller väldigt få följare
+  scores.follower_credibility = calculateFollowerScore(influencer);
+  details.follower_credibility = `Följar-trovärdighet: ${scores.follower_credibility}/100`;
+
   // Viktat totalpoäng
   const totalScore = Math.round(
     scores.ai_assessment * WEIGHTS.ai_assessment +
-    scores.niche_relevance * WEIGHTS.niche_relevance
+    scores.niche_relevance * WEIGHTS.niche_relevance +
+    scores.follower_credibility * WEIGHTS.follower_credibility
   );
 
+  // Hård cap: oavsett andra poäng, 0 followers → max 10, <50 → max 25, <1000 → max 40
+  const cappedScore = applyFollowerCap(totalScore, influencer);
+
   return {
-    total_score: Math.min(totalScore, 100),
+    total_score: Math.min(cappedScore, 100),
     component_scores: scores,
     details,
     weights: WEIGHTS,
@@ -108,6 +122,43 @@ function calculateAiScore(influencer) {
 
   // Fallback: AI har hittat denna influencer, vilket redan är en signal
   return 80;
+}
+
+/**
+ * Följar-trovärdighet: Straffar profiler med 0 eller väldigt få följare.
+ * En profil utan followers är i princip värdelös för marknadsföring.
+ */
+function calculateFollowerScore(influencer) {
+  const followers = influencer.followers || influencer.foljare_exakt || 0;
+
+  if (followers === 0 || followers == null) return 0;    // Ingen data alls
+  if (followers < 50) return 5;                           // Nästan tom profil
+  if (followers < 100) return 15;
+  if (followers < 500) return 30;
+  if (followers < 1000) return 45;                        // Under nano
+  if (followers < 5000) return 65;                        // Nano (liten)
+  if (followers < 10000) return 75;                       // Nano
+  if (followers < 50000) return 85;                       // Mikro
+  if (followers < 200000) return 92;                      // Mellanstor
+  return 100;                                              // Stor+
+}
+
+/**
+ * Hård cap baserat på följarantal — oavsett AI-bedömning och nisch-matchning
+ * kan en profil med 0 followers aldrig få hög score.
+ */
+function applyFollowerCap(score, influencer) {
+  const followers = influencer.followers || influencer.foljare_exakt || 0;
+
+  // YouTube-profiler med verifierad data från API har alltid subscribers
+  // Men IG/TT profiler kan ha null followers om enrichment misslyckades
+  if (followers === 0 || followers == null) return Math.min(score, 10);
+  if (followers < 50) return Math.min(score, 15);
+  if (followers < 100) return Math.min(score, 25);
+  if (followers < 500) return Math.min(score, 35);
+  if (followers < 1000) return Math.min(score, 40);
+
+  return score; // 1000+ followers → ingen cap
 }
 
 /**
@@ -393,11 +444,17 @@ export async function scoreAndRankInfluencers(influencers, companyProfile, { gen
 
     scored = filtered.map((inf, i) => {
       const claude = scoreMap.get(i);
+      const rawScore = claude?.match_score ?? 50;
+      // Säkerhetsnät: cap baserat på followers även för Claude-scoring
+      const cappedScore = applyFollowerCap(rawScore, inf);
+      if (cappedScore !== rawScore) {
+        console.log(`[Scoring] Cap: @${inf.handle || inf.kanalnamn} ${rawScore}→${cappedScore} (${inf.followers || 0} followers)`);
+      }
       return {
         ...inf,
-        match_score: claude?.match_score ?? 50,
+        match_score: cappedScore,
         ai_motivation: claude?.motivation || inf.ai_motivation || null,
-        score_details: { claude_score: claude?.match_score ?? 50 },
+        score_details: { claude_score: rawScore, capped_score: cappedScore },
         score_breakdown: { claude_motivation: claude?.motivation || '' },
       };
     });

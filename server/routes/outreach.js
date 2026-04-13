@@ -28,25 +28,30 @@ router.get('/foretag/:foretagId', async (req, res) => {
 });
 
 router.get('/', async (req, res) => {
-  const influencerRows = await queryAll(`
-    SELECT om.*, i.namn as influencer_namn, i.kanalnamn, i.plattform, i.kontakt_epost,
-           f.namn as foretag_namn, 'influencer' as outreach_typ
-    FROM outreach_meddelanden om
-    JOIN influencers i ON om.influencer_id = i.id
-    JOIN foretag f ON om.foretag_id = f.id
-  `);
-  const sponsorRows = await queryAll(`
-    SELECT so.id, so.foretag_id, so.meddelande, so.amne, so.status, so.skickat_datum, so.created_at,
-           sp.namn as influencer_namn, sp.hemsida as kanalnamn, 'Företag' as plattform, sp.epost as kontakt_epost,
-           f.namn as foretag_namn, 'sponsor' as outreach_typ
-    FROM sponsor_outreach so
-    JOIN sponsor_prospects sp ON so.prospect_id = sp.id
-    JOIN foretag f ON so.foretag_id = f.id
-  `);
-  const all = [...influencerRows, ...sponsorRows].sort((a, b) =>
-    new Date(b.created_at) - new Date(a.created_at)
-  );
-  res.json(all);
+  try {
+    const influencerRows = await queryAll(`
+      SELECT om.*, i.namn as influencer_namn, i.kanalnamn, i.plattform, i.kontakt_epost,
+             f.namn as foretag_namn, 'influencer' as outreach_typ
+      FROM outreach_meddelanden om
+      JOIN influencers i ON om.influencer_id = i.id
+      JOIN foretag f ON om.foretag_id = f.id
+    `);
+    const sponsorRows = await queryAll(`
+      SELECT so.id, so.foretag_id, so.meddelande, so.amne, so.status, so.skickat_datum, so.created_at,
+             sp.namn as influencer_namn, sp.hemsida as kanalnamn, 'Företag' as plattform, sp.epost as kontakt_epost,
+             f.namn as foretag_namn, 'sponsor' as outreach_typ
+      FROM sponsor_outreach so
+      JOIN sponsor_prospects sp ON so.prospect_id = sp.id
+      JOIN foretag f ON so.foretag_id = f.id
+    `);
+    const all = [...influencerRows, ...sponsorRows].sort((a, b) =>
+      new Date(b.created_at) - new Date(a.created_at)
+    );
+    res.json(all);
+  } catch (error) {
+    console.error('Outreach GET / error:', error);
+    res.status(500).json({ error: error.message });
+  }
 });
 
 router.post('/generate', async (req, res) => {

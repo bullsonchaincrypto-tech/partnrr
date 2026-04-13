@@ -6,7 +6,7 @@ import { findEmailsForChannels } from '../services/email-finder.js';
 import { searchSponsors, searchContacts, isApolloConfigured } from '../services/apollo.js';
 import { enrichInfluencers, enrichSingleProfile, isApifyConfigured } from '../services/social-enrichment.js';
 import { scoreAndRankInfluencers, scoreInfluencer } from '../services/scoring.js';
-import { searchInfluencersAI, generateNischKeywords, buildSearchQueries, generateYouTubeSearchTerms } from '../services/ai-search.js';
+import { searchInfluencersAI, generateNischKeywords, buildSearchQueries, generateYouTubeSearchTerms, generateDiscoveryHashtags } from '../services/ai-search.js';
 import { discoverInfluencers, isApifyConfigured as isApifyDiscoveryConfigured } from '../services/apify-discovery.js';
 
 const router = Router();
@@ -118,16 +118,21 @@ router.post('/influencers', async (req, res) => {
     if (nonYoutubePlatforms.length > 0 && isApifyDiscoveryConfigured()) {
       console.log(`[Search] Steg 2: Apify Discovery — söker via AI-genererade hashtags...`);
       try {
-        // Använd AI-genererade hashtags (svenska + nisch-specifika)
-        const aiHashtags = aiSearchQueries?.discoveryHashtags || [];
-        // Fallback: bygg från nisch-labels om AI inte gav hashtags
-        const fallbackHashtags = nischLabels.slice(0, 2).map(label =>
-          `svensk${label.split(' ')[0].toLowerCase()}`
-        );
-        const allHashtags = aiHashtags.length > 0
-          ? aiHashtags.slice(0, 5)
-          : [...new Set(fallbackHashtags)].slice(0, 4);
-        console.log(`[Search] Discovery hashtags (${aiHashtags.length > 0 ? 'AI' : 'fallback'}): ${allHashtags.join(', ')}`);
+        // Generera relevanta hashtags via Claude (5 st)
+        let allHashtags = [];
+        try {
+          allHashtags = await generateDiscoveryHashtags(
+            foretag.beskrivning || foretag.namn,
+            foretag.namn
+          );
+        } catch (err) {
+          console.warn(`[Search] generateDiscoveryHashtags misslyckades: ${err.message}`);
+        }
+        // Fallback om Claude inte gav hashtags
+        if (!allHashtags.length) {
+          allHashtags = nischLabels.slice(0, 3).map(l => l.split(' ')[0].toLowerCase());
+        }
+        console.log(`[Search] Discovery hashtags (${allHashtags.length > 0 ? 'AI' : 'fallback'}): ${allHashtags.join(', ')}`);
 
         apifyDiscoveryData = await discoverInfluencers(
           allHashtags,

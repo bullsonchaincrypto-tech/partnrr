@@ -445,6 +445,76 @@ Svara med ENBART en JSON-array av 20 strängar, ingen annan text.`
   }
 }
 
+/**
+ * Generera relevanta Instagram/TikTok-hashtags via Claude.
+ *
+ * Claude analyserar företagsbeskrivningen och genererar 5 hashtags
+ * optimerade för att hitta influencers via Apify hashtag-scraping.
+ *
+ * Returnerar en array av strängar (utan #), t.ex.:
+ *   ["smarthome", "hemelektronik", "techsverige", "smartahemmet", "techrecension"]
+ */
+export async function generateDiscoveryHashtags(beskrivning, companyName) {
+  const client = getClient();
+
+  console.log(`[AI-Search] Genererar discovery-hashtags för "${companyName}"...`);
+
+  try {
+    const response = await client.messages.create({
+      model: MODEL_DEFAULT,
+      max_tokens: 400,
+      messages: [{
+        role: 'user',
+        content: `Du hjälper ett svenskt företag hitta relevanta influencers på Instagram och TikTok.
+
+Företag: ${companyName}
+Beskrivning: ${beskrivning}
+
+Generera exakt 5 hashtags som SVENSKA influencers inom denna bransch FAKTISKT använder på Instagram och TikTok.
+
+REGLER:
+- Hashtagsen ska vara POPULÄRA nog att ge resultat (inte hyper-nischade)
+- Blanda svenska och engelska hashtags (influencers använder båda)
+- Fokusera på hashtags som KREATÖRER/INFLUENCERS använder, inte företag
+- Tänk: vilka hashtags sätter en svensk tech-reviewer/livsstilsinfluencer på sina inlägg?
+- INGA generiska hashtags som "sverige" eller "influencer"
+- Returnera UTAN #-tecken
+
+Exempel för ett företag som säljer träningskläder:
+["träning", "gymlife", "fitnesssverige", "träningsinspo", "workoutmotivation"]
+
+Exempel för ett företag som säljer hemelektronik:
+["smarthome", "techreview", "hemautomation", "gadgets", "techsverige"]
+
+Svara med ENBART en JSON-array av 5 strängar, ingen annan text.`
+      }],
+    });
+
+    trackApiCost({ service: 'anthropic', endpoint: 'generateDiscoveryHashtags' });
+
+    const text = response.content[0]?.text?.trim() || '[]';
+    const jsonMatch = text.match(/\[[\s\S]*\]/);
+    if (!jsonMatch) {
+      console.warn('[AI-Search] Kunde inte parsa discovery-hashtags, ingen JSON-array hittad');
+      return [];
+    }
+
+    const tags = JSON.parse(jsonMatch[0]);
+    if (!Array.isArray(tags)) return [];
+
+    const cleaned = tags
+      .filter(t => typeof t === 'string' && t.length > 2)
+      .map(t => t.replace(/^#/, '').trim().toLowerCase())
+      .slice(0, 5);
+
+    console.log(`[AI-Search] Discovery-hashtags (${cleaned.length}): ${cleaned.join(', ')}`);
+    return cleaned;
+  } catch (err) {
+    console.error('[AI-Search] generateDiscoveryHashtags fel:', err.message);
+    return [];
+  }
+}
+
 // ============================================================
 // INFLUENCER-SÖKNING: Multi-engine SerpAPI → Sonnet
 // ============================================================

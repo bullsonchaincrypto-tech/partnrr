@@ -151,6 +151,8 @@ async function enrichInstagramProfiles(usernames) {
           ACTORS.instagram,
           {
             usernames: batch.map(u => u.replace(/^@/, '')),
+            resultsLimit: 1,          // Bara profildata, inga posts
+            addParentData: false,
           },
           TIMEOUT_SECS
         );

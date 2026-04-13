@@ -12,9 +12,9 @@ const resolveMx = promisify(dns.resolveMx);
  * VERSION 6 — Optimerad: SerpAPI + MX-validering + sociala länkar.
  *
  * Waterfall med early exit (3 steg):
- * 1.   YouTube-beskrivningen — regex på text vi redan har (instant, gratis)
- * 1.5  YouTube Email Scraper — Apify actor som scrapar About-sidan (bakom CAPTCHA)
- * 2.   Apify Google Search (eller SerpAPI som fallback) — riktiga Google-sökresultat
+ * 1. YouTube-beskrivningen — regex på text vi redan har (instant, gratis)
+ * 2. Apify Google Search (eller SerpAPI som fallback) — riktiga Google-sökresultat
+ * 3. YouTube Channel Email Scraper — Apify, scrapar About-sidan (DYR, sista alternativ)
  *
  * Alla hittade e-poster MX-valideras innan de returneras.
  */
@@ -72,16 +72,6 @@ export async function findEmailForChannel(channelInfo) {
     if (result) return result;
   }
 
-  // ── Steg 1.5: YouTube Email Scraper — scrapa About-sidan (bakom CAPTCHA) ──
-  // Bara för YouTube-kanaler (IG/TT har inte About-sida)
-  if (handle && isYoutube && await isApifyConfigured()) {
-    const ytEmailResult = await searchWithYouTubeEmailScraper(handle);
-    if (ytEmailResult) {
-      const result = await found(ytEmailResult.email, 'youtube_about_scraper');
-      if (result) return result;
-    }
-  }
-
   // ── Steg 2: Apify Google Search — riktiga Google-sökresultat ──
   if (handle && await isApifyConfigured()) {
     const apifyResult = await searchWithApifyGoogle(handle, { namn });
@@ -98,6 +88,16 @@ export async function findEmailForChannel(channelInfo) {
     }
   }
 
+  // ── Steg 3: YouTube Channel Email Scraper — SISTA alternativ (dyr) ──
+  // Bara för YouTube-kanaler, bara om inget annat hittade e-post
+  if (handle && isYoutube && await isApifyConfigured()) {
+    const ytEmailResult = await searchWithYouTubeEmailScraper(handle);
+    if (ytEmailResult) {
+      const result = await found(ytEmailResult.email, 'youtube_about_scraper');
+      if (result) return result;
+    }
+  }
+
   console.log(`[E-post] ✗ @${handle} — ingen e-post hittad`);
   return { email: null, method: null, confidence: null, mx_valid: null };
 }
@@ -105,75 +105,16 @@ export async function findEmailForChannel(channelInfo) {
 /**
  * Kör e-postsökning för flera kanaler parallellt.
  *
- * Steg 1: Batch YouTube Email Scraper — en enda Apify-run för alla YT-kanaler
- * Steg 2: Per-kanal waterfall (regex → Google Search) för resten
+ * Per-kanal waterfall: 1) regex → 2) Google Search → 3) YT Channel Email Scraper (sista, dyr)
  */
 export async function findEmailsForChannels(channels, concurrency = 8) {
-  // ── Pre-steg: Batch YouTube Email Scraper för alla YT-kanaler ──
-  const ytEmailMap = new Map(); // handle → email
-  if (await isApifyConfigured()) {
-    const ytChannels = channels.filter(ch => {
-      const pl = (ch.plattform || '').toLowerCase();
-      return !pl || pl === 'youtube';
-    });
-
-    if (ytChannels.length > 0) {
-      console.log(`[E-post] 🎬 Batch YouTube Email Scraper: ${ytChannels.length} kanaler...`);
-      try {
-        const handles = ytChannels.map(ch => (ch.kanalnamn || '').replace(/^@/, ''));
-        const channelUrls = handles.map(h => `https://www.youtube.com/@${h}`);
-
-        // dataovercoffee/Youtube-Channel-Business-Email-Scraper
-        // Input: channels — array med @handles eller URLs
-        const items = await runApifyActor('dataovercoffee/Youtube-Channel-Business-Email-Scraper', {
-          channels: handles.map(h => `@${h}`),
-        }, 120); // 120 sek timeout för hela batchen
-
-        if (items && items.length > 0) {
-          for (const item of items) {
-            // Extrahera e-post från resultatet
-            const possibleEmails = [
-              item.email,
-              item.businessEmail,
-              item.contactEmail,
-              ...(item.emails || []),
-            ].filter(Boolean);
-
-            const email = possibleEmails.length > 0 ? extractEmails(possibleEmails.join(' ')) : extractEmails(JSON.stringify(item));
-
-            if (email) {
-              // Matcha mot handle från channel-data
-              const handleMatch = (item.channel || item.channelUrl || item.url || item.handle || '').match(/@([^/?\s]+)/);
-              if (handleMatch) {
-                ytEmailMap.set(handleMatch[1].toLowerCase(), email);
-                console.log(`[E-post] 🎬 Batch YT Email: @${handleMatch[1]} → ${email}`);
-              }
-            }
-          }
-          console.log(`[E-post] 🎬 Batch YouTube Email Scraper: ${ytEmailMap.size}/${ytChannels.length} e-poster hittade`);
-        }
-      } catch (err) {
-        console.error(`[E-post] 🎬 Batch YouTube Email Scraper fel: ${err.message}`);
-      }
-    }
-  }
-
-  // ── Per-kanal waterfall (med ytEmailMap som pre-cache) ──
   const results = [];
 
   for (let i = 0; i < channels.length; i += concurrency) {
     const batch = channels.slice(i, i + concurrency);
     const batchResults = await Promise.all(
-      batch.map(ch => {
-        const handle = (ch.kanalnamn || '').replace(/^@/, '').toLowerCase();
-        const ytEmail = ytEmailMap.get(handle);
-
-        // Om batch-scraper redan hittade e-post, returnera direkt
-        if (ytEmail) {
-          return Promise.resolve({ email: ytEmail, method: 'youtube_about_scraper', confidence: 'high', mx_valid: true });
-        }
-
-        return withTimeout(
+      batch.map(ch =>
+        withTimeout(
           findEmailForChannel(ch),
           45000
         ).catch(err => {

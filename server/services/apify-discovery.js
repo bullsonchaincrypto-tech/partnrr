@@ -1,5 +1,6 @@
 import fetch from 'node-fetch';
 import { trackApiCost } from './cost-tracker.js';
+import { enrichTikTokProfiles } from './social-enrichment.js';
 
 /**
  * Apify Discovery Service — Steg 2 i influencer-pipeline
@@ -427,7 +428,45 @@ export async function discoverTikTokViaSearch(searchTerms, timeoutSecs = 120, op
   });
 
   console.log(`[ApifyDiscovery] TikTok: ${items.length} profiler → ${creators.length} unika creators (skippat: ${skippedBusiness} företag, ${skippedInternational} internationella)`);
-  return creators.slice(0, MAX_CREATORS_PER_PLATFORM);
+
+  const topCreators = creators.slice(0, MAX_CREATORS_PER_PLATFORM);
+
+  // Berika TT-profilerna med followers + bio via clockworks/tiktok-profile-scraper
+  // Search-scrapern ger bara handle+avatar, men profile-scrapern ger full profildata.
+  // Kostnad: ~$0.005 per profil × 15 = ~$0.075 per körning — värt det för bättre underlag.
+  if (topCreators.length > 0) {
+    try {
+      console.log(`[ApifyDiscovery] TikTok: berikar ${topCreators.length} profiler med profile-scraper...`);
+      const enriched = await enrichTikTokProfiles(topCreators.map(c => c.handle));
+
+      // Bygg lookup och merge:a in followers/bio/postsCount i våra creators
+      const enrichedMap = new Map();
+      for (const p of enriched) {
+        const handle = (p.username || p.handle || '').toLowerCase();
+        if (handle) enrichedMap.set(handle, p);
+      }
+
+      let enrichedCount = 0;
+      for (const c of topCreators) {
+        const match = enrichedMap.get(c.handle.toLowerCase());
+        if (match) {
+          enrichedCount++;
+          c.followers = match.followers ?? match.fans ?? c.followers;
+          c.follows = match.following ?? match.follows ?? c.follows;
+          c.bio = sanitizeString(match.signature || match.bio || c.bio || '').slice(0, 300);
+          c.posts_count = match.videoCount ?? match.video ?? c.posts_count;
+          c.likes_count = match.heartCount ?? match.heart ?? c.likes_count;
+          c.is_verified = match.verified === true || c.is_verified;
+          c.full_name = c.full_name || sanitizeString(match.nickname || match.nickName || '');
+        }
+      }
+      console.log(`[ApifyDiscovery] TikTok: ${enrichedCount}/${topCreators.length} profiler berikade`);
+    } catch (err) {
+      console.warn(`[ApifyDiscovery] TikTok enrichment misslyckades (fortsätter utan): ${err.message}`);
+    }
+  }
+
+  return topCreators;
 }
 
 // ============================================================

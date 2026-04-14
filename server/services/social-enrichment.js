@@ -193,7 +193,7 @@ function normalizeInstagram(raw) {
  * Hämta TikTok-profiler via Apify actor i batches
  * @param {string[]} usernames - Lista med TikTok-handles (utan @)
  */
-async function enrichTikTokProfiles(usernames) {
+export async function enrichTikTokProfiles(usernames) {
   if (!usernames.length) return [];
 
   console.log(`[Enrichment] Hämtar ${usernames.length} TikTok-profiler via Apify (i batches om 4-5)...`);

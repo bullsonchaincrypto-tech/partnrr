@@ -196,7 +196,7 @@ export async function discoverInfluencers(queries, platforms = ['instagram', 'ti
 
   if (platforms.includes('tiktok') && ttSearchTerms.length) {
     promises.push(
-      discoverTikTokViaSearch(ttSearchTerms, timeoutSecs)
+      discoverTikTokViaVideoSearch(ttSearchTerms, timeoutSecs)
         .then(creators => { results.tiktok = creators; })
         .catch(err => {
           console.error('[ApifyDiscovery] TikTok discovery fel:', err.message);
@@ -480,19 +480,15 @@ export async function discoverInstagramViaSearch(searchTerms, timeoutSecs = 120,
 }
 
 // ============================================================
-// TIKTOK DISCOVERY — clockworks/tiktok-scraper (user-search mode)
+// TIKTOK DISCOVERY (INFLUENCER) — /video search-mode + dedup per author
 // ============================================================
-// Använder searchQueries + searchSection='/video' → returnerar VIDEOS med
-// authorMeta. Vi dedupar per author och summerar engagement.
+// Söker faktiska VIDEOS per sökterm → hittar creators som POSTAR content
+// (inte slumpmässiga konton med ord i namn). Dedupar per author och
+// summerar engagement. För INFLUENCER-flödet.
 //
-// Detta hittar creators som FAKTISKT POSTAR content i nischen, istället för
-// /user mode som returnerar slumpmässiga konton med ord i namn/bio (många
-// privata, tomma, internationella).
-//
-// Pricing: $1.70/1000 results × 5 termer × 5 videos = 25 videos = ~$0.04
-// + profile-enrichment ($0.005 × 15 = $0.075). Totalt: ~$0.12 per körning.
+// Pricing: $1.70/1000 × 25 videos = ~$0.04 + enrichment ~$0.075 = ~$0.12/run
 
-export async function discoverTikTokViaSearch(searchTerms, timeoutSecs = 120, options = {}) {
+export async function discoverTikTokViaVideoSearch(searchTerms, timeoutSecs = 120, options = {}) {
   const { includeBusinesses = false } = options;
   // Max 5 söktermer × 5 videos = 25 videos
   const terms = searchTerms.slice(0, 5);
@@ -629,6 +625,100 @@ export async function discoverTikTokViaSearch(searchTerms, timeoutSecs = 120, op
   }
 
   return topCreators;
+}
+
+// ============================================================
+// TIKTOK DISCOVERY (SPONSOR) — /user search-mode
+// ============================================================
+// Använder searchQueries + searchSection='/user' → returnerar profiler direkt.
+// För SPONSOR-flödet där vi vill hitta företag/varumärken med exakta ord
+// i namn/bio (oavsett om de postar mycket content eller inte).
+//
+// Pricing: $1.70/1000 × 15 profiler = ~$0.025/run
+
+export async function discoverTikTokViaSearch(searchTerms, timeoutSecs = 120, options = {}) {
+  const { includeBusinesses = false } = options;
+  // Max 5 söktermer × 3 profiler = 15 items
+  const terms = searchTerms.slice(0, 5);
+  const maxProfilesPerQuery = 3;
+
+  console.log(`[ApifyDiscovery] TikTok-user-search input: searchQueries=${JSON.stringify(terms)}, section=/user, maxProfilesPerQuery=${maxProfilesPerQuery}`);
+
+  const items = await runApifyActor(
+    DISCOVERY_ACTORS.tiktok,
+    {
+      searchQueries: terms,
+      searchSection: '/user',
+      maxProfilesPerQuery,
+      proxyCountryCode: 'SE',
+      shouldDownloadVideos: false,
+      shouldDownloadCovers: false,
+      shouldDownloadAvatars: false,
+    },
+    timeoutSecs
+  );
+
+  if (!items?.length) {
+    console.log('[ApifyDiscovery] TikTok user-search: inga profiler hittade');
+    return [];
+  }
+
+  console.log(`[ApifyDiscovery] TikTok user-search: ${items.length} items, filtrerar...`);
+
+  let skippedBusiness = 0;
+  let skippedInternational = 0;
+  const creatorMap = new Map();
+
+  for (const item of items) {
+    const author = item.authorMeta || item.author || item;
+    const username = author.name || author.uniqueId || author.id || author.username || '';
+    if (!username) continue;
+
+    const fullName = author.nickName || author.nickname || author.fullName || '';
+    const bio = author.signature || author.bio || author.biography || '';
+    const videoText = item.text || '';
+
+    if (isInternationalAccount(username, fullName, bio + ' ' + videoText)) {
+      skippedInternational++;
+      continue;
+    }
+
+    if (!includeBusinesses && isBusinessAccount(username, fullName)) {
+      skippedBusiness++;
+      continue;
+    }
+
+    const key = username.toLowerCase();
+    if (creatorMap.has(key)) continue;
+
+    creatorMap.set(key, {
+      handle: sanitizeString(username),
+      platform: 'tiktok',
+      full_name: sanitizeString(fullName),
+      bio: sanitizeString(bio.slice(0, 300)),
+      followers: author.fans ?? author.followers ?? author.followerCount ?? null,
+      follows: author.following ?? author.followingCount ?? null,
+      posts_count: author.video ?? author.videoCount ?? null,
+      likes_count: author.heart ?? author.heartCount ?? null,
+      is_verified: author.verified === true,
+      profile_pic_url: author.avatar || author.avatarLarger || null,
+      avatar_url: author.avatarLarger || author.avatar || null,
+      profile_url: `https://www.tiktok.com/@${username}`,
+      search_term: item.searchQuery || item.searchTerm || null,
+      datakalla: 'apify_tt_search',
+      verifierad: true,
+    });
+  }
+
+  const creators = Array.from(creatorMap.values()).sort((a, b) => {
+    const fa = a.followers || 0;
+    const fb = b.followers || 0;
+    if (fa !== fb) return fb - fa;
+    return (b.posts_count || 0) - (a.posts_count || 0);
+  });
+
+  console.log(`[ApifyDiscovery] TikTok user-search: ${items.length} → ${creators.length} unika (skippat: ${skippedBusiness} företag, ${skippedInternational} internationella)`);
+  return creators.slice(0, MAX_CREATORS_PER_PLATFORM);
 }
 
 // ============================================================

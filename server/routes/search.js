@@ -6,7 +6,7 @@ import { findEmailsForChannels } from '../services/email-finder.js';
 import { searchSponsors, searchContacts, isApolloConfigured } from '../services/apollo.js';
 import { enrichInfluencers, enrichSingleProfile, isApifyConfigured } from '../services/social-enrichment.js';
 import { scoreAndRankInfluencers, scoreInfluencer } from '../services/scoring.js';
-import { searchInfluencersAI, generateNischKeywords, buildSearchQueries, generateYouTubeSearchTerms, generateDiscoveryHashtags } from '../services/ai-search.js';
+import { searchInfluencersAI, generateNischKeywords, buildSearchQueries, generateYouTubeSearchTerms, generateDiscoveryHashtags, generateInstagramSearchTerms } from '../services/ai-search.js';
 import { discoverInfluencers, isApifyConfigured as isApifyDiscoveryConfigured } from '../services/apify-discovery.js';
 
 const router = Router();
@@ -116,25 +116,35 @@ router.post('/influencers', async (req, res) => {
     }
 
     if (nonYoutubePlatforms.length > 0 && isApifyDiscoveryConfigured()) {
-      console.log(`[Search] Steg 2: Apify Discovery — söker via AI-genererade hashtags...`);
+      console.log(`[Search] Steg 2: Apify Discovery — IG-search-scraper + TikTok-hashtag-scraper...`);
       try {
-        // Generera relevanta hashtags via Claude (5 st)
-        let allHashtags = [];
-        try {
-          allHashtags = await generateDiscoveryHashtags(
-            foretag.beskrivning || foretag.namn,
-            foretag.namn
-          );
-        } catch (err) {
-          console.warn(`[Search] generateDiscoveryHashtags misslyckades: ${err.message}`);
-        }
-        // Ingen fallback — vi kör med det Claude ger oss (0-10 hashtags)
-        console.log(`[Search] Discovery hashtags (${allHashtags.length}): ${allHashtags.join(', ')}`);
+        // Generera TT-hashtags (10 st) och IG-söktermer (5 st) parallellt
+        const wantsIG = nonYoutubePlatforms.includes('instagram');
+        const wantsTT = nonYoutubePlatforms.includes('tiktok');
+
+        const [ttHashtags, igSearchTerms] = await Promise.all([
+          wantsTT
+            ? generateDiscoveryHashtags(foretag.beskrivning || foretag.namn, foretag.namn).catch(err => {
+                console.warn(`[Search] generateDiscoveryHashtags misslyckades: ${err.message}`);
+                return [];
+              })
+            : Promise.resolve([]),
+          wantsIG
+            ? generateInstagramSearchTerms(foretag.beskrivning || foretag.namn, foretag.namn).catch(err => {
+                console.warn(`[Search] generateInstagramSearchTerms misslyckades: ${err.message}`);
+                return [];
+              })
+            : Promise.resolve([]),
+        ]);
+
+        // Ingen fallback — vi kör med det Claude ger oss
+        console.log(`[Search] TT hashtags (${ttHashtags.length}): ${ttHashtags.join(', ')}`);
+        console.log(`[Search] IG söktermer (${igSearchTerms.length}): ${igSearchTerms.join(' | ')}`);
 
         apifyDiscoveryData = await discoverInfluencers(
-          allHashtags,
+          { hashtags: ttHashtags, igSearchTerms },
           nonYoutubePlatforms,
-          { maxResultsPerHashtag: 1, timeoutSecs: 120 }
+          { timeoutSecs: 120 }
         );
         sources.apify_ig_discovery = apifyDiscoveryData.instagram?.length || 0;
         sources.apify_tt_discovery = apifyDiscoveryData.tiktok?.length || 0;

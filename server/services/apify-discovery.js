@@ -21,12 +21,16 @@ import { trackApiCost } from './cost-tracker.js';
 const APIFY_BASE = 'https://api.apify.com/v2';
 
 const DISCOVERY_ACTORS = {
-  instagram: 'apify/instagram-scraper',
+  // Instagram: bytt från hashtag-scraper till search-scraper (user mode)
+  // Search-scraper hittar PROFILER direkt istället för posts per hashtag
+  instagram: 'apify/instagram-search-scraper',
   tiktok: 'clockworks/tiktok-scraper',
 };
 
-// Max 10 items per plattform (1 item/hashtag × 10 hashtags = 10)
-const MAX_CREATORS_PER_PLATFORM = 10;
+// Max 25 items per plattform
+// Instagram: 5 söktermer × 5 results = 25 profiler
+// TikTok: 10 hashtags × 1 item = 10 videos (orörd i denna commit)
+const MAX_CREATORS_PER_PLATFORM = 25;
 
 /**
  * Rensa trasiga unicode-surrogat ur en sträng.
@@ -80,29 +84,42 @@ function getToken() {
 
 /**
  * Kör Apify discovery för Instagram och TikTok parallellt.
- * Returnerar en lista med unika creators (namn, handle, plattform, followers).
  *
- * @param {string[]} hashtags - Relevanta hashtags att söka (utan #)
+ * @param {object} queries - { hashtags: string[], igSearchTerms: string[] }
+ *   - hashtags: för TikTok (clockworks/tiktok-scraper)
+ *   - igSearchTerms: för Instagram (apify/instagram-search-scraper, user mode)
  * @param {string[]} platforms - ['instagram', 'tiktok']
- * @param {object} options - { maxResultsPerHashtag, timeoutSecs }
+ * @param {object} options - { timeoutSecs }
  * @returns {{ instagram: object[], tiktok: object[] }}
  */
-export async function discoverInfluencers(hashtags, platforms = ['instagram', 'tiktok'], options = {}) {
+export async function discoverInfluencers(queries, platforms = ['instagram', 'tiktok'], options = {}) {
   if (!isApifyConfigured()) {
     console.log('[ApifyDiscovery] APIFY_API_TOKEN saknas — skippar discovery');
     return { instagram: [], tiktok: [] };
   }
 
-  if (!hashtags?.length) {
-    console.log('[ApifyDiscovery] Inga hashtags att söka');
+  // Backwards-kompatibilitet: om queries är en array → behandla som hashtags (gamla API)
+  let hashtags = [];
+  let igSearchTerms = [];
+  if (Array.isArray(queries)) {
+    hashtags = queries;
+    igSearchTerms = queries;
+  } else if (queries && typeof queries === 'object') {
+    hashtags = queries.hashtags || [];
+    igSearchTerms = queries.igSearchTerms || queries.searchTerms || [];
+  }
+
+  if (!hashtags.length && !igSearchTerms.length) {
+    console.log('[ApifyDiscovery] Inga hashtags/söktermer att söka');
     return { instagram: [], tiktok: [] };
   }
 
-  const { maxResultsPerHashtag = 30, timeoutSecs = 120 } = options;
+  const { timeoutSecs = 120 } = options;
 
   console.log(`[ApifyDiscovery] ========================================`);
-  console.log(`[ApifyDiscovery] Söker influencers via hashtags: ${hashtags.join(', ')}`);
-  console.log(`[ApifyDiscovery] Plattformar: ${platforms.join(', ')}, max ${maxResultsPerHashtag} resultat/hashtag`);
+  console.log(`[ApifyDiscovery] IG söktermer (${igSearchTerms.length}): ${igSearchTerms.join(' | ')}`);
+  console.log(`[ApifyDiscovery] TT hashtags (${hashtags.length}): ${hashtags.join(', ')}`);
+  console.log(`[ApifyDiscovery] Plattformar: ${platforms.join(', ')}`);
   console.log(`[ApifyDiscovery] APIFY_API_TOKEN: ${process.env.APIFY_API_TOKEN ? '✅ satt (' + process.env.APIFY_API_TOKEN.slice(0, 8) + '...)' : '❌ SAKNAS'}`);
   console.log(`[ApifyDiscovery] Actors: IG=${DISCOVERY_ACTORS.instagram}, TT=${DISCOVERY_ACTORS.tiktok}`);
 
@@ -110,9 +127,9 @@ export async function discoverInfluencers(hashtags, platforms = ['instagram', 't
 
   const promises = [];
 
-  if (platforms.includes('instagram')) {
+  if (platforms.includes('instagram') && igSearchTerms.length) {
     promises.push(
-      discoverInstagram(hashtags, maxResultsPerHashtag, timeoutSecs)
+      discoverInstagramViaSearch(igSearchTerms, timeoutSecs)
         .then(creators => { results.instagram = creators; })
         .catch(err => {
           console.error('[ApifyDiscovery] Instagram discovery fel:', err.message);
@@ -120,9 +137,9 @@ export async function discoverInfluencers(hashtags, platforms = ['instagram', 't
     );
   }
 
-  if (platforms.includes('tiktok')) {
+  if (platforms.includes('tiktok') && hashtags.length) {
     promises.push(
-      discoverTikTok(hashtags, maxResultsPerHashtag, timeoutSecs)
+      discoverTikTok(hashtags, 1, timeoutSecs)
         .then(creators => { results.tiktok = creators; })
         .catch(err => {
           console.error('[ApifyDiscovery] TikTok discovery fel:', err.message);
@@ -137,122 +154,103 @@ export async function discoverInfluencers(hashtags, platforms = ['instagram', 't
 }
 
 // ============================================================
-// INSTAGRAM DISCOVERY — hashtag-sökning
+// INSTAGRAM DISCOVERY — apify/instagram-search-scraper (user mode)
 // ============================================================
+// Söker Instagram-profiler DIREKT via sökord (inte posts via hashtags).
+// Varje resultat är en riktig profil med followers, bio, verified-status.
+// Pricing: $1.50/1000 → 25 results = ~$0.04 per körning.
 
-async function discoverInstagram(hashtags, maxResults, timeoutSecs) {
-  // Bygg hashtag-URLs för Instagram
-  // Använd alla 5 hashtags från Claude för bredare träffyta
-  // Använd alla 10 hashtags — 2 posts per hashtag = 20 items max
-  // 2 posts ger backup ifall topp-resultatet är företag/internationellt/tomt
-  const directUrls = hashtags.slice(0, 10).map(tag =>
-    `https://www.instagram.com/explore/tags/${encodeURIComponent(tag.replace(/^#/, ''))}/`
-  );
+async function discoverInstagramViaSearch(searchTerms, timeoutSecs) {
+  // Max 5 söktermer × 5 resultat = 25 profiler totalt
+  const terms = searchTerms.slice(0, 5);
+  const searchString = terms.join(', ');
+  const searchLimit = 5;
 
-  console.log(`[ApifyDiscovery] Instagram hashtag-URLs (${directUrls.length}): ${directUrls.join(', ')}`);
-
-  // 2 posts per hashtag × 10 hashtags = 20 items max
-  const resultsPerHashtag = 2;
+  console.log(`[ApifyDiscovery] Instagram-search input: search="${searchString}", type=user, limit=${searchLimit}`);
 
   const items = await runApifyActor(
     DISCOVERY_ACTORS.instagram,
     {
-      directUrls,
-      resultsType: 'posts',
-      resultsLimit: resultsPerHashtag,
-      searchType: 'hashtag',
-      searchLimit: 1,
-      addParentData: false,
+      search: searchString,
+      searchType: 'user',
+      searchLimit: searchLimit,
     },
     timeoutSecs
   );
 
   if (!items?.length) {
-    console.log('[ApifyDiscovery] Instagram: inga posts hittade');
+    console.log('[ApifyDiscovery] Instagram: inga profiler hittade');
     return [];
   }
 
-  // Filtrera bort skräp-posts:
-  // 1. Kräv minst childPosts ELLER kommentarer ELLER några likes (inte helt tom)
-  // 2. Kräv minst 5 likes ELLER 1 kommentar — tomma reklam-posts har typiskt 0/0
-  // 3. Filtrera bort företagskonton (återförsäljare, e-handel, AB)
-  let skippedEmpty = 0;
+  console.log(`[ApifyDiscovery] Instagram: ${items.length} profiler hittade, filtrerar...`);
+
+  // Filtrera bort företagskonton och extrahera creators
+  let skippedPrivate = 0;
   let skippedBusiness = 0;
-  let skippedLowEngagement = 0;
 
-  const qualityPosts = items.filter(post => {
-    const likes = post.likesCount || post.likes || 0;
-    const comments = post.commentsCount || post.comments || 0;
-    const childPosts = post.childPosts?.length || post.sidecardImages?.length || 0;
-    const owner = post.ownerUsername || post.owner?.username || '';
-    const fullName = post.ownerFullName || post.owner?.fullName || '';
-
-    // Helt tom post
-    if (childPosts === 0 && comments === 0 && likes === 0) {
-      skippedEmpty++;
-      return false;
-    }
-
-    // Företagskonto — filtrera bort
-    if (isBusinessAccount(owner, fullName)) {
-      skippedBusiness++;
-      console.log(`[ApifyDiscovery] IG skip business: @${owner} (${fullName})`);
-      return false;
-    }
-
-    // För låg engagement — riktiga influencers har minst lite
-    if (likes < 5 && comments < 1) {
-      skippedLowEngagement++;
-      return false;
-    }
-
-    return true;
-  });
-  console.log(`[ApifyDiscovery] Instagram: ${items.length} posts → ${qualityPosts.length} efter filter (skippat: ${skippedEmpty} tomma, ${skippedBusiness} företag, ${skippedLowEngagement} låg engagement)`);
-
-  // Extrahera unika creators från kvalitets-posts
   const creatorMap = new Map();
 
-  for (const post of qualityPosts) {
-    const owner = post.ownerUsername || post.owner?.username || post.username;
-    if (!owner) continue;
+  for (const profile of items) {
+    const username = profile.username || '';
+    const fullName = profile.fullName || '';
+    const bio = profile.biography || '';
 
-    const key = owner.toLowerCase();
-    if (creatorMap.has(key)) {
-      const existing = creatorMap.get(key);
-      existing.posts_found++;
-      // Behåll bästa engagement
-      existing.post_likes = Math.max(existing.post_likes, post.likesCount || post.likes || 0);
-      existing.post_comments = Math.max(existing.post_comments, post.commentsCount || post.comments || 0);
+    if (!username) continue;
+
+    // Privata profiler kan vi inte kontakta — skippa
+    if (profile.private === true) {
+      skippedPrivate++;
       continue;
     }
 
+    // Företagskonto — signalerat via Instagram OCH via heuristik
+    const isBiz = profile.isBusinessAccount === true || isBusinessAccount(username, fullName);
+    if (isBiz) {
+      // Tillåt business om kategori verkar creator-relaterad (t.ex. blogger, content creator)
+      const cat = (profile.businessCategoryName || '').toLowerCase();
+      const creatorCats = ['creator', 'blogger', 'influencer', 'public figure', 'personal blog', 'artist', 'writer', 'journalist'];
+      const looksLikeCreator = creatorCats.some(c => cat.includes(c));
+      if (!looksLikeCreator) {
+        skippedBusiness++;
+        console.log(`[ApifyDiscovery] IG skip business: @${username} (${fullName}) cat="${cat}"`);
+        continue;
+      }
+    }
+
+    const key = username.toLowerCase();
+    if (creatorMap.has(key)) continue; // samma profil från olika söktermer
+
     creatorMap.set(key, {
-      handle: sanitizeString(owner),
+      handle: sanitizeString(username),
       platform: 'instagram',
-      full_name: sanitizeString(post.ownerFullName || post.owner?.fullName || ''),
-      bio: '', // Inte tillgänglig i posts — fylls i av enrichment (Steg 5)
-      followers: null, // Inte tillgänglig — fylls i av enrichment
-      posts_found: 1,
-      hashtag_source: post.hashtags?.slice(0, 5) || [],
-      profile_url: `https://www.instagram.com/${owner}/`,
-      is_verified: post.ownerIsVerified || false,
-      post_likes: post.likesCount || post.likes || 0,
-      post_comments: post.commentsCount || post.comments || 0,
-      datakalla: 'apify_ig_discovery',
+      full_name: sanitizeString(fullName),
+      bio: sanitizeString(bio.slice(0, 300)),
+      followers: profile.followersCount || null,
+      follows: profile.followsCount || null,
+      posts_count: profile.postsCount || 0,
+      is_verified: profile.verified === true,
+      is_business: profile.isBusinessAccount === true,
+      business_category: profile.businessCategoryName || null,
+      external_url: profile.externalUrl || null,
+      profile_pic_url: profile.profilePicUrl || null,
+      profile_url: profile.url || `https://www.instagram.com/${username}/`,
+      search_term: profile.searchTerm || null,
+      datakalla: 'apify_ig_search',
     });
   }
 
   const creators = Array.from(creatorMap.values());
 
-  // Sortera efter engagemang (posts_found * likes) — mer aktiva creators först
+  // Sortera efter följarantal (högst först) — fallback till postsCount
   creators.sort((a, b) => {
-    const scoreA = a.posts_found * (a.post_likes || 1);
-    const scoreB = b.posts_found * (b.post_likes || 1);
-    return scoreB - scoreA;
+    const fa = a.followers || 0;
+    const fb = b.followers || 0;
+    if (fa !== fb) return fb - fa;
+    return (b.posts_count || 0) - (a.posts_count || 0);
   });
 
-  console.log(`[ApifyDiscovery] Instagram: ${creators.length} unika creators extraherade (filtrerade från ${items.length} posts)`);
+  console.log(`[ApifyDiscovery] Instagram: ${items.length} profiler → ${creators.length} unika creators (skippat: ${skippedPrivate} privata, ${skippedBusiness} företag)`);
   return creators.slice(0, MAX_CREATORS_PER_PLATFORM);
 }
 
@@ -420,14 +418,17 @@ export function formatDiscoveryForClaude(discoveryResults) {
   const parts = [];
 
   if (discoveryResults.instagram?.length > 0) {
-    parts.push('APIFY INSTAGRAM DISCOVERY (hittade via hashtag-sökning):');
+    parts.push('APIFY INSTAGRAM DISCOVERY (hittade via user-sökning — VERIFIERADE profiler):');
     for (const c of discoveryResults.instagram.slice(0, 30)) {
       const line = [
         `  @${c.handle}`,
         c.full_name ? `(${c.full_name})` : '',
         c.is_verified ? '[✓ Verifierad]' : '',
-        `— ${c.posts_found} posts i hashtaggen`,
-        c.post_likes ? `(${c.post_likes} likes senaste post)` : '',
+        c.followers != null ? `${c.followers} followers` : '',
+        c.posts_count ? `${c.posts_count} posts` : '',
+        c.is_business ? `[biz: ${c.business_category || 'okänd'}]` : '',
+        c.search_term ? `[hittad via "${c.search_term}"]` : '',
+        c.bio ? `Bio: "${sanitizeString(c.bio).slice(0, 120)}"` : '',
       ].filter(Boolean).join(' ');
       parts.push(line);
     }

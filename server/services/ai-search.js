@@ -549,6 +549,80 @@ Svara med ENBART en JSON-array av 10 strängar, ingen annan text.`
 }
 
 // ============================================================
+// INSTAGRAM USER SEARCH TERMS — för apify/instagram-search-scraper
+// ============================================================
+/**
+ * Genererar 5 svenska SÖKORD (inte hashtags) som passar Instagram user-search.
+ * Dessa matar apify/instagram-search-scraper med searchType='user'.
+ *
+ * Söktermer kan vara fler ord (t.ex. "svensk inredning", "teknikbloggare sverige")
+ * eftersom IG söker på användarnamn OCH bio.
+ */
+export async function generateInstagramSearchTerms(beskrivning, companyName) {
+  const client = getClient();
+
+  console.log(`[AI-Search] Genererar Instagram-söktermer för "${companyName}"...`);
+
+  try {
+    const response = await client.messages.create({
+      model: MODEL_DEFAULT,
+      max_tokens: 400,
+      messages: [{
+        role: 'user',
+        content: `Du hjälper ett svenskt företag hitta riktiga svenska influencers via Instagram-sökning.
+
+Företag: ${companyName}
+Beskrivning: ${beskrivning}
+
+Generera exakt 5 SÖKORD (inte hashtags) som hittar svenska influencers i denna nisch på Instagram.
+
+VIKTIGT:
+- Söktermer matas till Instagrams användarsökning — de hittar profiler vars
+  användarnamn ELLER bio matchar orden
+- Använd 1-3 ord per sökterm
+- Bland söktermen ska svenska signalord ingå: "sverige", "svensk", "svenska"
+- Fokusera på nisch + svenskhet, inte generella engelska ord
+- Varje sökterm ska hitta OLIKA typer av creators (inte varianter)
+
+Bra exempel för ett företag som säljer hemelektronik:
+["svensk teknikbloggare", "tech sverige", "smarta hemmet", "teknikrecension svensk", "hemautomation"]
+
+Bra exempel för ett företag som säljer träningskläder:
+["svensk träning", "fitness sverige", "löparblogg", "träningsinspiration", "yoga svensk"]
+
+Bra exempel för ett fantasy fotboll-företag:
+["fotbollsanalys sverige", "fantasy fotboll svensk", "allsvenskan tips", "fotbollstipstare", "svensk fotbollsbloggare"]
+
+Svara med ENBART en JSON-array av 5 söktermer som strängar, ingen annan text.`
+      }],
+    });
+
+    trackApiCost({ service: 'anthropic', endpoint: 'generateInstagramSearchTerms' });
+
+    const text = response.content[0]?.text?.trim() || '[]';
+    const jsonMatch = text.match(/\[[\s\S]*\]/);
+    if (!jsonMatch) {
+      console.warn('[AI-Search] Kunde inte parsa Instagram-söktermer');
+      return [];
+    }
+
+    const terms = JSON.parse(jsonMatch[0]);
+    if (!Array.isArray(terms)) return [];
+
+    const cleaned = terms
+      .filter(t => typeof t === 'string' && t.trim().length > 2)
+      .map(t => t.replace(/#/g, '').trim())
+      .slice(0, 5);
+
+    console.log(`[AI-Search] Instagram-söktermer (${cleaned.length}): ${cleaned.join(' | ')}`);
+    return cleaned;
+  } catch (err) {
+    console.error('[AI-Search] generateInstagramSearchTerms fel:', err.message);
+    return [];
+  }
+}
+
+// ============================================================
 // INFLUENCER-SÖKNING: Apify Discovery → Sonnet (SerpAPI pausad)
 // ============================================================
 

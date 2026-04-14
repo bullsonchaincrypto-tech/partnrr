@@ -33,7 +33,7 @@ router.get('/roi-summary', async (req, res) => {
       margins: { top: 50, bottom: 50, left: 50, right: 50 },
       info: {
         Title: `ROI-rapport — ${foretag.namn}`,
-        Author: 'Partnrr Outreach CRM',
+        Author: 'SparkCollab Outreach CRM',
         Subject: 'Influencer Marketing ROI',
       },
     });
@@ -188,7 +188,7 @@ function buildReportPDF(doc, foretag, data) {
 
   // ─── COVER ───
   doc.rect(0, 0, doc.page.width, 200).fill('#1a1a2e');
-  doc.fontSize(28).fillColor('#a855f7').text('Partnrr', 50, 60);
+  doc.fontSize(28).fillColor('#a855f7').text('SparkCollab', 50, 60);
   doc.fontSize(10).fillColor('#6b7280').text('INFLUENCER MARKETING ROI-RAPPORT', 50, 95);
   doc.fontSize(20).fillColor('#ffffff').text(foretag.namn, 50, 130);
   doc.fontSize(10).fillColor('#9ca3af').text(
@@ -214,7 +214,7 @@ function buildReportPDF(doc, foretag, data) {
   doc.fontSize(10).fillColor('#374151');
 
   const summaryLines = [
-    `Under rapportperioden har ${foretag.namn} kontaktat ${data.outreachStats.total_kontaktade || 0} influencers via Partnrr.`,
+    `Under rapportperioden har ${foretag.namn} kontaktat ${data.outreachStats.total_kontaktade || 0} influencers via SparkCollab.`,
     `Av dessa svarade ${data.outreachStats.svarade || 0} st (${svarsfrekvens}% svarsfrekvens) och ${data.outreachStats.avtal_signerade || 0} avtal signerades (${konvFrekvens}% konvertering).`,
     data.totalSignups > 0
       ? `Totalt genererades ${data.totalSignups} signups via referral-koder.${costPerSignup ? ` Kostnad per signup: ${costPerSignup} SEK.` : ''}`
@@ -366,7 +366,7 @@ function buildReportPDF(doc, foretag, data) {
   // ─── FOOTER ───
   doc.moveDown(3);
   doc.fontSize(7).fillColor('#9ca3af');
-  doc.text('Rapporten genererades automatiskt av Partnrr Outreach CRM.', { align: 'center' });
+  doc.text('Rapporten genererades automatiskt av SparkCollab Outreach CRM.', { align: 'center' });
   doc.text(`${foretag.namn} • ${new Date().toLocaleDateString('sv-SE')}`, { align: 'center' });
 }
 

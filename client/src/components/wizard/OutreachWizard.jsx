@@ -43,8 +43,8 @@ const QUICK_COMPONENTS = {
 }
 
 // Hjälpfunktioner för att spara/ladda wizard-state
-const STORAGE_KEY = 'partnrr_wizard_state'
-const BOOT_ID_KEY = 'partnrr_server_boot_id'
+const STORAGE_KEY = 'sparkcollab_wizard_state'
+const BOOT_ID_KEY = 'sparkcollab_server_boot_id'
 
 function loadSavedState() {
   try {
@@ -184,7 +184,7 @@ function EmailConnectScreen({ onConnected }) {
           </div>
           <h2 className="text-xl font-bold text-white mb-2">Anslut din e-post</h2>
           <p className="text-gray-400 text-sm">
-            Partnrr behöver tillgång till ett e-postkonto för att skicka outreach-meddelanden. Välj din leverantör nedan.
+            SparkCollab behöver tillgång till ett e-postkonto för att skicka outreach-meddelanden. Välj din leverantör nedan.
           </p>
         </div>
 
@@ -220,7 +220,7 @@ function EmailConnectScreen({ onConnected }) {
         </div>
         <h2 className="text-xl font-bold text-white mb-2">Anslut Gmail</h2>
         <p className="text-gray-400 text-sm mb-6">
-          Du dirigeras till Google för att ge Partnrr tillgång att skicka e-post via ditt Gmail-konto.
+          Du dirigeras till Google för att ge SparkCollab tillgång att skicka e-post via ditt Gmail-konto.
         </p>
         <a
           href={`${import.meta.env.VITE_API_URL || ''}/api/auth/google`}
@@ -249,7 +249,7 @@ function EmailConnectScreen({ onConnected }) {
         </div>
         <h2 className="text-xl font-bold text-white mb-2">Anslut Outlook / Hotmail</h2>
         <p className="text-gray-400 text-sm mb-6">
-          Du dirigeras till Microsoft för att ge Partnrr tillgång att skicka e-post via ditt Outlook/Hotmail-konto.
+          Du dirigeras till Microsoft för att ge SparkCollab tillgång att skicka e-post via ditt Outlook/Hotmail-konto.
         </p>
         <a
           href={`${import.meta.env.VITE_API_URL || ''}/api/auth/microsoft`}

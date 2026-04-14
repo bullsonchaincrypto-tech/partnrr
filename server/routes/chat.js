@@ -1,7 +1,7 @@
 /**
  * Routes: /api/chat
  *
- * AI-chatassistent som kan utföra åtgärder i Partnrr
+ * AI-chatassistent som kan utföra åtgärder i SparkCollab
  */
 
 import { Router } from 'express';
@@ -52,7 +52,7 @@ router.post('/', async (req, res) => {
       }
     } catch { /* OK */ }
 
-    const systemPrompt = `Du är Partnrr AI-assistenten — en hjälpsam assistent inbyggd i Partnrr Outreach CRM. Du hjälper användaren med:
+    const systemPrompt = `Du är SparkCollab AI-assistenten — en hjälpsam assistent inbyggd i SparkCollab Outreach CRM. Du hjälper användaren med:
 
 1. **Frågor om data** — Visa statistik, outreach-status, konverteringsgrad osv.
 2. **Åtgärdsförslag** — Rekommendera uppföljningar, nya influencers att kontakta, optimeringsförslag

@@ -40,7 +40,7 @@ export default function App() {
   const [page, setPage] = useState('wizard')
   const [dashboardMounted, setDashboardMounted] = useState(false)
   const [showOnboarding, setShowOnboarding] = useState(() => {
-    try { return !sessionStorage.getItem('partnrr_onboarding_done') } catch { return true }
+    try { return !sessionStorage.getItem('sparkcollab_onboarding_done') } catch { return true }
   })
   const [showShortcuts, setShowShortcuts] = useState(false)
 
@@ -84,7 +84,7 @@ export default function App() {
       {/* Onboarding */}
       {showOnboarding && <Onboarding onComplete={() => {
         setShowOnboarding(false)
-        try { sessionStorage.setItem('partnrr_onboarding_done', '1') } catch {}
+        try { sessionStorage.setItem('sparkcollab_onboarding_done', '1') } catch {}
       }} />}
 
       {/* Keyboard shortcuts modal */}
@@ -120,20 +120,20 @@ export default function App() {
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="flex items-center justify-between h-16">
             <div className="flex items-center gap-2.5">
-              {/* Partnrr Logo */}
-              <div className="w-9 h-9 rounded-lg bg-gradient-to-br from-purple-500 to-pink-500 flex items-center justify-center shadow-lg shadow-purple-500/25">
-                <svg width="22" height="22" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
-                  <path d="M7 4h5a5 5 0 0 1 0 10H9v6H7V4z" fill="white" />
-                  <circle cx="12" cy="9" r="2.5" fill="url(#pg)" />
-                  <defs>
-                    <linearGradient id="pg" x1="10" y1="7" x2="14" y2="11">
-                      <stop stopColor="#a855f7" />
-                      <stop offset="1" stopColor="#ec4899" />
-                    </linearGradient>
-                  </defs>
-                </svg>
-              </div>
-              <span className="text-xl font-extrabold text-white tracking-tight">Partnrr</span>
+              {/* SparkCollab Logo — Spark Loop icon + wordmark */}
+              <img
+                src="/sparkcollab-icon.svg"
+                alt="SparkCollab"
+                width="32"
+                height="32"
+                className="flex-shrink-0"
+              />
+              <span
+                className="text-xl font-bold tracking-tight"
+                style={{ fontFamily: 'var(--sc-font-heading)', color: 'var(--sc-fg)' }}
+              >
+                Spark<span style={{ color: 'var(--sc-secondary)', fontWeight: 500 }}>Collab</span>
+              </span>
             </div>
             <div className="flex items-center gap-1">
               {NAV_ITEMS.map(({ key, label, icon: Icon, shortcut }) => (

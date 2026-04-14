@@ -223,8 +223,9 @@ export function generateContractPdf(data, outputPath) {
       .strokeColor(BORDER_GRAY).lineWidth(0.5).stroke();
 
     doc.moveDown(0.5);
+    // SparkCollab-branding (diskret, ljusgrå, 8pt)
     doc.fontSize(8).fillColor(GRAY_TEXT).font('Helvetica')
-      .text(`RankLeague  •  rankleague.com  •  Genererat ${datum}`, { align: 'center' });
+      .text(`Genererat via SparkCollab.se  •  ${datum}`, { align: 'center' });
 
     // Klart
     doc.end();

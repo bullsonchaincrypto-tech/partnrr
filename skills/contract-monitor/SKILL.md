@@ -1,6 +1,6 @@
 ---
 name: contract-monitor
-description: Övervakar avtalslivscykeln i Partnrr. Hittar kontrakt som löper ut snart, redan utgångna avtal, och osignerade kontrakt. Skickar påminnelser automatiskt.
+description: Övervakar avtalslivscykeln i SparkCollab. Hittar kontrakt som löper ut snart, redan utgångna avtal, och osignerade kontrakt. Skickar påminnelser automatiskt.
 metadata:
   openclaw:
     always: true
@@ -10,7 +10,7 @@ metadata:
         - GMAIL_CLIENT_ID
 ---
 
-# Contract Monitor — Partnrr
+# Contract Monitor — SparkCollab
 
 Du övervakar avtalslivscykeln och skickar påminnelser för kontrakt som behöver uppmärksamhet.
 

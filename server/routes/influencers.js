@@ -56,14 +56,14 @@ router.post('/find', async (req, res) => {
 
     // Steg 1: Hämta LÅSTA söktermer (inga AI-gissningar, alltid samma resultat)
     const searchQueries = getLockedSearchQueries(foretag.bransch);
-    console.log(`[Partnrr] Steg 1: Låsta söktermer (${searchQueries.length} st):`, searchQueries);
+    console.log(`[SparkCollab] Steg 1: Låsta söktermer (${searchQueries.length} st):`, searchQueries);
 
     // Steg 2: YouTube Data API v3 hämtar RIKTIG, VERIFIERAD data
-    console.log(`[Partnrr] Steg 2: Hämtar verifierad data från YouTube Data API v3...`);
+    console.log(`[SparkCollab] Steg 2: Hämtar verifierad data från YouTube Data API v3...`);
     const allChannels = await searchYouTubeChannels(searchQueries, 50);
 
     const filtered = allChannels;
-    console.log(`[Partnrr] ${allChannels.length} kanaler hittade`);
+    console.log(`[SparkCollab] ${allChannels.length} kanaler hittade`);
 
     // Sortera: nisch-relevans baserat på VALDA nischer, sedan följare
     // Bygg relevans-nyckelord från valda nisch-ID:n
@@ -99,10 +99,10 @@ router.post('/find', async (req, res) => {
     });
 
     const topChannels = filtered.slice(0, 10);
-    console.log(`[Partnrr] Topp ${topChannels.length} kanaler (nisch-sorterade, 1000+ prenumeranter)`);
+    console.log(`[SparkCollab] Topp ${topChannels.length} kanaler (nisch-sorterade, 1000+ prenumeranter)`);
 
     // Steg 3: Sök e-postadresser automatiskt för alla kanaler
-    console.log(`[Partnrr] Steg 3: Söker e-postadresser automatiskt (optimerad)...`);
+    console.log(`[SparkCollab] Steg 3: Söker e-postadresser automatiskt (optimerad)...`);
     const emailResults = await findEmailsForChannels(
       topChannels.map(ch => ({
         kanalnamn: ch.kanalnamn,
@@ -123,7 +123,7 @@ router.post('/find', async (req, res) => {
     }
 
     const foundEmails = topChannels.filter(ch => ch.kontakt_epost).length;
-    console.log(`[Partnrr] E-postsökning klar: ${foundEmails} av ${topChannels.length} e-postadresser hittade`);
+    console.log(`[SparkCollab] E-postsökning klar: ${foundEmails} av ${topChannels.length} e-postadresser hittade`);
 
     // Clear previous
     await runSql('DELETE FROM influencers WHERE foretag_id = ?', [foretagId]);
@@ -228,7 +228,7 @@ router.post('/find-multi', async (req, res) => {
     }
     const nischStr = nischLabels.length > 0 ? nischLabels.join(', ') : 'gaming, esports';
 
-    console.log(`[Partnrr] Multi-plattform: Söker ${plattform} influencers för nisch: ${nischStr}`);
+    console.log(`[SparkCollab] Multi-plattform: Söker ${plattform} influencers för nisch: ${nischStr}`);
 
     // AI-generera förslag
     const suggestions = await generateInfluencerSuggestions(plattform, nischStr, 10);
@@ -280,7 +280,7 @@ router.post('/find-multi', async (req, res) => {
 
     enriched.sort((a, b) => b.match_score - a.match_score);
 
-    console.log(`[Partnrr] ${enriched.length} ${plattform}-influencers genererade via AI`);
+    console.log(`[SparkCollab] ${enriched.length} ${plattform}-influencers genererade via AI`);
     res.json(enriched);
   } catch (error) {
     console.error('Find multi-platform error:', error);

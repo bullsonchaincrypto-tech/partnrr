@@ -1,6 +1,6 @@
 ---
 name: auto-followup
-description: Genererar och skickar automatiska uppföljningsmeddelanden för Partnrr-outreach som inte fått svar inom 5 dagar. Använder AI för att skapa personliga uppföljningar baserade på det ursprungliga meddelandet.
+description: Genererar och skickar automatiska uppföljningsmeddelanden för SparkCollab-outreach som inte fått svar inom 5 dagar. Använder AI för att skapa personliga uppföljningar baserade på det ursprungliga meddelandet.
 metadata:
   openclaw:
     always: true
@@ -11,7 +11,7 @@ metadata:
         - ANTHROPIC_API_KEY
 ---
 
-# Auto-Followup — Partnrr
+# Auto-Followup — SparkCollab
 
 Du hanterar automatiska uppföljningar för outreach-meddelanden som inte fått svar.
 

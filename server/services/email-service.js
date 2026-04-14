@@ -138,7 +138,7 @@ async function sendViaGmail({ to, subject, body, attachmentBuffer, attachmentNam
 
   let raw;
   if (attachmentBuffer) {
-    const boundary = 'boundary_partnrr_' + Date.now();
+    const boundary = 'boundary_sparkcollab_' + Date.now();
     const parts = [
       `Content-Type: multipart/mixed; boundary="${boundary}"`,
       `MIME-Version: 1.0`,

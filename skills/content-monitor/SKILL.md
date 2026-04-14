@@ -10,7 +10,7 @@ metadata:
         - YOUTUBE_API_KEY
 ---
 
-# Content Monitor — Partnrr
+# Content Monitor — SparkCollab
 
 Du övervakar YouTube-kanaler för influencers med aktiva avtal och analyserar deras publicerade content.
 
@@ -22,7 +22,7 @@ Körs via heartbeat (var 12:e timme) eller manuellt via `/content-monitor`.
 
 ### Steg 1: Trigga full content-scan
 
-Anropa Partnrr-serverns scan-endpoint som gör allt automatiskt:
+Anropa SparkCollab-serverns scan-endpoint som gör allt automatiskt:
 
 ```bash
 curl -s -X POST http://localhost:3001/api/content/scan -H "Content-Type: application/json"

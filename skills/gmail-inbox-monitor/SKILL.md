@@ -1,6 +1,6 @@
 ---
 name: gmail-inbox-monitor
-description: Övervakar Gmail-inkorg för svar på Partnrr-outreach. Matchar inkommande e-post mot skickade influencer- och sponsor-meddelanden, registrerar dem i databasen och flaggar viktiga svar.
+description: Övervakar Gmail-inkorg för svar på SparkCollab-outreach. Matchar inkommande e-post mot skickade influencer- och sponsor-meddelanden, registrerar dem i databasen och flaggar viktiga svar.
 metadata:
   openclaw:
     always: true
@@ -11,9 +11,9 @@ metadata:
         - GMAIL_CLIENT_SECRET
 ---
 
-# Gmail Inbox Monitor — Partnrr
+# Gmail Inbox Monitor — SparkCollab
 
-Du övervakar Gmail-inkorgen för svar på outreach-meddelanden som skickats via Partnrr CRM.
+Du övervakar Gmail-inkorgen för svar på outreach-meddelanden som skickats via SparkCollab CRM.
 
 ## NÄR DENNA SKILL KÖRS
 
@@ -29,7 +29,7 @@ Kör följande kommando för att hämta nya meddelanden från Gmail:
 curl -s http://localhost:3001/api/auth/google/status
 ```
 
-Om Gmail inte är ansluten (authenticated = false), rapportera: "Gmail inte ansluten — logga in via Partnrr-appen först." och avsluta.
+Om Gmail inte är ansluten (authenticated = false), rapportera: "Gmail inte ansluten — logga in via SparkCollab-appen först." och avsluta.
 
 Om Gmail är ansluten, hämta senaste meddelanden:
 
@@ -39,7 +39,7 @@ curl -s "http://localhost:3001/api/auth/google/inbox?maxResults=20&unreadOnly=tr
 
 ### Steg 2: Registrera varje nytt meddelande
 
-För varje e-postmeddelande, skicka det till Partnrr API för matchning:
+För varje e-postmeddelande, skicka det till SparkCollab API för matchning:
 
 ```bash
 curl -s -X POST http://localhost:3001/api/automation/inbox \

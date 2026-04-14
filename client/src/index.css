@@ -1,36 +1,157 @@
 @import "tailwindcss";
+@import "./styles/tokens.css";
 
-/* ===== LIGHT THEME OVERRIDES ===== */
-html.light body {
-  background-color: #f8fafc;
-  color: #1e293b;
-}
-html.light .bg-gray-950 { background-color: #f8fafc; }
-html.light .bg-gray-900 { background-color: #ffffff; }
-html.light .bg-gray-800 { background-color: #f1f5f9; }
-html.light .bg-gray-800\/50 { background-color: rgba(241,245,249,0.5); }
-html.light .bg-gray-800\/30 { background-color: rgba(241,245,249,0.3); }
-html.light .border-gray-800 { border-color: #e2e8f0; }
-html.light .border-gray-700 { border-color: #cbd5e1; }
-html.light .border-gray-600 { border-color: #94a3b8; }
-html.light .text-white { color: #0f172a; }
-html.light .text-gray-100 { color: #1e293b; }
-html.light .text-gray-300 { color: #475569; }
-html.light .text-gray-400 { color: #64748b; }
-html.light .text-gray-500 { color: #94a3b8; }
-html.light .text-gray-600 { color: #475569; }
-html.light .placeholder-gray-500::placeholder { color: #94a3b8; }
+/* ==========================================================================
+   SparkCollab — Theme Foundation
+   Dark mode är default (html.dark / html[data-theme="dark"]).
+   Light mode togglas via data-theme="light" på <html>.
+   Alla Tailwind bg-gray-*, text-*, border-*-klasser mappas till SC-tokens.
+   ========================================================================== */
 
-html.light input, html.light select, html.light textarea {
-  background-color: #f1f5f9;
-  border-color: #cbd5e1;
-  color: #0f172a;
-}
-html.light input:focus, html.light select:focus, html.light textarea:focus {
-  border-color: #a855f7;
+/* ----- Root: dark default ----- */
+:root {
+  color-scheme: dark;
 }
 
-/* ===== WIZARD STEP ANIMATIONS ===== */
+html {
+  font-family: var(--sc-font-body);
+  background-color: var(--sc-bg);
+  color: var(--sc-fg);
+}
+
+body {
+  background-color: var(--sc-bg);
+  color: var(--sc-fg);
+  font-family: var(--sc-font-body);
+  min-height: 100vh;
+}
+
+/* Headings använder Space Grotesk */
+h1, h2, h3, h4, h5, h6 {
+  font-family: var(--sc-font-heading);
+  letter-spacing: var(--sc-tracking-tight);
+}
+
+/* ==========================================================================
+   DARK MODE (default): mappa Tailwind-färger till SC-tokens
+   ========================================================================== */
+
+/* Backgrounds */
+.bg-gray-950 { background-color: var(--sc-bg) !important; }                    /* App base */
+.bg-gray-900 { background-color: var(--sc-bg-raised) !important; }             /* Surface */
+.bg-gray-800 { background-color: var(--sc-ink-800) !important; }               /* Elevated */
+.bg-gray-800\/50 { background-color: color-mix(in srgb, var(--sc-ink-800) 50%, transparent) !important; }
+.bg-gray-800\/30 { background-color: color-mix(in srgb, var(--sc-ink-800) 30%, transparent) !important; }
+.bg-gray-700 { background-color: var(--sc-ink-800) !important; }
+
+/* Borders */
+.border-gray-800 { border-color: var(--sc-border) !important; }
+.border-gray-700 { border-color: var(--sc-ink-800) !important; }
+.border-gray-600 { border-color: var(--sc-ink-600) !important; }
+
+/* Text */
+.text-white, .text-gray-50 { color: var(--sc-fg) !important; }
+.text-gray-100 { color: var(--sc-fg) !important; }
+.text-gray-200 { color: var(--sc-ink-100) !important; }
+.text-gray-300 { color: var(--sc-ink-300) !important; }
+.text-gray-400 { color: var(--sc-fg-muted) !important; }
+.text-gray-500 { color: var(--sc-ink-500) !important; }
+.text-gray-600 { color: var(--sc-ink-600) !important; }
+.placeholder-gray-500::placeholder { color: var(--sc-ink-500) !important; }
+
+/* ==========================================================================
+   PURPLE → EMBER/IRIS mappning
+   Gamla lila Tailwind-färger (purple-*, violet-*) mappas till SC brand-färger
+   ========================================================================== */
+
+/* Purple → Ember (primär) */
+.bg-purple-500, .bg-purple-600 { background-color: var(--sc-primary) !important; }
+.bg-purple-700 { background-color: var(--sc-primary-hover) !important; }
+.bg-purple-500\/10, .bg-purple-600\/10 { background-color: color-mix(in srgb, var(--sc-primary) 10%, transparent) !important; }
+.bg-purple-500\/20, .bg-purple-600\/20 { background-color: color-mix(in srgb, var(--sc-primary) 20%, transparent) !important; }
+.bg-purple-500\/30, .bg-purple-600\/30 { background-color: color-mix(in srgb, var(--sc-primary) 30%, transparent) !important; }
+.text-purple-300, .text-purple-400, .text-purple-500 { color: var(--sc-primary) !important; }
+.text-purple-600 { color: var(--sc-primary-hover) !important; }
+.border-purple-500, .border-purple-600 { border-color: var(--sc-primary) !important; }
+.border-purple-500\/30 { border-color: color-mix(in srgb, var(--sc-primary) 30%, transparent) !important; }
+.border-purple-500\/50 { border-color: color-mix(in srgb, var(--sc-primary) 50%, transparent) !important; }
+.ring-purple-500, .ring-purple-600 { --tw-ring-color: var(--sc-primary) !important; }
+.from-purple-500, .from-purple-600 { --tw-gradient-from: var(--sc-primary) !important; }
+.to-purple-500, .to-purple-600 { --tw-gradient-to: var(--sc-primary) !important; }
+.via-purple-500, .via-purple-600 { --tw-gradient-via: var(--sc-primary) !important; }
+
+/* Violet → Ember också */
+.bg-violet-500, .bg-violet-600 { background-color: var(--sc-primary) !important; }
+.text-violet-300, .text-violet-400, .text-violet-500 { color: var(--sc-primary) !important; }
+.border-violet-500, .border-violet-600 { border-color: var(--sc-primary) !important; }
+.from-violet-500, .from-violet-600 { --tw-gradient-from: var(--sc-primary) !important; }
+.to-violet-500, .to-violet-600 { --tw-gradient-to: var(--sc-primary) !important; }
+
+/* Fuchsia/Pink → Bloom (accent) */
+.bg-pink-500, .bg-pink-600, .bg-fuchsia-500, .bg-fuchsia-600 { background-color: var(--sc-accent) !important; }
+.text-pink-300, .text-pink-400, .text-pink-500, .text-fuchsia-400 { color: var(--sc-accent) !important; }
+.border-pink-500, .border-fuchsia-500 { border-color: var(--sc-accent) !important; }
+.from-pink-500, .from-pink-600, .from-fuchsia-500 { --tw-gradient-from: var(--sc-accent) !important; }
+.to-pink-500, .to-pink-600, .to-fuchsia-500 { --tw-gradient-to: var(--sc-accent) !important; }
+
+/* Cyan → Iris (sekundär) */
+.bg-cyan-500, .bg-cyan-600 { background-color: var(--sc-secondary) !important; }
+.text-cyan-300, .text-cyan-400, .text-cyan-500 { color: var(--sc-secondary) !important; }
+.border-cyan-500, .border-cyan-600 { border-color: var(--sc-secondary) !important; }
+
+/* Blue → Iris för konsistens */
+.bg-blue-500, .bg-blue-600 { background-color: var(--sc-secondary) !important; }
+.text-blue-300, .text-blue-400, .text-blue-500 { color: var(--sc-secondary) !important; }
+.border-blue-500, .border-blue-600 { border-color: var(--sc-secondary) !important; }
+
+/* Indigo → Iris direkt */
+.bg-indigo-500, .bg-indigo-600 { background-color: var(--sc-secondary) !important; }
+.text-indigo-300, .text-indigo-400, .text-indigo-500 { color: var(--sc-secondary) !important; }
+
+/* ==========================================================================
+   LIGHT MODE override (togglas via data-theme="light" eller html.light)
+   ========================================================================== */
+
+html[data-theme="light"], html.light {
+  color-scheme: light;
+}
+
+html[data-theme="light"] body, html.light body {
+  background-color: var(--sc-paper);
+  color: var(--sc-ink-950);
+}
+
+/* Override SC-tokens för light mode (motsvarande tokens.css [data-theme="dark"]) */
+html[data-theme="light"], html.light {
+  --sc-bg:            var(--sc-paper);
+  --sc-bg-raised:     #FFFFFF;
+  --sc-fg:            var(--sc-ink-950);
+  --sc-fg-muted:      var(--sc-ink-500);
+  --sc-border:        var(--sc-ink-200);
+  --sc-primary:       var(--sc-ember-500);
+  --sc-primary-hover: var(--sc-ember-600);
+  --sc-on-primary:    var(--sc-ink-950);
+  --sc-secondary:     var(--sc-iris-600);
+  --sc-accent:        var(--sc-bloom-600);
+  --sc-link:          var(--sc-iris-600);
+}
+
+/* Input/select/textarea */
+input, select, textarea {
+  background-color: var(--sc-bg-raised);
+  border-color: var(--sc-border);
+  color: var(--sc-fg);
+}
+input:focus, select:focus, textarea:focus {
+  border-color: var(--sc-primary);
+  outline: 2px solid color-mix(in srgb, var(--sc-primary) 30%, transparent);
+  outline-offset: -1px;
+}
+
+/* ==========================================================================
+   WIZARD STEP ANIMATIONS (behållna, oförändrade)
+   ========================================================================== */
+
 @keyframes slideInRight {
   from { opacity: 0; transform: translateX(40px); }
   to { opacity: 1; transform: translateX(0); }
@@ -48,78 +169,191 @@ html.light input:focus, html.light select:focus, html.light textarea:focus {
   to { opacity: 0; transform: translateY(-8px); }
 }
 
-.step-enter-right {
-  animation: slideInRight 0.35s cubic-bezier(0.16, 1, 0.3, 1);
-}
-.step-enter-left {
-  animation: slideInLeft 0.35s cubic-bezier(0.16, 1, 0.3, 1);
-}
-.step-fade-in {
-  animation: fadeIn 0.3s ease-out;
+.step-enter-right { animation: slideInRight 0.35s cubic-bezier(0.16, 1, 0.3, 1); }
+.step-enter-left  { animation: slideInLeft 0.35s cubic-bezier(0.16, 1, 0.3, 1); }
+.step-fade-in     { animation: fadeIn 0.3s ease-out; }
+
+/* ==========================================================================
+   SPARK ANIMATIONS — gnistor vid nyckelinteraktioner
+   Använd .spark-burst, .spark-pulse, .spark-sent-toast
+   ========================================================================== */
+
+/* Spark burst (t.ex. avtal signerat — explosion av gnistor från center) */
+@keyframes spark-burst-center {
+  0%   { transform: scale(0) rotate(0deg); opacity: 0; }
+  30%  { opacity: 1; }
+  100% { transform: scale(2.4) rotate(180deg); opacity: 0; }
 }
 
-/* ===== DRAG & DROP ===== */
+.spark-burst {
+  position: relative;
+  display: inline-block;
+  pointer-events: none;
+}
+.spark-burst::before,
+.spark-burst::after {
+  content: '';
+  position: absolute;
+  top: 50%; left: 50%;
+  width: 6px; height: 6px;
+  margin-left: -3px; margin-top: -3px;
+  background: var(--sc-primary);
+  border-radius: 50%;
+  box-shadow:
+    14px  0  0 0 var(--sc-primary),
+   -14px  0  0 0 var(--sc-primary),
+     0 14px 0 0 var(--sc-accent),
+     0 -14px 0 0 var(--sc-secondary),
+    10px 10px 0 0 var(--sc-primary),
+   -10px 10px 0 0 var(--sc-accent),
+    10px -10px 0 0 var(--sc-secondary),
+   -10px -10px 0 0 var(--sc-primary);
+  animation: spark-burst-center 0.7s ease-out forwards;
+}
+.spark-burst::after {
+  animation-delay: 0.12s;
+  animation-duration: 0.85s;
+  opacity: 0.6;
+}
+
+/* Spark pulse (t.ex. "ny matchning hittad" — mjuk puls) */
+@keyframes spark-pulse {
+  0%, 100% { box-shadow: 0 0 0 0 color-mix(in srgb, var(--sc-primary) 60%, transparent); }
+  50%      { box-shadow: 0 0 0 14px color-mix(in srgb, var(--sc-primary) 0%, transparent); }
+}
+.spark-pulse {
+  animation: spark-pulse 1.6s ease-out infinite;
+}
+
+/* Spark trail (t.ex. "mail skickat" — gnistor flyger åt sidan) */
+@keyframes spark-trail {
+  0%   { transform: translateX(0) scale(1); opacity: 1; }
+  100% { transform: translateX(36px) scale(0); opacity: 0; }
+}
+.spark-sent {
+  position: relative;
+}
+.spark-sent::after {
+  content: '';
+  position: absolute;
+  top: 50%; right: -4px;
+  width: 4px; height: 4px;
+  margin-top: -2px;
+  background: var(--sc-primary);
+  border-radius: 50%;
+  box-shadow: 8px 0 0 0 var(--sc-accent), 18px 0 0 0 var(--sc-secondary);
+  animation: spark-trail 0.7s ease-out forwards;
+}
+
+/* Spark flicker på ikoner (kontinuerlig subtil animation) */
+@keyframes spark-flicker {
+  0%, 100% { filter: drop-shadow(0 0 2px color-mix(in srgb, var(--sc-primary) 40%, transparent)); }
+  50%      { filter: drop-shadow(0 0 6px color-mix(in srgb, var(--sc-primary) 80%, transparent)); }
+}
+.spark-flicker {
+  animation: spark-flicker 2.5s ease-in-out infinite;
+}
+
+/* ==========================================================================
+   DRAG & DROP (uppdaterat med Ember-glow istället för lila)
+   ========================================================================== */
+
 .drag-item {
   transition: transform 0.15s ease, box-shadow 0.15s ease;
   cursor: grab;
 }
-.drag-item:active {
-  cursor: grabbing;
-}
+.drag-item:active { cursor: grabbing; }
 .drag-item.dragging {
   opacity: 0.5;
   transform: scale(0.98);
-  box-shadow: 0 0 0 2px rgba(168, 85, 247, 0.5);
+  box-shadow: 0 0 0 2px color-mix(in srgb, var(--sc-primary) 50%, transparent);
 }
 .drag-over {
-  border-color: rgba(168, 85, 247, 0.5) !important;
-  background-color: rgba(168, 85, 247, 0.05) !important;
+  border-color: color-mix(in srgb, var(--sc-primary) 50%, transparent) !important;
+  background-color: color-mix(in srgb, var(--sc-primary) 5%, transparent) !important;
 }
 
-/* ===== SKELETON PULSE ===== */
+/* ==========================================================================
+   SKELETON PULSE (tema-anpassad)
+   ========================================================================== */
+
 @keyframes shimmer {
-  0% { background-position: -200% 0; }
+  0%   { background-position: -200% 0; }
   100% { background-position: 200% 0; }
 }
 .animate-pulse {
-  background: linear-gradient(90deg, #1f2937 25%, #374151 50%, #1f2937 75%);
+  background: linear-gradient(90deg, var(--sc-ink-900) 25%, var(--sc-ink-800) 50%, var(--sc-ink-900) 75%);
   background-size: 200% 100%;
   animation: shimmer 1.5s ease-in-out infinite;
 }
-html.light .animate-pulse {
-  background: linear-gradient(90deg, #e2e8f0 25%, #cbd5e1 50%, #e2e8f0 75%);
+html[data-theme="light"] .animate-pulse, html.light .animate-pulse {
+  background: linear-gradient(90deg, var(--sc-ink-200) 25%, var(--sc-ink-300) 50%, var(--sc-ink-200) 75%);
   background-size: 200% 100%;
   animation: shimmer 1.5s ease-in-out infinite;
 }
 
-/* ===== SMOOTH TRANSITIONS ===== */
+/* ==========================================================================
+   SMOOTH TRANSITIONS
+   ========================================================================== */
+
 * {
   transition-property: color, background-color, border-color;
   transition-timing-function: ease;
   transition-duration: 0.15s;
 }
-button, a {
-  transition-duration: 0.2s;
+button, a { transition-duration: 0.2s; }
+
+/* ==========================================================================
+   BRAND HELPERS
+   ========================================================================== */
+
+/* Gradient amber → iris för hero/accents */
+.sc-gradient-text {
+  background: linear-gradient(135deg, var(--sc-ember-500), var(--sc-iris-600));
+  background-clip: text;
+  -webkit-background-clip: text;
+  color: transparent;
+}
+.sc-gradient-bg {
+  background: linear-gradient(135deg, var(--sc-ember-500) 0%, var(--sc-bloom-600) 100%);
 }
 
-/* ===== HIDE SCROLLBAR (for horizontal tab scroll on mobile) ===== */
+/* Primärknapp — Ink-950 text på Ember-bg (WCAG AA 6.37:1) */
+.sc-btn-primary {
+  background: var(--sc-primary);
+  color: var(--sc-on-primary);
+  font-family: var(--sc-font-body);
+  font-weight: 600;
+  border-radius: var(--sc-radius-md);
+  padding: 0.625rem 1.25rem;
+  transition: background 0.15s ease;
+}
+.sc-btn-primary:hover { background: var(--sc-primary-hover); }
+
+/* Sekundärknapp — Iris */
+.sc-btn-secondary {
+  background: transparent;
+  color: var(--sc-secondary);
+  border: 1px solid var(--sc-secondary);
+  font-weight: 500;
+  border-radius: var(--sc-radius-md);
+  padding: 0.625rem 1.25rem;
+}
+.sc-btn-secondary:hover {
+  background: color-mix(in srgb, var(--sc-secondary) 10%, transparent);
+}
+
+/* ==========================================================================
+   UTILITIES
+   ========================================================================== */
+
 .scrollbar-hide {
   -ms-overflow-style: none;
   scrollbar-width: none;
 }
-.scrollbar-hide::-webkit-scrollbar {
-  display: none;
-}
+.scrollbar-hide::-webkit-scrollbar { display: none; }
 
-/* ===== MOBILE IMPROVEMENTS ===== */
 @media (max-width: 640px) {
-  /* Prevent horizontal page overflow */
-  html, body {
-    overflow-x: hidden;
-  }
-  /* Tighter padding on mobile */
-  .mobile-compact {
-    padding-left: 0.75rem;
-    padding-right: 0.75rem;
-  }
+  html, body { overflow-x: hidden; }
+  .mobile-compact { padding-left: 0.75rem; padding-right: 0.75rem; }
 }

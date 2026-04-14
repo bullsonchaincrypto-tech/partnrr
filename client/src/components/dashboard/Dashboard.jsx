@@ -36,14 +36,14 @@ export default function Dashboard() {
     if (typeof window !== 'undefined') {
       const params = new URLSearchParams(window.location.search)
       if (params.get('admin') === ADMIN_KEY) {
-        sessionStorage.setItem('partnrr_admin', '1')
+        sessionStorage.setItem('sparkcollab_admin', '1')
         // Clean URL
         params.delete('admin')
         const clean = params.toString()
         window.history.replaceState({}, '', window.location.pathname + (clean ? '?' + clean : ''))
         return true
       }
-      return sessionStorage.getItem('partnrr_admin') === '1'
+      return sessionStorage.getItem('sparkcollab_admin') === '1'
     }
     return false
   })

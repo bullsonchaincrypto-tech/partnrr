@@ -1,6 +1,6 @@
-# OpenClaw Setup — Partnrr
+# OpenClaw Setup — SparkCollab
 
-## Vad OpenClaw gör för Partnrr
+## Vad OpenClaw gör för SparkCollab
 
 OpenClaw körs i bakgrunden och automatiserar tre saker:
 
@@ -98,9 +98,9 @@ Redigera `HEARTBEAT.md` i projektroten. Varje task har:
 
 ## Viktigt
 
-- **Partnrr-servern MÅSTE köra** (`npm run dev`) för att OpenClaw ska kunna anropa API:t
-- Gmail måste vara ansluten i Partnrr innan inbox-monitor fungerar
-- YouTube API-kvoten (10 000 units/dag) delas mellan Partnrr och content-monitor
+- **SparkCollab-servern MÅSTE köra** (`npm run dev`) för att OpenClaw ska kunna anropa API:t
+- Gmail måste vara ansluten i SparkCollab innan inbox-monitor fungerar
+- YouTube API-kvoten (10 000 units/dag) delas mellan SparkCollab och content-monitor
 - Alla OpenClaw-jobb loggas i databasen (automation_log-tabellen)
 
 ---

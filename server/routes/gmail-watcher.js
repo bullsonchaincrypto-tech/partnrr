@@ -20,7 +20,7 @@ import {
   checkMicrosoftSentMail,
   isMicrosoftConnected,
 } from '../services/microsoft-inbox.js';
-import { runPartnrrTask } from '../services/managed-agents.js';
+import { runSparkCollabTask } from '../services/managed-agents.js';
 
 const router = Router();
 
@@ -254,7 +254,7 @@ router.post('/analyze/:messageId', async (req, res) => {
       const agentInfo = agents['gmail-inbox-monitor'];
 
       if (agentInfo && envId) {
-        const result = await runPartnrrTask(
+        const result = await runSparkCollabTask(
           'gmail-inbox-monitor', agentInfo.id, envId,
           `Analysera detta inkommande mail:\n\nFrån: ${msg.from_name} <${msg.from_email}>\nÄmne: ${msg.subject}\nInnehåll: ${msg.body_preview || msg.snippet}\n\n${kontextInfo}\n\nReturnera JSON: { "summary": "kort sammanfattning på svenska (max 50 ord)", "sentiment": "positive|neutral|negative", "suggested_action": "svara_intresse|boka_mote|skicka_kontrakt|skicka_info|avvakta|ingen_atgard", "suggested_reply": "förslag på svar (svenska, max 100 ord)" }`
         );

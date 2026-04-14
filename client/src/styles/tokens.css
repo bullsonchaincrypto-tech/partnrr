@@ -1,0 +1,121 @@
+/* ==========================================================================
+   SparkCollab — Design Tokens (CSS custom properties)
+   For implementation. Import at the root of your app.
+   ========================================================================== */
+
+:root {
+  /* ---------- Brand Colors ---------- */
+  /* Primary — Ember (warm amber, energy + warmth) */
+  --sc-ember-50:  #FFF7ED;
+  --sc-ember-100: #FFEDD5;
+  --sc-ember-300: #FDBA74;
+  --sc-ember-500: #F97316;  /* Primary */
+  --sc-ember-600: #EA580C;  /* Hover / pressed */
+  --sc-ember-700: #C2410C;
+
+  /* Secondary — Iris (indigo, trust + depth) */
+  --sc-iris-50:   #EEF2FF;
+  --sc-iris-100:  #E0E7FF;
+  --sc-iris-400:  #818CF8;
+  --sc-iris-500:  #6366F1;  /* Secondary */
+  --sc-iris-600:  #4F46E5;  /* Hover / accent text on light */
+  --sc-iris-700:  #4338CA;
+
+  /* Accent — Bloom (soft pink-coral; replaces teal for less-common pairing) */
+  --sc-bloom-500: #F472B6;
+  --sc-bloom-600: #EC4899;
+
+  /* Neutrals — Ink scale */
+  --sc-ink-950:   #0F172A;  /* App background (dark mode base) */
+  --sc-ink-900:   #1E293B;
+  --sc-ink-800:   #334155;
+  --sc-ink-600:   #475569;
+  --sc-ink-500:   #64748B;
+  --sc-ink-300:   #CBD5E1;
+  --sc-ink-200:   #E2E8F0;
+  --sc-ink-100:   #F1F5F9;
+  --sc-paper:     #FAFAF7;  /* Warm paper white — do NOT use pure #FFFFFF */
+
+  /* ---------- Semantic tokens — LIGHT mode (default) ---------- */
+  --sc-bg:            var(--sc-paper);
+  --sc-bg-raised:     #FFFFFF;
+  --sc-fg:            var(--sc-ink-950);
+  --sc-fg-muted:      var(--sc-ink-500);
+  --sc-border:        var(--sc-ink-200);
+  --sc-primary:       var(--sc-ember-500);
+  --sc-primary-hover: var(--sc-ember-600);
+  --sc-on-primary:    var(--sc-ink-950);    /* INK on Ember = 6.37:1 AA. White on Ember FAILS (2.8:1). */
+  --sc-secondary:     var(--sc-iris-600);   /* darker on light bg for AA contrast */
+  --sc-accent:        var(--sc-bloom-600);
+  --sc-link:          var(--sc-iris-600);
+}
+
+/* ---------- Semantic tokens — DARK mode ---------- */
+@media (prefers-color-scheme: dark) {
+  :root {
+    --sc-bg:            var(--sc-ink-950);
+    --sc-bg-raised:     var(--sc-ink-900);
+    --sc-fg:            var(--sc-paper);
+    --sc-fg-muted:      var(--sc-ink-300);
+    --sc-border:        var(--sc-ink-800);
+    --sc-primary:       var(--sc-ember-500);
+    --sc-primary-hover: var(--sc-ember-300);
+    --sc-on-primary:    var(--sc-ink-950);
+    --sc-secondary:     var(--sc-iris-400);  /* lighter on dark for AA contrast */
+    --sc-accent:        var(--sc-bloom-500);
+    --sc-link:          var(--sc-iris-400);
+  }
+}
+
+/* Manual override hook — apply data-theme="dark" to <html> for user toggle */
+[data-theme="dark"] {
+  --sc-bg:            var(--sc-ink-950);
+  --sc-bg-raised:     var(--sc-ink-900);
+  --sc-fg:            var(--sc-paper);
+  --sc-fg-muted:      var(--sc-ink-300);
+  --sc-border:        var(--sc-ink-800);
+  --sc-primary:       var(--sc-ember-500);
+  --sc-primary-hover: var(--sc-ember-300);
+  --sc-on-primary:    var(--sc-ink-950);
+  --sc-secondary:     var(--sc-iris-400);
+  --sc-accent:        var(--sc-bloom-500);
+  --sc-link:          var(--sc-iris-400);
+}
+
+/* ---------- Typography tokens ---------- */
+:root {
+  --sc-font-heading: 'Space Grotesk', 'Inter', system-ui, -apple-system, sans-serif;
+  --sc-font-body:    'Inter', system-ui, -apple-system, sans-serif;
+  --sc-font-mono:    'JetBrains Mono', ui-monospace, SFMono-Regular, Menlo, monospace;
+
+  /* Type scale (1.250 major third) */
+  --sc-text-xs:   12px;
+  --sc-text-sm:   14px;
+  --sc-text-base: 16px;
+  --sc-text-lg:   18px;
+  --sc-text-xl:   22px;
+  --sc-text-2xl:  28px;
+  --sc-text-3xl:  36px;
+  --sc-text-4xl:  48px;
+  --sc-text-5xl:  60px;
+
+  --sc-leading-tight: 1.15;
+  --sc-leading-snug:  1.35;
+  --sc-leading-base:  1.55;
+
+  --sc-tracking-tight: -0.02em;  /* Headings */
+  --sc-tracking-base:   0;
+  --sc-tracking-wide:   0.08em;  /* All-caps labels */
+}
+
+/* ---------- Spacing / radius / shadow ---------- */
+:root {
+  --sc-radius-sm: 6px;
+  --sc-radius-md: 10px;
+  --sc-radius-lg: 16px;
+  --sc-radius-xl: 24px;
+
+  --sc-shadow-sm: 0 1px 2px rgba(15, 23, 42, 0.06);
+  --sc-shadow-md: 0 4px 12px rgba(15, 23, 42, 0.08);
+  --sc-shadow-lg: 0 12px 32px rgba(15, 23, 42, 0.12);
+}

@@ -6,7 +6,7 @@ export default function AiChat() {
   const [open, setOpen] = useState(false)
   const [input, setInput] = useState('')
   const [messages, setMessages] = useState([
-    { role: 'assistant', content: 'Hej! Jag är Partnrr AI-assistenten. Fråga mig vad som helst om dina kampanjer, influencers eller outreach.' },
+    { role: 'assistant', content: 'Hej! Jag är SparkCollab AI-assistenten. Fråga mig vad som helst om dina kampanjer, influencers eller outreach.' },
   ])
   const [loading, setLoading] = useState(false)
   const messagesEndRef = useRef(null)
@@ -72,7 +72,7 @@ export default function AiChat() {
                 <Bot className="w-4 h-4 text-white" />
               </div>
               <div>
-                <p className="text-sm font-medium text-white">Partnrr AI</p>
+                <p className="text-sm font-medium text-white">SparkCollab AI</p>
                 <p className="text-[10px] text-gray-400">Powered by Claude</p>
               </div>
             </div>

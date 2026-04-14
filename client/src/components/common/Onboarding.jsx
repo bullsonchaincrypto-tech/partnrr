@@ -4,7 +4,7 @@ import { X, Zap, ArrowRight, ArrowLeft, Building2, Search, MessageSquare, FileTe
 const GUIDE_STEPS = [
   {
     icon: Zap,
-    title: 'Välkommen till Partnrr Outreach!',
+    title: 'Välkommen till SparkCollab Outreach!',
     description: 'Hitta influencers eller sponsorer, generera personliga meddelanden med AI, bifoga kontrakt och skicka — allt i ett flöde.',
     detail: 'Låt oss gå igenom hur det fungerar steg för steg.',
     color: 'purple',
@@ -154,10 +154,16 @@ export default function Onboarding({ onComplete }) {
           {step + 1} / {GUIDE_STEPS.length}
         </div>
 
-        {/* Icon */}
-        <div className={`w-14 h-14 rounded-2xl flex items-center justify-center mb-5 border ${colors.iconBg}`}>
-          <Icon className={`w-7 h-7 ${colors.iconText}`} />
-        </div>
+        {/* Icon — welcome step visar SparkCollab-logo, resten: step-ikon */}
+        {step === 0 ? (
+          <div className="mb-5 flex items-center gap-3">
+            <img src="/sparkcollab-icon.svg" alt="" width="56" height="56" className="spark-flicker" />
+          </div>
+        ) : (
+          <div className={`w-14 h-14 rounded-2xl flex items-center justify-center mb-5 border ${colors.iconBg}`}>
+            <Icon className={`w-7 h-7 ${colors.iconText}`} />
+          </div>
+        )}
 
         {/* Content */}
         <h2 className="text-xl font-bold text-white mb-3">{current.title}</h2>

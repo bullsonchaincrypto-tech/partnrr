@@ -6,8 +6,8 @@
 
 import { Router } from 'express';
 import {
-  setupPartnrrAgents,
-  runPartnrrTask,
+  setupSparkCollabAgents,
+  runSparkCollabTask,
   createSession,
   sendEvent,
   getSession,
@@ -34,12 +34,12 @@ const router = Router();
 let agentConfig = null;
 
 /**
- * POST /api/agents/setup — Sätt upp alla Partnrr-agenter i Anthropic molnet
+ * POST /api/agents/setup — Sätt upp alla SparkCollab-agenter i Anthropic molnet
  */
 router.post('/setup', async (req, res) => {
   try {
     console.log('[Agents] Sätter upp Managed Agents...');
-    const config = await setupPartnrrAgents();
+    const config = await setupSparkCollabAgents();
     agentConfig = config;
 
     // Spara i DB
@@ -112,7 +112,7 @@ router.post('/run/:task', async (req, res) => {
     }
 
     console.log(`[Agents] Kör task: ${task}`);
-    const result = await runPartnrrTask(
+    const result = await runSparkCollabTask(
       task,
       agentInfo.id,
       agentConfig.environment.id,

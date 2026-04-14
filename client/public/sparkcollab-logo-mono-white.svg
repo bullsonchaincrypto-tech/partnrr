@@ -1,0 +1,14 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 420 100" role="img" aria-label="SparkCollab logo — monochrome white">
+  <title>SparkCollab — Concept A monochrome (white, for dark backgrounds)</title>
+  <g transform="translate(10,18)">
+    <path d="M 32 32 C 16 8, -8 8, -8 32 C -8 56, 16 56, 32 32"
+          fill="none" stroke="#FFFFFF" stroke-width="8" stroke-linecap="round"/>
+    <path d="M 32 32 C 48 8, 72 8, 72 32 C 72 56, 48 56, 32 32"
+          fill="none" stroke="#FFFFFF" stroke-width="8" stroke-linecap="round"/>
+    <path d="M 32 22 L 36 32 L 32 42 L 28 32 Z" fill="#FFFFFF"/>
+    <path d="M 22 32 L 32 29 L 42 32 L 32 35 Z" fill="#FFFFFF"/>
+  </g>
+  <g transform="translate(110, 0)" font-family="'Space Grotesk', 'Inter', system-ui, sans-serif" fill="#FFFFFF">
+    <text x="0" y="60" font-size="42" font-weight="700" letter-spacing="-1.2">Spark<tspan font-weight="500">Collab</tspan></text>
+  </g>
+</svg>

@@ -38,7 +38,7 @@ async function fetchHtml(url, timeoutMs = 8000) {
     const res = await fetch(url, {
       signal: controller.signal,
       headers: {
-        'User-Agent': 'Mozilla/5.0 (compatible; Partnrr/1.0; +https://rankleague.com)',
+        'User-Agent': 'Mozilla/5.0 (compatible; SparkCollab/1.0; +https://rankleague.com)',
         'Accept': 'text/html,application/xhtml+xml',
         'Accept-Language': 'sv,en;q=0.9',
       },

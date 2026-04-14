@@ -225,13 +225,13 @@ export async function runAgentTask({ agentId, environmentId, title, message, tim
 }
 
 // ============================================================
-// PARTNRR-SPECIFIKA AGENTER (setup)
+// SPARKCOLLAB-SPECIFIKA AGENTER (setup)
 // ============================================================
 
-const PARTNRR_AGENTS = {
+const SPARKCOLLAB_AGENTS = {
   'auto-followup': {
-    name: 'Partnrr Auto-Followup',
-    system: `Du är en automationsagent för Partnrr Outreach CRM. Din uppgift är att hitta outreach-meddelanden som inte fått svar inom 5 dagar och generera personliga uppföljningar.
+    name: 'SparkCollab Auto-Followup',
+    system: `Du är en automationsagent för SparkCollab Outreach CRM. Din uppgift är att hitta outreach-meddelanden som inte fått svar inom 5 dagar och generera personliga uppföljningar.
 
 REGLER:
 - Max 1 uppföljning per outreach
@@ -246,8 +246,8 @@ Använd bash + curl för att anropa API:t.`,
   },
 
   'content-monitor': {
-    name: 'Partnrr Content Monitor',
-    system: `Du är en content-övervakningsagent för Partnrr. Du skannar YouTube-kanaler för influencers med aktiva avtal och analyserar publicerat content.
+    name: 'SparkCollab Content Monitor',
+    system: `Du är en content-övervakningsagent för SparkCollab. Du skannar YouTube-kanaler för influencers med aktiva avtal och analyserar publicerat content.
 
 UPPGIFT:
 1. Anropa POST http://localhost:3001/api/content/scan för att trigga scanning
@@ -260,8 +260,8 @@ Svara ALLTID med JSON-format.`,
   },
 
   'contract-monitor': {
-    name: 'Partnrr Contract Monitor',
-    system: `Du är en avtalsövervakningsagent för Partnrr. Du hittar kontrakt som löper ut snart, redan utgångna, och osignerade.
+    name: 'SparkCollab Contract Monitor',
+    system: `Du är en avtalsövervakningsagent för SparkCollab. Du hittar kontrakt som löper ut snart, redan utgångna, och osignerade.
 
 UPPGIFT:
 1. Anropa GET http://localhost:3001/api/contracts/reminders/due
@@ -274,8 +274,8 @@ Backend: http://localhost:3001`,
   },
 
   'gmail-inbox-monitor': {
-    name: 'Partnrr Gmail Monitor',
-    system: `Du är en inbox-övervakningsagent för Partnrr. Du kollar Gmail för svar på outreach-meddelanden.
+    name: 'SparkCollab Gmail Monitor',
+    system: `Du är en inbox-övervakningsagent för SparkCollab. Du kollar Gmail för svar på outreach-meddelanden.
 
 UPPGIFT:
 1. Kolla Gmail-status via GET http://localhost:3001/api/auth/google/status
@@ -289,8 +289,8 @@ Backend: http://localhost:3001`,
   },
 
   'smart-email-finder': {
-    name: 'Partnrr Email Finder',
-    system: `Du är en e-postsökningsagent för Partnrr. Du söker aktivt efter kontaktinfo för influencers som saknar e-postadress.
+    name: 'SparkCollab Email Finder',
+    system: `Du är en e-postsökningsagent för SparkCollab. Du söker aktivt efter kontaktinfo för influencers som saknar e-postadress.
 
 UPPGIFT:
 1. Hämta influencers utan e-post via GET http://localhost:3001/api/email-finder/missing
@@ -306,19 +306,19 @@ Backend: http://localhost:3001`,
 };
 
 /**
- * Sätt upp alla Partnrr-agenter och en delad environment
+ * Sätt upp alla SparkCollab-agenter och en delad environment
  * Returnerar { agents: {}, environment: {} }
  */
-export async function setupPartnrrAgents() {
-  console.log('[ManagedAgent] Sätter upp Partnrr-agenter...');
+export async function setupSparkCollabAgents() {
+  console.log('[ManagedAgent] Sätter upp SparkCollab-agenter...');
 
   // Skapa environment
-  const environment = await createEnvironment({ name: 'partnrr-automation' });
+  const environment = await createEnvironment({ name: 'sparkcollab-automation' });
   console.log(`[ManagedAgent] Environment skapad: ${environment.id}`);
 
   // Skapa alla agenter
   const agents = {};
-  for (const [key, config] of Object.entries(PARTNRR_AGENTS)) {
+  for (const [key, config] of Object.entries(SPARKCOLLAB_AGENTS)) {
     const agent = await createAgent(config);
     agents[key] = { id: agent.id, version: agent.version };
     console.log(`[ManagedAgent] Agent "${key}" skapad: ${agent.id}`);
@@ -328,9 +328,9 @@ export async function setupPartnrrAgents() {
 }
 
 /**
- * Kör en specifik Partnrr-automation
+ * Kör en specifik SparkCollab-automation
  */
-export async function runPartnrrTask(taskKey, agentId, environmentId, customMessage = null) {
+export async function runSparkCollabTask(taskKey, agentId, environmentId, customMessage = null) {
   const defaults = {
     'auto-followup': 'Kör auto-uppföljning: hitta alla outreach utan svar efter 5 dagar, generera och logga uppföljningar. Returnera JSON-rapport.',
     'content-monitor': 'Kör content-scan: skanna YouTube-kanaler, analysera CTA-kvalitet, flagga försenade. Returnera JSON-rapport.',
@@ -344,7 +344,7 @@ export async function runPartnrrTask(taskKey, agentId, environmentId, customMess
   return runAgentTask({
     agentId,
     environmentId,
-    title: `Partnrr ${taskKey} — ${new Date().toISOString()}`,
+    title: `SparkCollab ${taskKey} — ${new Date().toISOString()}`,
     message,
   });
 }

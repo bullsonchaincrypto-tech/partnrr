@@ -138,7 +138,7 @@ export async function generateDailySummary() {
  */
 function formatSummaryEmail(summary) {
   const lines = [];
-  lines.push(`Partnrr — Daglig sammanfattning (${summary.date})`);
+  lines.push(`SparkCollab — Daglig sammanfattning (${summary.date})`);
   lines.push('');
   lines.push(`📊 Nyckeltal`);
   lines.push(`   Skickade: ${summary.stats.totalSent} · Svar: ${summary.stats.totalReplied} (${summary.stats.responseRate}%) · Avtal: ${summary.stats.totalContracts}`);
@@ -166,7 +166,7 @@ function formatSummaryEmail(summary) {
   lines.push(`Väntar på svar: ${summary.stats.awaitingReply} utskick`);
   lines.push('');
   lines.push('—');
-  lines.push('Öppna Partnrr för att se detaljer och agera.');
+  lines.push('Öppna SparkCollab för att se detaljer och agera.');
 
   return lines.join('\n');
 }
@@ -180,8 +180,8 @@ export async function sendDailySummary(recipientEmail) {
   const summary = generateDailySummary();
   const body = formatSummaryEmail(summary);
   const subject = summary.actionItems.length > 0
-    ? `Partnrr: ${summary.actionItems.length} saker kräver uppmärksamhet`
-    : `Partnrr: Daglig sammanfattning (${summary.date})`;
+    ? `SparkCollab: ${summary.actionItems.length} saker kräver uppmärksamhet`
+    : `SparkCollab: Daglig sammanfattning (${summary.date})`;
 
   await sendEmail({ to: recipientEmail, subject, body });
 

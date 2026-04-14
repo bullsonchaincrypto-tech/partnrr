@@ -40,12 +40,12 @@ import { startScheduler as startFollowupScheduler, getSettings as getFollowupSet
 const app = express();
 const PORT = process.env.PORT || 3001;
 
-// Allowed origins: env + sparkcollab.se + partnrr.vercel.app
+// Allowed origins: env + sparkcollab.se + sparkcollab.vercel.app
 const allowedOrigins = new Set([
   'http://localhost:5173',
   'https://sparkcollab.se',
   'https://www.sparkcollab.se',
-  'https://partnrr.vercel.app',
+  'https://sparkcollab.vercel.app',
   ...(process.env.CLIENT_URL ? process.env.CLIENT_URL.split(',').map(s => s.trim()) : []),
 ]);
 

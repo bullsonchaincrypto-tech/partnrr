@@ -1,0 +1,19 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 420 100" role="img" aria-label="SparkCollab logo — Concept A, Spark Loop">
+  <title>SparkCollab — Concept A: Spark Loop</title>
+  <!-- Symbol: two interlocking loops forming an infinity / collaboration mark, with a spark at the crossing point -->
+  <g transform="translate(10,18)">
+    <!-- Left lobe: amber -->
+    <path d="M 32 32 C 16 8, -8 8, -8 32 C -8 56, 16 56, 32 32"
+          fill="none" stroke="#F97316" stroke-width="8" stroke-linecap="round"/>
+    <!-- Right lobe: indigo -->
+    <path d="M 32 32 C 48 8, 72 8, 72 32 C 72 56, 48 56, 32 32"
+          fill="none" stroke="#4F46E5" stroke-width="8" stroke-linecap="round"/>
+    <!-- Spark at crossing: a soft 4-wedge accent, desaturated diamond -->
+    <path d="M 32 22 L 36 32 L 32 42 L 28 32 Z" fill="#0F172A"/>
+    <path d="M 22 32 L 32 29 L 42 32 L 32 35 Z" fill="#0F172A" opacity="0.85"/>
+  </g>
+  <!-- Wordmark -->
+  <g transform="translate(110, 0)" font-family="'Space Grotesk', 'Inter', system-ui, sans-serif" fill="#0F172A">
+    <text x="0" y="60" font-size="42" font-weight="700" letter-spacing="-1.2">Spark<tspan font-weight="500" fill="#4F46E5">Collab</tspan></text>
+  </g>
+</svg>

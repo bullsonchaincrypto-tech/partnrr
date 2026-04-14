@@ -11,9 +11,9 @@ export async function searchAllPlatforms(searchQueries, options = {}) {
   const allInfluencers = [];
 
   // --- YouTube (verifierad API-data) ---
-  console.log('[Partnrr] Söker YouTube-kanaler...');
+  console.log('[SparkCollab] Söker YouTube-kanaler...');
   const youtubeChannels = await searchYouTubeChannels(searchQueries, 50);
-  console.log(`[Partnrr] ${youtubeChannels.length} YouTube-kanaler hittade`);
+  console.log(`[SparkCollab] ${youtubeChannels.length} YouTube-kanaler hittade`);
 
   // Extrahera cross-platform-länkar från YouTube-beskrivningar
   for (const ch of youtubeChannels) {

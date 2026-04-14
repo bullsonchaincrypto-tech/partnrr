@@ -177,8 +177,8 @@ router.get('/send-test', async (req, res) => {
     const to = req.query.to || 'jimmymunter@hotmail.com';
     const result = await sendEmail({
       to,
-      subject: `Partnrr testmail — ${new Date().toLocaleTimeString('sv-SE')}`,
-      body: `Detta är ett testmeddelande från Partnrr.\n\nTid: ${new Date().toISOString()}\n\nOm du ser detta mail fungerar e-postleveransen korrekt.`,
+      subject: `SparkCollab testmail — ${new Date().toLocaleTimeString('sv-SE')}`,
+      body: `Detta är ett testmeddelande från SparkCollab.\n\nTid: ${new Date().toISOString()}\n\nOm du ser detta mail fungerar e-postleveransen korrekt.`,
     });
     res.json({ ok: true, message: `Testmail skickat till ${to}`, result });
   } catch (err) {

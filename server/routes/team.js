@@ -87,8 +87,8 @@ router.post('/invite', async (req, res) => {
       const { sendEmail } = await import('../services/email-service.js');
       await sendEmail({
         to: epost,
-        subject: `Du har bjudits in till Partnrr-teamet`,
-        body: `Hej ${namn}!\n\nDu har bjudits in att använda Partnrr (outreach-verktyg för influencer-marknadsföring).\n\nDin roll: ${ROLES[validRoll]?.label || validRoll}\n\nLogga in här: ${process.env.CLIENT_URL || 'http://localhost:5173'}\n\nVälkommen!`,
+        subject: `Du har bjudits in till SparkCollab-teamet`,
+        body: `Hej ${namn}!\n\nDu har bjudits in att använda SparkCollab (outreach-verktyg för influencer-marknadsföring).\n\nDin roll: ${ROLES[validRoll]?.label || validRoll}\n\nLogga in här: ${process.env.CLIENT_URL || 'http://localhost:5173'}\n\nVälkommen!`,
       });
     } catch (emailErr) {
       console.log('[Team] Kunde inte skicka inbjudningsmail:', emailErr.message);

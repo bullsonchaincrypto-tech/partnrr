@@ -305,7 +305,7 @@ def generate_pdf(data):
     story.append(Spacer(1, 24))
     story.append(HRFlowable(width="100%", thickness=0.5, color=BORDER_GRAY, spaceBefore=8, spaceAfter=8))
     story.append(Paragraph(
-        f"RankLeague \u2022 rankleague.com \u2022 Genererat {datum_text}",
+        f"Genererat via SparkCollab.se \u2022 {datum_text}",
         ParagraphStyle('Footer', parent=styles['Normal'],
                        fontSize=8, textColor=GRAY_TEXT, alignment=TA_CENTER)
     ))

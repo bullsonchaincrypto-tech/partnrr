@@ -1,0 +1,11 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" role="img" aria-label="SparkCollab app icon 512">
+  <rect width="512" height="512" rx="114" fill="#0F172A"/>
+  <g transform="translate(52, 92)">
+    <path d="M 204 164 C 100 12, -52 12, -52 164 C -52 316, 100 316, 204 164"
+          fill="none" stroke="#F97316" stroke-width="50" stroke-linecap="round"/>
+    <path d="M 204 164 C 308 12, 460 12, 460 164 C 460 316, 308 316, 204 164"
+          fill="none" stroke="#6366F1" stroke-width="50" stroke-linecap="round"/>
+    <path d="M 204 100 L 230 164 L 204 228 L 178 164 Z" fill="#FAFAF7"/>
+    <path d="M 140 164 L 204 148 L 268 164 L 204 180 Z" fill="#FAFAF7" opacity="0.9"/>
+  </g>
+</svg>

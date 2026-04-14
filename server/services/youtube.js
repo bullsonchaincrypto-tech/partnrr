@@ -82,7 +82,7 @@ export async function searchYouTubeChannels(searchQueries, maxResultsPerQuery = 
         const country = (snippet.country || '').toUpperCase();
         const allowedCountries = new Set(['', 'SE']);
         if (!allowedCountries.has(country)) {
-          console.log(`[Partnrr] Filtrerar bort "${snippet.title}" (land: ${country})`);
+          console.log(`[SparkCollab] Filtrerar bort "${snippet.title}" (land: ${country})`);
           continue;
         }
 

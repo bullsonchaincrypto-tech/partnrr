@@ -10,9 +10,9 @@ metadata:
         - SERPAPI_KEY
 ---
 
-# Smart E-postsökning — Partnrr
+# Smart E-postsökning — SparkCollab
 
-Du söker aktivt efter e-postadresser för influencers i Partnrr-databasen som saknar kontaktinfo.
+Du söker aktivt efter e-postadresser för influencers i SparkCollab-databasen som saknar kontaktinfo.
 
 ## NÄR DENNA SKILL KÖRS
 

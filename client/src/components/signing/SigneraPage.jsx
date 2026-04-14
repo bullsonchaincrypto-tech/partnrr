@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react'
 import { FileText, Check, CheckCircle, AlertCircle, Loader2, Download, Shield, Clock, ArrowRight } from 'lucide-react'
 import * as api from '../../services/api'
+import { SparkBurst } from '../common/SparkEffect'
 
 export default function SigneraPage({ token }) {
   const [loading, setLoading] = useState(true)
@@ -76,7 +77,9 @@ export default function SigneraPage({ token }) {
       <div className="min-h-screen bg-gray-950 flex items-center justify-center px-4">
         <div className="max-w-md w-full bg-gray-900 border border-green-500/30 rounded-2xl p-8 text-center">
           <div className="w-16 h-16 rounded-full bg-green-500/20 flex items-center justify-center mx-auto mb-4">
-            <CheckCircle className="w-10 h-10 text-green-400" />
+            <SparkBurst active={true}>
+              <CheckCircle className="w-10 h-10 text-green-400" />
+            </SparkBurst>
           </div>
           <h1 className="text-2xl font-bold text-white mb-2">Avtalet är signerat!</h1>
           <p className="text-gray-400 text-sm mb-6">

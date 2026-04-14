@@ -1,12 +1,14 @@
 import { useState, useEffect } from 'react'
 import { Send, Loader2, CheckCircle, XCircle, Mail, ExternalLink, AlertTriangle, ArrowLeft } from 'lucide-react'
 import * as api from '../../services/api'
+import { SparkToast } from '../common/SparkEffect'
 
 export default function Step7Send({ foretag, outreachType, messages, attachContracts, kontaktperson, kontraktBrief, sendResults, setSendResults, prev, onNavigate }) {
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
   const [authStatus, setAuthStatus] = useState(null)
   const [showConfirm, setShowConfirm] = useState(false)
+  const [sparkActive, setSparkActive] = useState(false)
 
   const isSponsor = outreachType === 'sponsor'
 
@@ -55,6 +57,8 @@ export default function Step7Send({ foretag, outreachType, messages, attachContr
         })
         setSendResults(results)
       }
+      // Spark-animation vid lyckad skickning
+      setSparkActive(true)
     } catch (err) {
       setError(err.message)
     } finally {
@@ -65,8 +69,17 @@ export default function Step7Send({ foretag, outreachType, messages, attachContr
   const sentCount = sendResults?.filter((r) => r.status === 'skickat').length || 0
   const failedCount = sendResults?.filter((r) => r.status === 'misslyckat').length || 0
 
+  const sparkMessage = sentCount > 0
+    ? `${sentCount} ${sentCount === 1 ? 'utskick skickat' : 'utskick skickade'} — Spark sent!`
+    : 'Spark sent!'
+
   return (
     <div>
+      <SparkToast
+        active={sparkActive && sentCount > 0}
+        message={sparkMessage}
+        onDone={() => setSparkActive(false)}
+      />
       <div className="flex items-center gap-3 mb-6">
         <Send className={`w-6 h-6 ${isSponsor ? 'text-blue-500' : 'text-purple-500'}`} />
         <h2 className="text-xl font-bold">Steg 6: Skicka</h2>

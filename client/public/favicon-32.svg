@@ -1,0 +1,6 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32" role="img" aria-label="SparkCollab favicon 32">
+  <rect width="32" height="32" rx="6" fill="#0F172A"/>
+  <path d="M 16 16 C 12 8, 4 8, 4 16 C 4 24, 12 24, 16 16" fill="none" stroke="#F97316" stroke-width="3.2" stroke-linecap="round"/>
+  <path d="M 16 16 C 20 8, 28 8, 28 16 C 28 24, 20 24, 16 16" fill="none" stroke="#6366F1" stroke-width="3.2" stroke-linecap="round"/>
+  <path d="M 16 12 L 18 16 L 16 20 L 14 16 Z" fill="#FAFAF7"/>
+</svg>

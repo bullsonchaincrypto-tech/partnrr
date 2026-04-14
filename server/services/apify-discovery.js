@@ -51,19 +51,72 @@ function isBusinessAccount(username, fullName) {
   const u = (username || '').toLowerCase();
   const n = (fullName || '').toLowerCase();
 
-  // Domän-suffix i användarnamn (miniprojektor.se, some.com)
-  if (/\.(se|com|nu|net|shop|store|io)$/i.test(u)) return true;
+  // Domän-suffix i användarnamn (miniprojektor.se, some.com, .com.pe etc.)
+  if (/\.(se|com|nu|net|shop|store|io)(\.\w{2,3})?$/i.test(u)) return true;
 
   // Vanliga företagssuffix i användarnamn
-  if (/_?(shop|butik|store|ab|sverige|sweden|official)$/i.test(u)) return true;
+  if (/_?(shop|butik|store|ab|sverige|sweden|official|solution|solutions)$/i.test(u)) return true;
+
+  // Sverige-/sweden-suffix (oavsett position) tyder på företag
+  // T.ex. smartai.sverige, vvsmiljotekniksverige, smartshopsverige
+  if (/\.sverige$|\.sweden$/i.test(u)) return true;
+  if (/(shop|butik|store)sverige|sverige(shop|butik|store)/i.test(u)) return true;
+
+  // Företagsverksamhets-ord i användarnamn (svensktekniker, svensktadteknik etc.)
+  // "tekniker" / "teknik" som suffix utan personnamn → företag
+  if (/^(svensk|svenska|svenske)(tekniker|stadteknik|stadteknik|pyroteknik|miljoteknik)/i.test(u)) return true;
+  if (/(tekniker|miljoteknik|miljöteknik|stadteknik|städteknik|pyroteknik)$/i.test(u)) return true;
+
+  // "tekniksolution(s)", "teknikservice" — företag
+  if (/(teknik|tjanst|tjänst)(s|service|solution|solutions|akut|ab)$/i.test(u)) return true;
+
+  // College, skola, utbildning
+  if (/(college|gymnasium|skola|utbildning|university|hogskola|högskola)/i.test(u)) return true;
+
+  // Generella företags-/e-handels-ord
+  if (/(reserv|reservdelar|begagnat|outlet|sale)/i.test(u)) return true;
 
   // Full name innehåller "AB" som eget ord eller företagsindikatorer
   if (/\b(ab|aktiebolag)\b/i.test(n)) return true;
-  if (/\b(butik|shop|store|återförsäljare|kedja)\b/i.test(n)) return true;
-  if (/\b(vitvaror|elektronik|tjänst|tjanst)\b/i.test(n)) return true;
+  if (/\b(butik|shop|store|återförsäljare|aterforsaljare|kedja|firma|företag|foretag)\b/i.test(n)) return true;
+  if (/\b(vitvaror|elektronik|tjänst|tjanst|service|installation)\b/i.test(n)) return true;
+  if (/\b(college|gymnasium|skola|utbildning)\b/i.test(n)) return true;
 
   // Användarnamn som innehåller brand-mönster
-  if (/_?(elon|power|mediamarkt|netonnet)/.test(u)) return true;
+  if (/_?(elon|power|mediamarkt|netonnet|matsmart|capellmobler)/.test(u)) return true;
+
+  return false;
+}
+
+/**
+ * Försöker avgöra om ett konto är internationellt (inte svenskt).
+ * Vi vill bara ha svenska creators så icke-svenska filtreras bort.
+ */
+function isInternationalAccount(username, fullName, bio) {
+  const u = (username || '').toLowerCase();
+  const n = (fullName || '').toLowerCase();
+  const b = (bio || '').toLowerCase();
+
+  // TLD-suffix i användarnamn som indikerar utländskt land
+  // .sv = El Salvador, .pe = Peru, .mx = Mexico, .br = Brasilien, .ar = Argentina
+  if (/\.(sv|pe|mx|br|ar|cl|co|us|uk|de|fr|es|it|pt|ru|tr|in|pk|bd|ph|id)(\.\w{2,3})?$/i.test(u)) return true;
+  if (/\.com\.(sv|pe|mx|br|ar|cl|co|tr|in|ph|id)$/i.test(u)) return true;
+
+  // Bio innehåller landskoder/flaggor som inte är svenska
+  // 🇪🇸 🇲🇽 🇵🇪 🇸🇻 🇮🇳 etc.
+  if (/[🇪🇲🇵🇸🇮🇧🇦🇨🇰🇹🇷]🇸/.test(b)) {
+    // Innehåller en utländsk flagga — kolla om det INTE är svensk flagga (🇸🇪)
+    if (!b.includes('🇸🇪')) return true;
+  }
+
+  // Vanliga utländska språk-indikatorer i bio
+  // Spanska: "hola", "venta", "tienda", "envío"
+  // Engelska bio är OK (många svenskar skriver på engelska)
+  if (/\b(hola|venta|tienda|envío|envios|gratis a domicilio)\b/i.test(b)) return true;
+  // Arabiska/persiska tecken
+  if (/[\u0600-\u06FF\u0750-\u077F]/.test(b) || /[\u0600-\u06FF\u0750-\u077F]/.test(n)) return true;
+  // Azerbajdzjanska/turkiska specifika tecken kombinerat med icke-svensk text
+  if (/(ağıllı|gözəl|ev sistemləri)/i.test(b) || /(ağıllı|gözəl|ev sistemləri)/i.test(n)) return true;
 
   return false;
 }
@@ -190,6 +243,7 @@ export async function discoverInstagramViaSearch(searchTerms, timeoutSecs = 120,
   // Filtrera bort företagskonton och extrahera creators
   let skippedPrivate = 0;
   let skippedBusiness = 0;
+  let skippedInternational = 0;
 
   const creatorMap = new Map();
 
@@ -203,6 +257,13 @@ export async function discoverInstagramViaSearch(searchTerms, timeoutSecs = 120,
     // Privata profiler kan vi inte kontakta — skippa
     if (profile.private === true) {
       skippedPrivate++;
+      continue;
+    }
+
+    // Internationell-filter (skippas vid sponsor-sökning där vi inte bryr oss)
+    if (!includeBusinesses && isInternationalAccount(username, fullName, bio)) {
+      skippedInternational++;
+      console.log(`[ApifyDiscovery] IG skip international: @${username} (${fullName})`);
       continue;
     }
 
@@ -257,7 +318,7 @@ export async function discoverInstagramViaSearch(searchTerms, timeoutSecs = 120,
     return (b.posts_count || 0) - (a.posts_count || 0);
   });
 
-  console.log(`[ApifyDiscovery] Instagram: ${items.length} profiler → ${creators.length} unika creators (skippat: ${skippedPrivate} privata, ${skippedBusiness} företag)`);
+  console.log(`[ApifyDiscovery] Instagram: ${items.length} profiler → ${creators.length} unika creators (skippat: ${skippedPrivate} privata, ${skippedBusiness} företag, ${skippedInternational} internationella)`);
   return creators.slice(0, MAX_CREATORS_PER_PLATFORM);
 }
 
@@ -303,6 +364,7 @@ export async function discoverTikTokViaSearch(searchTerms, timeoutSecs = 120, op
   // User-search returnerar profiler (inte videos). Försök extrahera authorMeta
   // eller direkta fält — defensiv extraktion eftersom formatet kan variera.
   let skippedBusiness = 0;
+  let skippedInternational = 0;
   const creatorMap = new Map();
 
   for (const item of items) {
@@ -313,6 +375,14 @@ export async function discoverTikTokViaSearch(searchTerms, timeoutSecs = 120, op
 
     const fullName = author.nickName || author.nickname || author.fullName || '';
     const bio = author.signature || author.bio || author.biography || '';
+    const videoText = item.text || ''; // Video-caption innehåller ofta språk-signaler
+
+    // Internationell-filter — kolla username, fullName och video-text
+    if (isInternationalAccount(username, fullName, bio + ' ' + videoText)) {
+      skippedInternational++;
+      console.log(`[ApifyDiscovery] TT skip international: @${username} (${fullName})`);
+      continue;
+    }
 
     // Företagskonto-filter — skippas helt vid sponsor-sökning (includeBusinesses=true)
     if (!includeBusinesses && isBusinessAccount(username, fullName)) {
@@ -356,7 +426,7 @@ export async function discoverTikTokViaSearch(searchTerms, timeoutSecs = 120, op
     return (b.posts_count || 0) - (a.posts_count || 0);
   });
 
-  console.log(`[ApifyDiscovery] TikTok: ${items.length} profiler → ${creators.length} unika creators (skippat: ${skippedBusiness} företag)`);
+  console.log(`[ApifyDiscovery] TikTok: ${items.length} profiler → ${creators.length} unika creators (skippat: ${skippedBusiness} företag, ${skippedInternational} internationella)`);
   return creators.slice(0, MAX_CREATORS_PER_PLATFORM);
 }
 

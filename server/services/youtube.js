@@ -21,9 +21,19 @@ export async function searchYouTubeChannels(searchQueries, maxResultsPerQuery = 
   let totalHits = 0;
   let searchesMade = 0;
 
-  // Steg 1: Sök kanaler med varje sökterm — avbryt när vi nått EARLY_EXIT_AT unika
+  // Steg 1: Sök VIDEOS med varje sökterm (inte channels direkt!)
+  //
+  // Varför video-search istället för channel-search:
+  // - type=channel returnerar bara kanaler vars NAMN/BIO matchar söktermen
+  //   (ger typiskt 1-5 träffar per term)
+  // - type=video returnerar videos vars INNEHÅLL matchar (titel/beskrivning/taggar)
+  //   → vi extraherar channelId från varje video och dedup:ar
+  //   → ger 20-40 unique kanaler per sökterm (samma som YouTube.com web-search)
+  //
+  // Kostnad: exakt samma — 100 units/anrop oavsett type.
+  //
+  // Early-exit: vi räknar UNIKA channelIds, inte videos. Stopp när ≥ EARLY_EXIT_AT.
   for (const query of searchQueries) {
-    // Early-exit: vi har tillräckligt, sluta slösa credits
     if (allChannelIds.size >= EARLY_EXIT_AT) {
       const skipped = searchQueries.length - searchesMade;
       console.log(`[YouTube] Early-exit: ${allChannelIds.size} unika kanaler ≥ ${EARLY_EXIT_AT}, hoppar över ${skipped} återstående sökningar (sparar ${skipped * 100} units)`);
@@ -33,10 +43,7 @@ export async function searchYouTubeChannels(searchQueries, maxResultsPerQuery = 
       const searchRes = await youtube.search.list({
         key: apiKey,
         q: query,
-        type: 'channel',
-        // regionCode + relevanceLanguage → prioriterar svenskt innehåll
-        // regionCode=SE filtrerar inte bort kanaler utan land-metadata, men
-        // påverkar rankningen så svenska kanaler hamnar högst
+        type: 'video',              // ← video-search (var 'channel')
         regionCode: 'SE',
         relevanceLanguage: 'sv',
         maxResults: maxResultsPerQuery,
@@ -49,13 +56,15 @@ export async function searchYouTubeChannels(searchQueries, maxResultsPerQuery = 
       const items = searchRes.data.items || [];
       const beforeSize = allChannelIds.size;
       for (const item of items) {
-        if (item.id?.channelId) {
-          allChannelIds.add(item.id.channelId);
+        // För type=video ligger channelId i snippet.channelId (inte id.channelId)
+        const channelId = item.snippet?.channelId;
+        if (channelId) {
+          allChannelIds.add(channelId);
         }
       }
       const newUnique = allChannelIds.size - beforeSize;
       totalHits += items.length;
-      console.log(`[YouTube] "${query}" → ${items.length} träffar, ${newUnique} nya unika (totalt: ${allChannelIds.size})`);
+      console.log(`[YouTube] "${query}" → ${items.length} videos, ${newUnique} nya unika kanaler (totalt: ${allChannelIds.size})`);
     } catch (err) {
       searchesMade++;
       console.error(`YouTube search error for "${query}":`, err.message);

@@ -125,7 +125,7 @@ export async function enrichSingleProfile(handle, platform) {
  * Hämta Instagram-profiler via Apify actor i batches
  * @param {string[]} usernames - Lista med Instagram-handles (utan @)
  */
-async function enrichInstagramProfiles(usernames) {
+export async function enrichInstagramProfiles(usernames) {
   if (!usernames.length) return [];
 
   console.log(`[Enrichment] Hämtar ${usernames.length} Instagram-profiler via Apify (i batches om 5)...`);

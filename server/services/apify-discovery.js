@@ -1,6 +1,6 @@
 import fetch from 'node-fetch';
 import { trackApiCost } from './cost-tracker.js';
-import { enrichTikTokProfiles } from './social-enrichment.js';
+import { enrichTikTokProfiles, enrichInstagramProfiles } from './social-enrichment.js';
 
 /**
  * Apify Discovery Service — Steg 2 i influencer-pipeline
@@ -22,9 +22,11 @@ import { enrichTikTokProfiles } from './social-enrichment.js';
 const APIFY_BASE = 'https://api.apify.com/v2';
 
 const DISCOVERY_ACTORS = {
-  // Instagram: bytt från hashtag-scraper till search-scraper (user mode)
-  // Search-scraper hittar PROFILER direkt istället för posts per hashtag
-  instagram: 'apify/instagram-search-scraper',
+  // Instagram: använder Reels-search-scraper (söker faktiska Reels-videos)
+  // istället för instagram-search-scraper (som googlar profiler).
+  // Reels-search hittar CREATORS som faktiskt postar content,
+  // istället för företag med bra Google SEO.
+  instagram: 'patient_discovery/instagram-search-reels',
   tiktok: 'clockworks/tiktok-scraper',
 };
 
@@ -184,7 +186,7 @@ export async function discoverInfluencers(queries, platforms = ['instagram', 'ti
 
   if (platforms.includes('instagram') && igSearchTerms.length) {
     promises.push(
-      discoverInstagramViaSearch(igSearchTerms, timeoutSecs)
+      discoverInstagramViaReels(igSearchTerms, timeoutSecs)
         .then(creators => { results.instagram = creators; })
         .catch(err => {
           console.error('[ApifyDiscovery] Instagram discovery fel:', err.message);
@@ -209,8 +211,162 @@ export async function discoverInfluencers(queries, platforms = ['instagram', 'ti
 }
 
 // ============================================================
+// INSTAGRAM DISCOVERY — patient_discovery/instagram-search-reels (PRIMÄR)
+// ============================================================
+// Söker faktiska Instagram Reels-videos per sökterm → hittar CREATORS
+// som faktiskt postar content (inte företag med bra Google SEO).
+// Returnerar reels med user-info; vi dedup:ar per username och berikar
+// top 15 med apify/instagram-profile-scraper för followers + bio.
+//
+// Pricing: $2.50/1000 reels × ~10 reels/term × 5 termer = ~$0.13 + enrichment
+//
+// Actor input per run: { query: string, maxPages: 1 } — endast 1 query/run,
+// så vi kör 5 runs parallellt.
+
+export async function discoverInstagramViaReels(searchTerms, timeoutSecs = 120) {
+  const terms = searchTerms.slice(0, 5);
+  if (!terms.length) {
+    console.log('[ApifyDiscovery] Instagram-Reels: inga söktermer');
+    return [];
+  }
+
+  console.log(`[ApifyDiscovery] Instagram-Reels: söker ${terms.length} termer parallellt: ${terms.join(' | ')}`);
+
+  // Kör en run per sökterm parallellt (actor accepterar bara 1 query/run)
+  const runs = terms.map(query =>
+    runApifyActor(
+      DISCOVERY_ACTORS.instagram,
+      { query, maxPages: 1 },
+      timeoutSecs
+    ).catch(err => {
+      console.warn(`[ApifyDiscovery] Reels-search "${query}" misslyckades: ${err.message}`);
+      return [];
+    })
+  );
+
+  const allReelsArrays = await Promise.all(runs);
+  const allReels = allReelsArrays.flat();
+
+  if (!allReels.length) {
+    console.log('[ApifyDiscovery] Instagram-Reels: 0 reels totalt');
+    return [];
+  }
+
+  console.log(`[ApifyDiscovery] Instagram-Reels: ${allReels.length} reels totalt över ${terms.length} sökningar`);
+
+  // Dedup:a per username — en creator kan ha flera reels i resultaten
+  // Behåll bästa engagement per creator
+  let skippedBusiness = 0;
+  let skippedInternational = 0;
+  const userMap = new Map();
+
+  for (const reel of allReels) {
+    const user = reel.user || {};
+    const username = user.username || '';
+    if (!username) continue;
+
+    const fullName = user.full_name || '';
+    const playCount = reel.ig_play_count || 0;
+    const likeCount = reel.like_count || 0;
+    const commentCount = reel.comment_count || 0;
+    const shareCount = reel.share_count || 0;
+    const captionText = reel.caption?.text || '';
+    // Engagement-score: likes + comments*5 + shares*10 (shares vägs tyngst, signalerar verkligt värde)
+    const engagementScore = likeCount + (commentCount * 5) + (shareCount * 10);
+
+    // Internationell-filter
+    if (isInternationalAccount(username, fullName, captionText)) {
+      skippedInternational++;
+      continue;
+    }
+
+    // Företagskonto-filter
+    if (isBusinessAccount(username, fullName)) {
+      skippedBusiness++;
+      continue;
+    }
+
+    const key = username.toLowerCase();
+    const existing = userMap.get(key);
+    if (existing) {
+      // Uppdatera om denna reel har bättre engagement
+      existing.engagement_score += engagementScore;
+      existing.reels_found++;
+      if (playCount > existing.video_plays) existing.video_plays = playCount;
+    } else {
+      userMap.set(key, {
+        handle: sanitizeString(username),
+        platform: 'instagram',
+        full_name: sanitizeString(fullName),
+        bio: '', // Fylls i av enrichment nedan
+        followers: null, // Fylls i av enrichment nedan
+        is_verified: user.is_verified === true,
+        avatar_url: user.profile_pic_url || null,
+        profile_url: `https://www.instagram.com/${username}/`,
+        reels_found: 1,
+        engagement_score: engagementScore,
+        video_plays: playCount,
+        search_term: reel.searchQuery || reel.query || null,
+        datakalla: 'apify_ig_reels',
+        verifierad: false, // Markeras true efter enrichment
+      });
+    }
+  }
+
+  // Sortera per engagement (totalt över alla matchade reels)
+  const sorted = Array.from(userMap.values())
+    .sort((a, b) => b.engagement_score - a.engagement_score);
+
+  console.log(`[ApifyDiscovery] Instagram-Reels: ${allReels.length} reels → ${sorted.length} unika creators (skippat: ${skippedBusiness} företag, ${skippedInternational} internationella)`);
+
+  // Begränsa till MAX_CREATORS_PER_PLATFORM (15) FÖRE enrichment för att hålla kostnaden nere
+  const top = sorted.slice(0, MAX_CREATORS_PER_PLATFORM);
+
+  if (top.length === 0) return top;
+
+  // Berika med apify/instagram-profile-scraper för followers + bio
+  try {
+    console.log(`[ApifyDiscovery] Instagram-Reels: berikar ${top.length} creators med profile-scraper...`);
+    const enriched = await enrichInstagramProfiles(top.map(c => c.handle));
+
+    const enrichedMap = new Map();
+    for (const p of enriched) {
+      const h = (p.username || '').toLowerCase();
+      if (h) enrichedMap.set(h, p);
+    }
+
+    let enrichedCount = 0;
+    for (const c of top) {
+      const match = enrichedMap.get(c.handle.toLowerCase());
+      if (match) {
+        enrichedCount++;
+        c.full_name = c.full_name || sanitizeString(match.full_name || '');
+        c.bio = sanitizeString((match.bio || '').slice(0, 300));
+        c.followers = match.followers ?? c.followers;
+        c.follows = match.following ?? null;
+        c.posts_count = match.posts_count ?? null;
+        c.is_verified = match.is_verified === true || c.is_verified;
+        c.is_business = match.is_business === true;
+        c.business_category = match.category || null;
+        c.external_url = match.website || null;
+        c.engagement_rate = match.engagement_rate || null;
+        c.verifierad = true; // Nu har vi full profildata → skippa Profile Scraper i Steg 5
+      }
+    }
+    console.log(`[ApifyDiscovery] Instagram-Reels: ${enrichedCount}/${top.length} berikade`);
+  } catch (err) {
+    console.warn(`[ApifyDiscovery] Instagram-Reels enrichment misslyckades (fortsätter utan): ${err.message}`);
+  }
+
+  return top;
+}
+
+// ============================================================
 // INSTAGRAM DISCOVERY — apify/instagram-search-scraper (user mode)
 // ============================================================
+// LEGACY (pausad i influencer-flödet) — fortfarande använd i sponsor-flödet
+// där vi vill hitta företag, inte creators.
+//
 // Söker Instagram-profiler DIREKT via sökord (inte posts via hashtags).
 // Varje resultat är en riktig profil med followers, bio, verified-status.
 // Pricing: $1.50/1000 → 25 results = ~$0.04 per körning.

@@ -473,22 +473,25 @@ Beskrivning: ${beskrivning}
 
 Generera exakt 10 UNIKA och VARIERADE hashtags som SVENSKA influencers inom denna bransch FAKTISKT använder på Instagram och TikTok.
 
-REGLER:
-- ALLA hashtags ska vara på SVENSKA — vi söker efter SVENSKA influencers
-- Hashtagsen ska vara POPULÄRA nog att ge resultat (inte hyper-nischade)
-- Fokusera på hashtags som SVENSKA KREATÖRER/INFLUENCERS faktiskt använder
-- Tänk: vilka hashtags sätter en svensk influencer i denna nisch på sina inlägg?
+KRITISKT VIKTIGT — HASHTAGS SKA HITTA SVENSKA CREATORS:
+- INGA rent engelska ord. "unboxing", "gadgets", "gaming" ger 90% internationellt innehåll
+  ❌ UNDVIK: "unboxing", "gadgets", "gaming", "tech", "review", "lifestyle"
+  ✅ ANVÄND istället: "unboxingsverige", "svensktest", "svenskagamers", "teknikpåsvenska"
+- Hashtags måste antingen:
+  (a) Vara HELT SVENSKA ord (t.ex. "träningsinspo", "hemrenovering", "föräldraskap"), ELLER
+  (b) Ha "sverige"/"sve"/"svensk" suffix/prefix (t.ex. "techtipsverige", "svenskinredning")
+- MINST 7 tecken — korta ord som "tips", "hem", "mat" är för breda
 - VARJE hashtag ska vara TILLRÄCKLIGT ANNORLUNDA för att ge OLIKA creators
-  (inte bara varianter av samma ord, t.ex. "smarthem" och "smarthome" ger samma resultat)
+  (inte bara varianter, t.ex. "smarthem" och "smarthome" ger samma resultat)
 - Blanda breda nisch-hashtags med mer specifika sub-nisch-hashtags
-- INGA generiska hashtags som "sverige" eller "influencer"
+- INGA generiska hashtags som "sverige" eller "influencer" ensamt
 - Returnera UTAN #-tecken
 
-Exempel för ett företag som säljer träningskläder:
-["träning", "träningsinspo", "gymlivet", "hälsoliv", "sportmode", "yogasverige", "löpning", "hemmaträning", "fitnessmotivation", "aktivliv"]
+Exempel för ett företag som säljer träningskläder (alla svenska eller sverige-suffix):
+["träningsinspo", "träningsmotivation", "svenskträning", "hälsoliv", "sportmode", "löpning", "hemmaträning", "gymtips", "yogasverige", "aktivliv"]
 
 Exempel för ett företag som säljer hemelektronik:
-["smartahem", "teknikprylar", "hemelektronik", "tekniktips", "smarthem", "hemautomation", "unboxingsverige", "gadgets", "teknikrecension", "digitalthemma"]
+["smartahem", "teknikprylar", "hemelektronik", "tekniktips", "smarthem", "hemautomation", "unboxingsverige", "teknikpåsvenska", "svensktest", "digitalthemma"]
 
 Svara med ENBART en JSON-array av 10 strängar, ingen annan text.`
       }],
@@ -506,9 +509,21 @@ Svara med ENBART en JSON-array av 10 strängar, ingen annan text.`
     const tags = JSON.parse(jsonMatch[0]);
     if (!Array.isArray(tags)) return [];
 
+    // Lista med vanliga engelska ord som ger internationellt innehåll på TikTok/IG
+    // Om hashtagen är EXAKT ett av dessa ord → filtrera bort
+    const ENGLISH_BLOCKLIST = new Set([
+      'unboxing', 'gadgets', 'gaming', 'tech', 'review', 'reviews', 'lifestyle',
+      'fitness', 'beauty', 'fashion', 'food', 'travel', 'music', 'art',
+      'business', 'marketing', 'finance', 'crypto', 'motivation', 'inspiration',
+      'style', 'design', 'love', 'happy', 'family', 'friends', 'work',
+      'gym', 'yoga', 'run', 'running', 'tips', 'hacks', 'tutorial',
+    ]);
+
     const cleaned = tags
-      .filter(t => typeof t === 'string' && t.length > 2)
+      .filter(t => typeof t === 'string')
       .map(t => t.replace(/^#/, '').trim().toLowerCase())
+      .filter(t => t.length >= 7)                       // Min 7 tecken — utesluter för breda
+      .filter(t => !ENGLISH_BLOCKLIST.has(t))           // Inga rent engelska ord
       .slice(0, 10);
 
     console.log(`[AI-Search] Discovery-hashtags (${cleaned.length}): ${cleaned.join(', ')}`);

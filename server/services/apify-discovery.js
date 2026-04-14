@@ -243,12 +243,24 @@ async function discoverTikTok(hashtags, maxResults, timeoutSecs) {
     const likes = item.diggCount || item.likes || 0;
     return plays > 0 || likes > 0;
   });
-  console.log(`[ApifyDiscovery] TikTok: ${items.length} videos hittade, ${qualityItems.length} med engagement, extraherar creators...`);
+
+  // Språk-prioritet: svenska videos först, sen övriga
+  // Detta säkerställer att svenska creators hamnar överst även om Apify
+  // returnerade massa engelskt innehåll från generella hashtags
+  const swedishItems = qualityItems.filter(item =>
+    (item.textLanguage || '').toLowerCase() === 'sv'
+  );
+  const otherItems = qualityItems.filter(item =>
+    (item.textLanguage || '').toLowerCase() !== 'sv'
+  );
+  const sortedItems = [...swedishItems, ...otherItems];
+
+  console.log(`[ApifyDiscovery] TikTok: ${items.length} videos hittade, ${qualityItems.length} med engagement (${swedishItems.length} svenska, ${otherItems.length} andra språk), extraherar creators...`);
 
   // Extrahera unika creators från kvalitets-videos
   const creatorMap = new Map();
 
-  for (const item of qualityItems) {
+  for (const item of sortedItems) {
     // TikTok scraper returnerar videos med authorMeta
     const author = item.authorMeta || item.author || {};
     const username = author.name || author.uniqueId || author.id || item.authorId || '';
@@ -275,6 +287,7 @@ async function discoverTikTok(hashtags, maxResults, timeoutSecs) {
       is_verified: author.verified || false,
       video_plays: item.playCount || item.plays || 0,
       video_likes: item.diggCount || item.likes || 0,
+      video_language: (item.textLanguage || '').toLowerCase(),
       datakalla: 'apify_tt_discovery',
     });
   }

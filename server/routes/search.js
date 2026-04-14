@@ -116,33 +116,25 @@ router.post('/influencers', async (req, res) => {
     }
 
     if (nonYoutubePlatforms.length > 0 && isApifyDiscoveryConfigured()) {
-      console.log(`[Search] Steg 2: Apify Discovery — IG-search-scraper + TikTok-hashtag-scraper...`);
+      console.log(`[Search] Steg 2: Apify Discovery — IG + TT search-scrapers (user mode)...`);
       try {
-        // Generera TT-hashtags (10 st) och IG-söktermer (5 st) parallellt
-        const wantsIG = nonYoutubePlatforms.includes('instagram');
-        const wantsTT = nonYoutubePlatforms.includes('tiktok');
-
-        const [ttHashtags, igSearchTerms] = await Promise.all([
-          wantsTT
-            ? generateDiscoveryHashtags(foretag.beskrivning || foretag.namn, foretag.namn).catch(err => {
-                console.warn(`[Search] generateDiscoveryHashtags misslyckades: ${err.message}`);
-                return [];
-              })
-            : Promise.resolve([]),
-          wantsIG
-            ? generateInstagramSearchTerms(foretag.beskrivning || foretag.namn, foretag.namn).catch(err => {
-                console.warn(`[Search] generateInstagramSearchTerms misslyckades: ${err.message}`);
-                return [];
-              })
-            : Promise.resolve([]),
-        ]);
+        // Generera 5 svenska söktermer — samma används för både IG och TT
+        // eftersom båda nu använder user-search (sökord → profiler)
+        let searchTerms = [];
+        try {
+          searchTerms = await generateInstagramSearchTerms(
+            foretag.beskrivning || foretag.namn,
+            foretag.namn
+          );
+        } catch (err) {
+          console.warn(`[Search] generateInstagramSearchTerms misslyckades: ${err.message}`);
+        }
 
         // Ingen fallback — vi kör med det Claude ger oss
-        console.log(`[Search] TT hashtags (${ttHashtags.length}): ${ttHashtags.join(', ')}`);
-        console.log(`[Search] IG söktermer (${igSearchTerms.length}): ${igSearchTerms.join(' | ')}`);
+        console.log(`[Search] Discovery-söktermer (${searchTerms.length}): ${searchTerms.join(' | ')}`);
 
         apifyDiscoveryData = await discoverInfluencers(
-          { hashtags: ttHashtags, igSearchTerms },
+          { igSearchTerms: searchTerms, ttSearchTerms: searchTerms },
           nonYoutubePlatforms,
           { timeoutSecs: 120 }
         );
@@ -180,10 +172,14 @@ router.post('/influencers', async (req, res) => {
           prebuiltQueries: aiSearchQueries,
         });
         if (aiInfluencers?.length > 0) {
-          // Bygg lookup för Apify IG search-data (har redan verifierade followers/bio)
+          // Bygg lookups för Apify search-data (har redan verifierade followers/bio)
           const igSearchLookup = new Map();
           for (const c of (apifyDiscoveryData?.instagram || [])) {
             if (c.handle) igSearchLookup.set(c.handle.toLowerCase(), c);
+          }
+          const ttSearchLookup = new Map();
+          for (const c of (apifyDiscoveryData?.tiktok || [])) {
+            if (c.handle) ttSearchLookup.set(c.handle.toLowerCase(), c);
           }
 
           // Normalisera AI-resultat till samma format som pipeline
@@ -191,37 +187,39 @@ router.post('/influencers', async (req, res) => {
             const handle = (inf.kanalnamn || '').replace(/^@+/, '');
             const platform = (inf.plattform || inf.platform || 'instagram').toLowerCase();
 
-            // Om detta är en IG-profil som fanns i search-scraper-resultaten
+            // Om profilen fanns i Apify search-scraper-resultaten
             // → använd den verifierade datan (followers, bio, verified) direkt
-            const igMatch = platform === 'instagram'
-              ? igSearchLookup.get(handle.toLowerCase())
-              : null;
+            let match = null;
+            if (platform === 'instagram') match = igSearchLookup.get(handle.toLowerCase());
+            else if (platform === 'tiktok') match = ttSearchLookup.get(handle.toLowerCase());
+
+            const sourceTag = platform === 'instagram' ? 'apify_ig_search' : 'apify_tt_search';
 
             return {
-              name: igMatch?.full_name || inf.namn || inf.name,
+              name: match?.full_name || inf.namn || inf.name,
               handle,
               platform,
-              followers: igMatch?.followers ?? inf.foljare ?? null,
-              bio: igMatch?.bio || inf.profil_beskrivning || inf.bio || '',
+              followers: match?.followers ?? inf.foljare ?? null,
+              bio: match?.bio || inf.profil_beskrivning || inf.bio || '',
               kontakt_epost: inf.kontakt_epost || null,
               kontakt_info: inf.kontakt_metod || null,
               nisch: inf.nisch || '',
-              datakalla: igMatch ? 'apify_ig_search' : 'apify_discovery_ai',
-              verifierad: !!igMatch,  // IG search-profiler är redan verifierade
+              datakalla: match ? sourceTag : 'apify_discovery_ai',
+              verifierad: !!match,  // Search-profiler är redan verifierade
               ai_score: inf.ai_score || 50,
               ai_motivation: inf.ai_motivation || '',
               engagement_rate: null,
-              avatar_url: igMatch?.avatar_url || null,
-              posts_count: igMatch?.posts_count || null,
-              is_verified: igMatch?.is_verified || false,
-              external_url: igMatch?.external_url || null,
+              avatar_url: match?.avatar_url || null,
+              posts_count: match?.posts_count || null,
+              is_verified: match?.is_verified || false,
+              external_url: match?.external_url || null,
               estimated_price_sek: inf.estimerad_kostnad_sek || null,
             };
           });
           allResults.push(...normalized);
           sources.ai_web_search = normalized.length;
           const verifiedCount = normalized.filter(r => r.verifierad).length;
-          console.log(`[Search] AI-sökning hittade ${normalized.length} profiler (${verifiedCount} redan verifierade via IG search)`);
+          console.log(`[Search] AI-sökning hittade ${normalized.length} profiler (${verifiedCount} redan verifierade via search-scrapers)`);
         }
       } catch (aiErr) {
         console.error(`[Search] AI-sökning misslyckades:`, aiErr.message);

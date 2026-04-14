@@ -84,10 +84,11 @@ function getToken() {
 
 /**
  * Kör Apify discovery för Instagram och TikTok parallellt.
+ * Båda använder nu user-search (sökord → profiler) istället för hashtag-search.
  *
- * @param {object} queries - { hashtags: string[], igSearchTerms: string[] }
- *   - hashtags: för TikTok (clockworks/tiktok-scraper)
+ * @param {object} queries - { igSearchTerms: string[], ttSearchTerms: string[] }
  *   - igSearchTerms: för Instagram (apify/instagram-search-scraper, user mode)
+ *   - ttSearchTerms: för TikTok (clockworks/tiktok-scraper, /user mode)
  * @param {string[]} platforms - ['instagram', 'tiktok']
  * @param {object} options - { timeoutSecs }
  * @returns {{ instagram: object[], tiktok: object[] }}
@@ -98,19 +99,19 @@ export async function discoverInfluencers(queries, platforms = ['instagram', 'ti
     return { instagram: [], tiktok: [] };
   }
 
-  // Backwards-kompatibilitet: om queries är en array → behandla som hashtags (gamla API)
-  let hashtags = [];
+  // Backwards-kompatibilitet: om queries är en array → använd för båda plattformar
   let igSearchTerms = [];
+  let ttSearchTerms = [];
   if (Array.isArray(queries)) {
-    hashtags = queries;
     igSearchTerms = queries;
+    ttSearchTerms = queries;
   } else if (queries && typeof queries === 'object') {
-    hashtags = queries.hashtags || [];
     igSearchTerms = queries.igSearchTerms || queries.searchTerms || [];
+    ttSearchTerms = queries.ttSearchTerms || queries.searchTerms || queries.igSearchTerms || [];
   }
 
-  if (!hashtags.length && !igSearchTerms.length) {
-    console.log('[ApifyDiscovery] Inga hashtags/söktermer att söka');
+  if (!igSearchTerms.length && !ttSearchTerms.length) {
+    console.log('[ApifyDiscovery] Inga söktermer att söka');
     return { instagram: [], tiktok: [] };
   }
 
@@ -118,7 +119,7 @@ export async function discoverInfluencers(queries, platforms = ['instagram', 'ti
 
   console.log(`[ApifyDiscovery] ========================================`);
   console.log(`[ApifyDiscovery] IG söktermer (${igSearchTerms.length}): ${igSearchTerms.join(' | ')}`);
-  console.log(`[ApifyDiscovery] TT hashtags (${hashtags.length}): ${hashtags.join(', ')}`);
+  console.log(`[ApifyDiscovery] TT söktermer (${ttSearchTerms.length}): ${ttSearchTerms.join(' | ')}`);
   console.log(`[ApifyDiscovery] Plattformar: ${platforms.join(', ')}`);
   console.log(`[ApifyDiscovery] APIFY_API_TOKEN: ${process.env.APIFY_API_TOKEN ? '✅ satt (' + process.env.APIFY_API_TOKEN.slice(0, 8) + '...)' : '❌ SAKNAS'}`);
   console.log(`[ApifyDiscovery] Actors: IG=${DISCOVERY_ACTORS.instagram}, TT=${DISCOVERY_ACTORS.tiktok}`);
@@ -137,9 +138,9 @@ export async function discoverInfluencers(queries, platforms = ['instagram', 'ti
     );
   }
 
-  if (platforms.includes('tiktok') && hashtags.length) {
+  if (platforms.includes('tiktok') && ttSearchTerms.length) {
     promises.push(
-      discoverTikTok(hashtags, 1, timeoutSecs)
+      discoverTikTokViaSearch(ttSearchTerms, timeoutSecs)
         .then(creators => { results.tiktok = creators; })
         .catch(err => {
           console.error('[ApifyDiscovery] TikTok discovery fel:', err.message);
@@ -258,103 +259,100 @@ async function discoverInstagramViaSearch(searchTerms, timeoutSecs) {
 }
 
 // ============================================================
-// TIKTOK DISCOVERY — hashtag-sökning
+// TIKTOK DISCOVERY — clockworks/tiktok-scraper (user-search mode)
 // ============================================================
+// Använder searchQueries + searchSection='/user' för att hitta PROFILER direkt
+// (istället för videos via hashtags). Ger unika creators + fans/followers direkt
+// → kan skippa TikTok Profile Scraper i enrichment.
+//
+// 5 söktermer × 5 profiler = 25 items max. Pris: $1.70/1000 = ~$0.04 per körning.
 
-async function discoverTikTok(hashtags, maxResults, timeoutSecs) {
-  // clockworks/tiktok-scraper tar hashtags som array — använd alla 5 från Claude
-  // Använd alla 10 hashtags — 1 video per hashtag = 10 items, alla unika creators
-  const cleanHashtags = hashtags.slice(0, 10).map(tag => tag.replace(/^#/, ''));
+async function discoverTikTokViaSearch(searchTerms, timeoutSecs) {
+  // Max 5 söktermer × 5 profiler = 25 items totalt
+  const terms = searchTerms.slice(0, 5);
+  const maxProfilesPerQuery = 5;
 
-  console.log(`[ApifyDiscovery] TikTok hashtags (${cleanHashtags.length}): ${cleanHashtags.join(', ')}`);
-
-  // 1 video per hashtag × 10 hashtags = 10 items — varje hashtag ger en unik creator
-  const resultsPerHashtag = 1;
+  console.log(`[ApifyDiscovery] TikTok-search input: searchQueries=${JSON.stringify(terms)}, section=/user, maxProfilesPerQuery=${maxProfilesPerQuery}`);
 
   const items = await runApifyActor(
     DISCOVERY_ACTORS.tiktok,
     {
-      hashtags: cleanHashtags,
-      resultsPerPage: resultsPerHashtag,
-      // searchSection gäller bara keyword-sök, INTE hashtag-sök — lämna tom
-      searchSection: '',
-      // Proxy via Sverige → TikTok visar svenska creators/innehåll
-      proxyCountryCode: 'SE',
-      maxProfilesPerQuery: 20,
+      searchQueries: terms,
+      searchSection: '/user',           // Filtrera till user-profiler enbart
+      maxProfilesPerQuery,              // 5 profiler per sökterm
+      proxyCountryCode: 'SE',           // Svenska creators prioriteras
+      // Fält som inte behövs (har default=false men sätter explicit för tydlighet)
+      shouldDownloadVideos: false,
+      shouldDownloadCovers: false,
+      shouldDownloadAvatars: false,
     },
     timeoutSecs
   );
 
   if (!items?.length) {
-    console.log('[ApifyDiscovery] TikTok: inga videos hittade');
+    console.log('[ApifyDiscovery] TikTok: inga profiler hittade');
     return [];
   }
 
-  // Filtrera bort skräp-videos (0 plays OCH 0 likes = värdelös)
-  const qualityItems = items.filter(item => {
-    const plays = item.playCount || item.plays || 0;
-    const likes = item.diggCount || item.likes || 0;
-    return plays > 0 || likes > 0;
-  });
+  console.log(`[ApifyDiscovery] TikTok: ${items.length} items från search, filtrerar...`);
 
-  // Språk-prioritet: svenska videos först, sen övriga
-  // Detta säkerställer att svenska creators hamnar överst även om Apify
-  // returnerade massa engelskt innehåll från generella hashtags
-  const swedishItems = qualityItems.filter(item =>
-    (item.textLanguage || '').toLowerCase() === 'sv'
-  );
-  const otherItems = qualityItems.filter(item =>
-    (item.textLanguage || '').toLowerCase() !== 'sv'
-  );
-  const sortedItems = [...swedishItems, ...otherItems];
-
-  console.log(`[ApifyDiscovery] TikTok: ${items.length} videos hittade, ${qualityItems.length} med engagement (${swedishItems.length} svenska, ${otherItems.length} andra språk), extraherar creators...`);
-
-  // Extrahera unika creators från kvalitets-videos
+  // User-search returnerar profiler (inte videos). Försök extrahera authorMeta
+  // eller direkta fält — defensiv extraktion eftersom formatet kan variera.
+  let skippedBusiness = 0;
   const creatorMap = new Map();
 
-  for (const item of sortedItems) {
-    // TikTok scraper returnerar videos med authorMeta
-    const author = item.authorMeta || item.author || {};
-    const username = author.name || author.uniqueId || author.id || item.authorId || '';
+  for (const item of items) {
+    // Försök först authorMeta (om det finns), sen direkta fält på item
+    const author = item.authorMeta || item.author || item;
+    const username = author.name || author.uniqueId || author.id || author.username || '';
     if (!username) continue;
 
-    const key = username.toLowerCase();
-    if (creatorMap.has(key)) {
-      const existing = creatorMap.get(key);
-      existing.videos_found++;
-      existing.video_plays = Math.max(existing.video_plays, item.playCount || item.plays || 0);
-      existing.video_likes = Math.max(existing.video_likes, item.diggCount || item.likes || 0);
+    const fullName = author.nickName || author.nickname || author.fullName || '';
+    const bio = author.signature || author.bio || author.biography || '';
+
+    // Företagskonto-filter (samma heuristik som IG)
+    if (isBusinessAccount(username, fullName)) {
+      skippedBusiness++;
+      console.log(`[ApifyDiscovery] TT skip business: @${username} (${fullName})`);
       continue;
     }
+
+    const key = username.toLowerCase();
+    if (creatorMap.has(key)) continue; // samma profil från olika söktermer
+
+    const followers = author.fans ?? author.followers ?? author.followerCount ?? null;
 
     creatorMap.set(key, {
       handle: sanitizeString(username),
       platform: 'tiktok',
-      full_name: sanitizeString(author.nickName || author.nickname || author.name || ''),
-      bio: sanitizeString(author.signature || author.bio || ''),
-      followers: author.fans || author.followers || author.followerCount || null,
-      videos_found: 1,
-      hashtag_source: (item.hashtags || []).map(h => h.name || h).slice(0, 5),
+      full_name: sanitizeString(fullName),
+      bio: sanitizeString(bio.slice(0, 300)),
+      followers,
+      follows: author.following ?? author.followingCount ?? null,
+      posts_count: author.video ?? author.videoCount ?? author.heartCount ?? null,
+      likes_count: author.heart ?? author.heartCount ?? null,
+      is_verified: author.verified === true,
+      profile_pic_url: author.avatar || author.avatarLarger || null,
+      avatar_url: author.avatarLarger || author.avatar || null,
       profile_url: `https://www.tiktok.com/@${username}`,
-      is_verified: author.verified || false,
-      video_plays: item.playCount || item.plays || 0,
-      video_likes: item.diggCount || item.likes || 0,
-      video_language: (item.textLanguage || '').toLowerCase(),
-      datakalla: 'apify_tt_discovery',
+      search_term: item.searchQuery || item.searchTerm || null,
+      datakalla: 'apify_tt_search',
+      // Search-scrapern ger bio+followers direkt → skippa Profile Scraper
+      verifierad: true,
     });
   }
 
   const creators = Array.from(creatorMap.values());
 
-  // Sortera efter engagemang
+  // Sortera efter följarantal (högst först) — fallback till posts_count
   creators.sort((a, b) => {
-    const scoreA = a.videos_found * (a.video_plays || 1);
-    const scoreB = b.videos_found * (b.video_plays || 1);
-    return scoreB - scoreA;
+    const fa = a.followers || 0;
+    const fb = b.followers || 0;
+    if (fa !== fb) return fb - fa;
+    return (b.posts_count || 0) - (a.posts_count || 0);
   });
 
-  console.log(`[ApifyDiscovery] TikTok: ${creators.length} unika creators extraherade (max ${MAX_CREATORS_PER_PLATFORM})`);
+  console.log(`[ApifyDiscovery] TikTok: ${items.length} profiler → ${creators.length} unika creators (skippat: ${skippedBusiness} företag)`);
   return creators.slice(0, MAX_CREATORS_PER_PLATFORM);
 }
 
@@ -438,16 +436,16 @@ export function formatDiscoveryForClaude(discoveryResults) {
   }
 
   if (discoveryResults.tiktok?.length > 0) {
-    parts.push('\nAPIFY TIKTOK DISCOVERY (hittade via hashtag-sökning):');
+    parts.push('\nAPIFY TIKTOK DISCOVERY (hittade via user-sökning — VERIFIERADE profiler):');
     for (const c of discoveryResults.tiktok.slice(0, 30)) {
       const line = [
         `  @${c.handle}`,
         c.full_name ? `(${c.full_name})` : '',
         c.is_verified ? '[✓ Verifierad]' : '',
-        c.followers ? `${c.followers} followers` : '',
-        `— ${c.videos_found} videos i hashtaggen`,
-        c.video_plays ? `(${c.video_plays} visningar)` : '',
-        c.bio ? `Bio: "${sanitizeString(c.bio).slice(0, 80)}"` : '',
+        c.followers != null ? `${c.followers} followers` : '',
+        c.posts_count ? `${c.posts_count} videos` : '',
+        c.search_term ? `[hittad via "${c.search_term}"]` : '',
+        c.bio ? `Bio: "${sanitizeString(c.bio).slice(0, 120)}"` : '',
       ].filter(Boolean).join(' ');
       parts.push(line);
     }

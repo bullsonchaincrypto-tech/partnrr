@@ -476,10 +476,17 @@ Generera exakt 10 UNIKA och VARIERADE hashtags som SVENSKA influencers inom denn
 KRITISKT VIKTIGT — HASHTAGS SKA HITTA SVENSKA CREATORS:
 - INGA rent engelska ord. "unboxing", "gadgets", "gaming" ger 90% internationellt innehåll
   ❌ UNDVIK: "unboxing", "gadgets", "gaming", "tech", "review", "lifestyle"
-  ✅ ANVÄND istället: "unboxingsverige", "svensktest", "svenskagamers", "teknikpåsvenska"
+  ✅ ANVÄND istället: "unboxingsverige", "svensktest", "svenskagamers", "teknikpasvenska"
 - Hashtags måste antingen:
-  (a) Vara HELT SVENSKA ord (t.ex. "träningsinspo", "hemrenovering", "föräldraskap"), ELLER
+  (a) Vara HELT SVENSKA ord (t.ex. "traningsinspo", "hemrenovering", "foraldraskap"), ELLER
   (b) Ha "sverige"/"sve"/"svensk" suffix/prefix (t.ex. "techtipsverige", "svenskinredning")
+- ❌ ANVÄND ALDRIG åäö I HASHTAGS — Instagram-konventionen är att skriva utan:
+  ❌ "träningsinspo" → ✅ "traningsinspo"
+  ❌ "hälsoliv" → ✅ "halsoliv"
+  ❌ "föräldraskap" → ✅ "foraldraskap"
+  ❌ "höstnyheter" → ✅ "hostnyheter"
+  Hashtags med åäö matchar färre posts eftersom de flesta användare
+  skriver utan dessa tecken på Instagram.
 - MINST 7 tecken — korta ord som "tips", "hem", "mat" är för breda
 - VARJE hashtag ska vara TILLRÄCKLIGT ANNORLUNDA för att ge OLIKA creators
   (inte bara varianter, t.ex. "smarthem" och "smarthome" ger samma resultat)
@@ -487,11 +494,11 @@ KRITISKT VIKTIGT — HASHTAGS SKA HITTA SVENSKA CREATORS:
 - INGA generiska hashtags som "sverige" eller "influencer" ensamt
 - Returnera UTAN #-tecken
 
-Exempel för ett företag som säljer träningskläder (alla svenska eller sverige-suffix):
-["träningsinspo", "träningsmotivation", "svenskträning", "hälsoliv", "sportmode", "löpning", "hemmaträning", "gymtips", "yogasverige", "aktivliv"]
+Exempel för ett företag som säljer träningskläder (inga åäö):
+["traningsinspo", "traningsmotivation", "svensktraning", "halsoliv", "sportmode", "lopning", "hemmatraning", "gymtips", "yogasverige", "aktivliv"]
 
 Exempel för ett företag som säljer hemelektronik:
-["smartahem", "teknikprylar", "hemelektronik", "tekniktips", "smarthem", "hemautomation", "unboxingsverige", "teknikpåsvenska", "svensktest", "digitalthemma"]
+["smartahem", "teknikprylar", "hemelektronik", "tekniktips", "smarthem", "hemautomation", "unboxingsverige", "teknikpasvenska", "svensktest", "digitalthemma"]
 
 Svara med ENBART en JSON-array av 10 strängar, ingen annan text.`
       }],
@@ -519,9 +526,16 @@ Svara med ENBART en JSON-array av 10 strängar, ingen annan text.`
       'gym', 'yoga', 'run', 'running', 'tips', 'hacks', 'tutorial',
     ]);
 
+    // Normalisera åäö → aao (Instagram-konvention)
+    const normalizeSwedish = (s) => s
+      .replace(/å/g, 'a').replace(/Å/g, 'a')
+      .replace(/ä/g, 'a').replace(/Ä/g, 'a')
+      .replace(/ö/g, 'o').replace(/Ö/g, 'o');
+
     const cleaned = tags
       .filter(t => typeof t === 'string')
       .map(t => t.replace(/^#/, '').trim().toLowerCase())
+      .map(normalizeSwedish)                            // åäö → aao för bättre matchning
       .filter(t => t.length >= 7)                       // Min 7 tecken — utesluter för breda
       .filter(t => !ENGLISH_BLOCKLIST.has(t))           // Inga rent engelska ord
       .slice(0, 10);

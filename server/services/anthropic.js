@@ -472,7 +472,7 @@ Ge 3-5 konkreta förbättringsförslag på svenska.`;
   return await callClaude(system, prompt);
 }
 
-export async function findSponsorProspects(foretagNamn, bransch, beskrivning, googleMapsResults = []) {
+export async function findSponsorProspects(foretagNamn, bransch, beskrivning, googleMapsResults = [], socialProfiles = { instagram: [], tiktok: [] }) {
   const system = `Du är en expert på svenska företag och sponsorpartnerskap.
 Du ska alltid svara med giltig JSON, inget annat.`;
 
@@ -490,20 +490,41 @@ Du ska alltid svara med giltig JSON, inget annat.`;
     mapsContext = `\n\nHär är RIKTIGA företag som hittats via Google Maps. Prioritera dessa framför påhittade förslag:
 ${mapsList}
 
-Välj de mest relevanta från listan ovan (max 25). Returnera ENBART företag från Google Maps-listan — hitta ALDRIG på egna förslag.
+Välj de mest relevanta från listan ovan. Returnera ENBART företag från Google Maps-listan — hitta ALDRIG på egna förslag.
 För varje företag från Google Maps, behåll deras riktiga kontaktuppgifter (hemsida, telefon).
 Gissa e-post baserat på domännamnet (t.ex. info@foretag.se).
 Alla företag ska ha kalla: "google_maps".`;
   }
 
-  const prompt = googleMapsResults.length > 0
-    ? `Ranka och berika följande Google Maps-företag som potentiella kampanjsponsorer för ${companyContext}.
+  // Social-profiler (IG + TT) — företag som hittats via sökscrapers
+  let socialContext = '';
+  const igProfiles = socialProfiles.instagram || [];
+  const ttProfiles = socialProfiles.tiktok || [];
+  if (igProfiles.length > 0 || ttProfiles.length > 0) {
+    const igList = igProfiles.slice(0, 20).map((p, i) =>
+      `  IG${i + 1}. @${p.handle} (${p.full_name || '-'}) | ${p.followers != null ? p.followers + ' followers' : 'okänd'} | ${p.is_business ? 'biz: ' + (p.business_category || '?') : 'person'} | Bio: "${(p.bio || '').slice(0, 100)}" | Website: ${p.external_url || '-'}`
+    ).join('\n');
+    const ttList = ttProfiles.slice(0, 20).map((p, i) =>
+      `  TT${i + 1}. @${p.handle} (${p.full_name || '-'}) | ${p.followers != null ? p.followers + ' followers' : 'okänd'} | Bio: "${(p.bio || '').slice(0, 100)}"`
+    ).join('\n');
+
+    socialContext = `\n\nHär är RIKTIGA företag/profiler som hittats via Instagram & TikTok-sökning:
+${igList ? 'INSTAGRAM:\n' + igList : ''}
+${ttList ? '\nTIKTOK:\n' + ttList : ''}
+
+Inkludera dessa som sponsor-kandidater om de är relevanta företag (inte privatpersoner/creators).
+För IG/TT-profiler: använd handle som instagram_handle, bio-websiten som hemsida, gissa e-post från domän.
+Källa: "apify_ig_search" för IG-profiler, "apify_tt_search" för TikTok-profiler.`;
+  }
+
+  const prompt = (googleMapsResults.length > 0 || igProfiles.length > 0 || ttProfiles.length > 0)
+    ? `Ranka och berika följande riktiga företag som potentiella kampanjsponsorer för ${companyContext}.
 
 Basera din rankning på hur väl varje företag matchar som sponsor — vars målgrupp överlappar.
 ${beskrivning ? `Företagets beskrivning: "${beskrivning}"` : ''}
-${mapsContext}
+${mapsContext}${socialContext}
 
-VIKTIGT: Returnera ENBART företag från Google Maps-listan ovan. Hitta ALDRIG på egna företag.
+VIKTIGT: Returnera ENBART företag från listorna ovan. Hitta ALDRIG på egna företag.
 
 Returnera en JSON-array med exakt detta format:
 [
@@ -516,7 +537,7 @@ Returnera en JSON-array med exakt detta format:
     "hemsida": "https://foretag.se",
     "telefon": "Telefonnummer eller null",
     "betyg": "Google-betyg eller null",
-    "kalla": "google_maps"
+    "kalla": "google_maps | apify_ig_search | apify_tt_search"
   }
 ]
 

@@ -623,6 +623,78 @@ Svara med ENBART en JSON-array av 5 söktermer som strängar, ingen annan text.`
 }
 
 // ============================================================
+// SPONSOR SEARCH TERMS — för apify/instagram-search-scraper + TikTok
+// ============================================================
+/**
+ * Genererar 5 söktermer som passar för att hitta svenska FÖRETAG/sponsorer
+ * på Instagram och TikTok — tvärtom mot generateInstagramSearchTerms()
+ * som letar efter creators.
+ */
+export async function generateSponsorSearchTerms(beskrivning, companyName) {
+  const client = getClient();
+
+  console.log(`[AI-Search] Genererar sponsor-söktermer för "${companyName}"...`);
+
+  try {
+    const response = await client.messages.create({
+      model: MODEL_DEFAULT,
+      max_tokens: 400,
+      messages: [{
+        role: 'user',
+        content: `Du hjälper ${companyName} hitta potentiella sponsorer/företagspartners via Instagram och TikTok-sökning.
+
+Företag som söker sponsor: ${companyName}
+Beskrivning: ${beskrivning}
+
+Generera exakt 5 SÖKORD som hittar svenska FÖRETAG/varumärken som skulle kunna vara sponsorer till ${companyName}.
+
+VIKTIGT:
+- Vi söker FÖRETAG, inte personer/influencers
+- Söktermer matas till Instagrams användarsökning och hittar profiler vars
+  användarnamn ELLER bio matchar orden
+- Använd 1-3 ord per sökterm
+- Sökorden ska matcha företag som skulle vilja sponsra en verksamhet inom ${companyName}s nisch
+- Tänk: vilka branscher har intresse av denna målgrupp? T.ex. för gaming → energidrycker,
+  tech-återförsäljare, datortillverkare. För sport → sportkläder, kosttillskott.
+- Inkludera "sverige" / "svensk" / "sve" i söktermen där lämpligt
+- Blanda breda branschord med nisch-specifika termer
+
+Bra exempel för en gaming-plattform (letar sponsorer):
+["energidryck sverige", "gaming brand sverige", "esport sponsor", "svensk tech", "streaming utrustning"]
+
+Bra exempel för en fantasy fotboll-app:
+["sportswear sverige", "svensk spel bransch", "betting sverige", "fotbollsklubb sverige", "sportsponsor"]
+
+Svara med ENBART en JSON-array av 5 söktermer som strängar, ingen annan text.`
+      }],
+    });
+
+    trackApiCost({ service: 'anthropic', endpoint: 'generateSponsorSearchTerms' });
+
+    const text = response.content[0]?.text?.trim() || '[]';
+    const jsonMatch = text.match(/\[[\s\S]*\]/);
+    if (!jsonMatch) {
+      console.warn('[AI-Search] Kunde inte parsa sponsor-söktermer');
+      return [];
+    }
+
+    const terms = JSON.parse(jsonMatch[0]);
+    if (!Array.isArray(terms)) return [];
+
+    const cleaned = terms
+      .filter(t => typeof t === 'string' && t.trim().length > 2)
+      .map(t => t.replace(/#/g, '').trim())
+      .slice(0, 5);
+
+    console.log(`[AI-Search] Sponsor-söktermer (${cleaned.length}): ${cleaned.join(' | ')}`);
+    return cleaned;
+  } catch (err) {
+    console.error('[AI-Search] generateSponsorSearchTerms fel:', err.message);
+    return [];
+  }
+}
+
+// ============================================================
 // INFLUENCER-SÖKNING: Apify Discovery → Sonnet (SerpAPI pausad)
 // ============================================================
 

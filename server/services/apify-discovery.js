@@ -27,10 +27,10 @@ const DISCOVERY_ACTORS = {
   tiktok: 'clockworks/tiktok-scraper',
 };
 
-// Max 25 items per plattform
-// Instagram: 5 söktermer × 5 results = 25 profiler
-// TikTok: 10 hashtags × 1 item = 10 videos (orörd i denna commit)
-const MAX_CREATORS_PER_PLATFORM = 25;
+// Max 15 items per plattform
+// Instagram: 5 söktermer × 3 results = 15 profiler
+// TikTok: 5 söktermer × 3 profiler = 15 profiler
+const MAX_CREATORS_PER_PLATFORM = 15;
 
 /**
  * Rensa trasiga unicode-surrogat ur en sträng.
@@ -161,13 +161,14 @@ export async function discoverInfluencers(queries, platforms = ['instagram', 'ti
 // Varje resultat är en riktig profil med followers, bio, verified-status.
 // Pricing: $1.50/1000 → 25 results = ~$0.04 per körning.
 
-async function discoverInstagramViaSearch(searchTerms, timeoutSecs) {
-  // Max 5 söktermer × 5 resultat = 25 profiler totalt
+export async function discoverInstagramViaSearch(searchTerms, timeoutSecs = 120, options = {}) {
+  const { includeBusinesses = false } = options;
+  // Max 5 söktermer × 3 resultat = 15 profiler totalt
   const terms = searchTerms.slice(0, 5);
   const searchString = terms.join(', ');
-  const searchLimit = 5;
+  const searchLimit = 3;
 
-  console.log(`[ApifyDiscovery] Instagram-search input: search="${searchString}", type=user, limit=${searchLimit}`);
+  console.log(`[ApifyDiscovery] Instagram-search input: search="${searchString}", type=user, limit=${searchLimit}, includeBusinesses=${includeBusinesses}`);
 
   const items = await runApifyActor(
     DISCOVERY_ACTORS.instagram,
@@ -205,17 +206,19 @@ async function discoverInstagramViaSearch(searchTerms, timeoutSecs) {
       continue;
     }
 
-    // Företagskonto — signalerat via Instagram OCH via heuristik
-    const isBiz = profile.isBusinessAccount === true || isBusinessAccount(username, fullName);
-    if (isBiz) {
-      // Tillåt business om kategori verkar creator-relaterad (t.ex. blogger, content creator)
-      const cat = (profile.businessCategoryName || '').toLowerCase();
-      const creatorCats = ['creator', 'blogger', 'influencer', 'public figure', 'personal blog', 'artist', 'writer', 'journalist'];
-      const looksLikeCreator = creatorCats.some(c => cat.includes(c));
-      if (!looksLikeCreator) {
-        skippedBusiness++;
-        console.log(`[ApifyDiscovery] IG skip business: @${username} (${fullName}) cat="${cat}"`);
-        continue;
+    // Företagskonto-filter — skippas helt vid sponsor-sökning (includeBusinesses=true)
+    if (!includeBusinesses) {
+      const isBiz = profile.isBusinessAccount === true || isBusinessAccount(username, fullName);
+      if (isBiz) {
+        // Tillåt business om kategori verkar creator-relaterad (t.ex. blogger, content creator)
+        const cat = (profile.businessCategoryName || '').toLowerCase();
+        const creatorCats = ['creator', 'blogger', 'influencer', 'public figure', 'personal blog', 'artist', 'writer', 'journalist'];
+        const looksLikeCreator = creatorCats.some(c => cat.includes(c));
+        if (!looksLikeCreator) {
+          skippedBusiness++;
+          console.log(`[ApifyDiscovery] IG skip business: @${username} (${fullName}) cat="${cat}"`);
+          continue;
+        }
       }
     }
 
@@ -267,10 +270,11 @@ async function discoverInstagramViaSearch(searchTerms, timeoutSecs) {
 //
 // 5 söktermer × 5 profiler = 25 items max. Pris: $1.70/1000 = ~$0.04 per körning.
 
-async function discoverTikTokViaSearch(searchTerms, timeoutSecs) {
-  // Max 5 söktermer × 5 profiler = 25 items totalt
+export async function discoverTikTokViaSearch(searchTerms, timeoutSecs = 120, options = {}) {
+  const { includeBusinesses = false } = options;
+  // Max 5 söktermer × 3 profiler = 15 items totalt
   const terms = searchTerms.slice(0, 5);
-  const maxProfilesPerQuery = 5;
+  const maxProfilesPerQuery = 3;
 
   console.log(`[ApifyDiscovery] TikTok-search input: searchQueries=${JSON.stringify(terms)}, section=/user, maxProfilesPerQuery=${maxProfilesPerQuery}`);
 
@@ -310,8 +314,8 @@ async function discoverTikTokViaSearch(searchTerms, timeoutSecs) {
     const fullName = author.nickName || author.nickname || author.fullName || '';
     const bio = author.signature || author.bio || author.biography || '';
 
-    // Företagskonto-filter (samma heuristik som IG)
-    if (isBusinessAccount(username, fullName)) {
+    // Företagskonto-filter — skippas helt vid sponsor-sökning (includeBusinesses=true)
+    if (!includeBusinesses && isBusinessAccount(username, fullName)) {
       skippedBusiness++;
       console.log(`[ApifyDiscovery] TT skip business: @${username} (${fullName})`);
       continue;

@@ -1,7 +1,8 @@
 import { Router } from 'express';
 import { queryAll, queryOne, runSql } from '../db/schema.js';
 import { findSponsorProspects, generateSponsorPitch } from '../services/anthropic.js';
-import { findSponsorsViaGoogleMaps, searchGoogleMaps } from '../services/ai-search.js';
+import { findSponsorsViaGoogleMaps, searchGoogleMaps, generateSponsorSearchTerms } from '../services/ai-search.js';
+import { discoverInstagramViaSearch, discoverTikTokViaSearch, isApifyConfigured } from '../services/apify-discovery.js';
 import { sendEmail } from '../services/email-service.js';
 
 const router = Router();
@@ -19,18 +20,52 @@ router.post('/prospects/find', async (req, res) => {
     const foretag = await queryOne('SELECT * FROM foretag WHERE id = ?', [foretagId]);
     if (!foretag) return res.status(404).json({ error: 'Foretag hittades inte' });
 
-    // Steg 1: Sök Google Maps efter riktiga företag
-    console.log(`[Sponsors] Söker Google Maps för "${foretag.namn}"...`);
-    let googleMapsResults = [];
-    try {
-      googleMapsResults = await findSponsorsViaGoogleMaps(foretag.namn, foretag.beskrivning);
-      console.log(`[Sponsors] Google Maps hittade ${googleMapsResults.length} företag`);
-    } catch (err) {
-      console.warn(`[Sponsors] Google Maps-sökning misslyckades, kör utan: ${err.message}`);
+    // Steg 1: Generera sponsor-söktermer för IG + TT (Claude, en anrop)
+    let sponsorSearchTerms = [];
+    if (isApifyConfigured()) {
+      try {
+        sponsorSearchTerms = await generateSponsorSearchTerms(
+          foretag.beskrivning || foretag.namn,
+          foretag.namn
+        );
+      } catch (err) {
+        console.warn(`[Sponsors] generateSponsorSearchTerms misslyckades: ${err.message}`);
+      }
     }
 
-    // Steg 2: Claude rankar och filtrerar (med Google Maps-data som underlag)
-    const prospects = await findSponsorProspects(foretag.namn, foretag.bransch, foretag.beskrivning, googleMapsResults);
+    // Steg 2: Kör Google Maps + IG-search + TT-search parallellt
+    console.log(`[Sponsors] Parallell discovery: Google Maps + IG search + TT search`);
+    const [googleMapsResults, igResults, ttResults] = await Promise.all([
+      findSponsorsViaGoogleMaps(foretag.namn, foretag.beskrivning).catch(err => {
+        console.warn(`[Sponsors] Google Maps misslyckades: ${err.message}`);
+        return [];
+      }),
+      (isApifyConfigured() && sponsorSearchTerms.length > 0)
+        ? discoverInstagramViaSearch(sponsorSearchTerms, 120, { includeBusinesses: true }).catch(err => {
+            console.warn(`[Sponsors] IG search misslyckades: ${err.message}`);
+            return [];
+          })
+        : Promise.resolve([]),
+      (isApifyConfigured() && sponsorSearchTerms.length > 0)
+        ? discoverTikTokViaSearch(sponsorSearchTerms, 120, { includeBusinesses: true }).catch(err => {
+            console.warn(`[Sponsors] TT search misslyckades: ${err.message}`);
+            return [];
+          })
+        : Promise.resolve([]),
+    ]);
+
+    console.log(`[Sponsors] Hittade: ${googleMapsResults.length} Google Maps + ${igResults.length} IG + ${ttResults.length} TT`);
+
+    const socialProfiles = { instagram: igResults, tiktok: ttResults };
+
+    // Steg 3: Claude rankar och filtrerar från alla källor
+    const prospects = await findSponsorProspects(
+      foretag.namn,
+      foretag.bransch,
+      foretag.beskrivning,
+      googleMapsResults,
+      socialProfiles
+    );
 
     await runSql('DELETE FROM sponsor_prospects WHERE foretag_id = ?', [foretagId]);
 

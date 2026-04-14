@@ -9,14 +9,14 @@ const resolveMx = promisify(dns.resolveMx);
 
 /**
  * Hitta e-postadress för en YouTube-kanal automatiskt.
- * VERSION 6 — Optimerad: SerpAPI + MX-validering + sociala länkar.
+ * VERSION 7 — Apify-only (SerpAPI-fallback borttagen).
  *
  * Waterfall med early exit (2 steg):
  * 1. YouTube-beskrivningen — regex på text vi redan har (instant, gratis)
- * 2. Apify Google Search (eller SerpAPI som fallback) — riktiga Google-sökresultat
+ * 2. Apify Google Search — riktiga Google-sökresultat
  *
- * Om ingen e-post hittas → användaren hänvisas till att kolla YouTube About-sidan
- * manuellt och mata in e-post i UI:t.
+ * INGEN SerpAPI-fallback. Om Apify saknas/misslyckas → ingen e-post hittas.
+ * Användaren hänvisas till att kolla YouTube About-sidan manuellt.
  *
  * Alla hittade e-poster MX-valideras innan de returneras.
  */
@@ -73,19 +73,15 @@ export async function findEmailForChannel(channelInfo) {
   }
 
   // ── Steg 2: Apify Google Search — riktiga Google-sökresultat ──
+  // INGEN SerpAPI-fallback. Om Apify saknas/misslyckas → ingen e-post hittas.
   if (handle && await isApifyConfigured()) {
     const apifyResult = await searchWithApifyGoogle(handle, { namn });
     if (apifyResult) {
       const result = await found(apifyResult.email, apifyResult.method);
       if (result) return result;
     }
-  } else if (handle && process.env.SERPAPI_KEY) {
-    // Fallback: SerpAPI om Apify inte är konfigurerat
-    const serpResult = await searchWithSerpAPI(handle, { namn });
-    if (serpResult) {
-      const result = await found(serpResult.email, serpResult.method);
-      if (result) return result;
-    }
+  } else if (handle) {
+    console.log(`[E-post] ⚠ Apify ej konfigurerat — skippar Google-sökning för @${handle}`);
   }
 
   console.log(`[E-post] ✗ @${handle} — ingen e-post hittad`);

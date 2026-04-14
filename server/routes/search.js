@@ -180,27 +180,48 @@ router.post('/influencers', async (req, res) => {
           prebuiltQueries: aiSearchQueries,
         });
         if (aiInfluencers?.length > 0) {
+          // Bygg lookup för Apify IG search-data (har redan verifierade followers/bio)
+          const igSearchLookup = new Map();
+          for (const c of (apifyDiscoveryData?.instagram || [])) {
+            if (c.handle) igSearchLookup.set(c.handle.toLowerCase(), c);
+          }
+
           // Normalisera AI-resultat till samma format som pipeline
-          const normalized = aiInfluencers.map(inf => ({
-            name: inf.namn || inf.name,
-            handle: (inf.kanalnamn || '').replace(/^@+/, ''),
-            platform: (inf.plattform || inf.platform || 'instagram').toLowerCase(),
-            followers: inf.foljare || null,
-            bio: inf.profil_beskrivning || inf.bio || '',
-            kontakt_epost: inf.kontakt_epost || null,
-            kontakt_info: inf.kontakt_metod || null,
-            nisch: inf.nisch || '',
-            datakalla: 'apify_discovery_ai',
-            verifierad: false,
-            ai_score: inf.ai_score || 50,
-            ai_motivation: inf.ai_motivation || '',
-            engagement_rate: null,
-            avatar_url: null,
-            estimated_price_sek: inf.estimerad_kostnad_sek || null,
-          }));
+          const normalized = aiInfluencers.map(inf => {
+            const handle = (inf.kanalnamn || '').replace(/^@+/, '');
+            const platform = (inf.plattform || inf.platform || 'instagram').toLowerCase();
+
+            // Om detta är en IG-profil som fanns i search-scraper-resultaten
+            // → använd den verifierade datan (followers, bio, verified) direkt
+            const igMatch = platform === 'instagram'
+              ? igSearchLookup.get(handle.toLowerCase())
+              : null;
+
+            return {
+              name: igMatch?.full_name || inf.namn || inf.name,
+              handle,
+              platform,
+              followers: igMatch?.followers ?? inf.foljare ?? null,
+              bio: igMatch?.bio || inf.profil_beskrivning || inf.bio || '',
+              kontakt_epost: inf.kontakt_epost || null,
+              kontakt_info: inf.kontakt_metod || null,
+              nisch: inf.nisch || '',
+              datakalla: igMatch ? 'apify_ig_search' : 'apify_discovery_ai',
+              verifierad: !!igMatch,  // IG search-profiler är redan verifierade
+              ai_score: inf.ai_score || 50,
+              ai_motivation: inf.ai_motivation || '',
+              engagement_rate: null,
+              avatar_url: igMatch?.avatar_url || null,
+              posts_count: igMatch?.posts_count || null,
+              is_verified: igMatch?.is_verified || false,
+              external_url: igMatch?.external_url || null,
+              estimated_price_sek: inf.estimerad_kostnad_sek || null,
+            };
+          });
           allResults.push(...normalized);
           sources.ai_web_search = normalized.length;
-          console.log(`[Search] AI-sökning hittade ${normalized.length} profiler`);
+          const verifiedCount = normalized.filter(r => r.verifierad).length;
+          console.log(`[Search] AI-sökning hittade ${normalized.length} profiler (${verifiedCount} redan verifierade via IG search)`);
         }
       } catch (aiErr) {
         console.error(`[Search] AI-sökning misslyckades:`, aiErr.message);

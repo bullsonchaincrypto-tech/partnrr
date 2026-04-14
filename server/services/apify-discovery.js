@@ -234,9 +234,12 @@ async function discoverInstagramViaSearch(searchTerms, timeoutSecs) {
       business_category: profile.businessCategoryName || null,
       external_url: profile.externalUrl || null,
       profile_pic_url: profile.profilePicUrl || null,
+      avatar_url: profile.profilePicUrlHD || profile.profilePicUrl || null,
       profile_url: profile.url || `https://www.instagram.com/${username}/`,
       search_term: profile.searchTerm || null,
       datakalla: 'apify_ig_search',
+      // Search-scrapern ger redan fullständig profildata → skippa Profile Scraper
+      verifierad: true,
     });
   }
 

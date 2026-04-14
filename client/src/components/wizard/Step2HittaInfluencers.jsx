@@ -710,10 +710,6 @@ export default function Step2HittaInfluencers({ foretag, outreachType, influence
                           @{inf.kanalnamn} <ExternalLink className="w-2.5 h-2.5" />
                         </a>
                       )}
-                      {/* Nisch — inline */}
-                      {inf.nisch && (
-                        <span className="text-[10px] text-gray-500">{inf.nisch}</span>
-                      )}
                     </div>
                     {/* AI-motivering — visas i sin helhet (begränsad vid generering) */}
                     {inf.ai_motivation && (

@@ -384,41 +384,63 @@ export async function generateYouTubeSearchTerms(beskrivning, companyName) {
   try {
     const response = await client.messages.create({
       model: MODEL_DEFAULT,
-      max_tokens: 800,
+      max_tokens: 600,
       messages: [{
         role: 'user',
-        content: `Du hjälper ett svenskt företag hitta relevanta YouTube-kanaler att samarbeta med.
+        content: `Du hjälper ett svenskt företag hitta SVENSKA YouTube-kreatörer att samarbeta med.
 
 Företag: ${companyName}
 Beskrivning: ${beskrivning}
 
-Generera exakt 20 MAXIMALT VARIERADE svenska söktermer som hittar YouTube-kanaler.
+Generera exakt 10 PRECISA svenska söktermer för YouTubes sök-API.
 
-KRITISKT — Varje sökterm MÅSTE ge OLIKA resultat. YouTube returnerar samma kanaler för snarlika sökningar. Dina 20 termer ska täcka:
+🎯 KRITISKT — HÅLL DIG TILL EXAKT PRODUKTKATEGORIN:
+Analysera företagets beskrivning NOGA och generera bara termer som matchar EXAKT det företaget säljer.
 
-1. KÄRNÄMNET (3-4 termer) — direkt kopplat till företaget
-   Exempel: "bilrecensioner", "lastbilar sverige"
+FRÅGA DIG: "Vad skulle en PERSON som vill KÖPA denna produkt söka på YouTube?"
+Alltså: termerna ska matcha KÖPARENS sökintent — inte relaterade livsstilsämnen.
 
-2. RELATERADE INTRESSEN (5-6 termer) — vad samma målgrupp OCKSÅ tittar på
-   Exempel: Om företaget säljer bilar → "mekaniker verkstad", "roadtrip vlogg", "bilmässa"
+❌ UNDVIK TANGERANDE OMRÅDEN:
+Om företaget säljer hemelektronik (smarta lampor, wifi-router, speakers):
+  ✗ "lägenhet inredning" → handlar om inredning, inte elektronik
+  ✗ "renovera hus vlogg" → handlar om renovering
+  ✗ "villa köp tips" → handlar om fastigheter
+  ✗ "husbygge dagbok" → handlar om bygg
+  ✗ "solceller installation" → handlar om energi, inte konsumentelektronik
+  ✗ "kontorsrum tour" → handlar om inredning
+  ✗ "man cave byggprojekt" → generell DIY
 
-3. LIVSSTILS-KANALER (4-5 termer) — bredare innehåll som når samma publik
-   Exempel: "svensk motor vlogg", "EPA traktor bygge", "husbil äventyr"
+Om företaget säljer träningskläder:
+  ✗ "hälsokost recept" → kost, inte kläder
+  ✗ "meditation avslappning" → helt annan nisch
 
-4. BRANSCH-ANGRÄNSANDE (3-4 termer) — närliggande branscher
-   Exempel: "bilförsäkring tips", "körkort övningskörning", "motorsport sverige"
+Om företaget säljer kaffe:
+  ✗ "frukost recept" → mat
+  ✗ "café interiör" → design
 
-5. UNDERHÅLLNING/HUMOR (2-3 termer) — populärkultur i nischen
-   Exempel: "roliga bilar fails", "barn leker bilar"
+✅ HÅLL DIG TILL KÄRNAN:
+Rätt termer för en hemelektronik-butik:
+  ✓ "smart hem test"
+  ✓ "smarta prylar recension"
+  ✓ "teknik unboxing"
+  ✓ "smart lampa guide"
+  ✓ "wifi router test"
+  ✓ "smarta högtalare sverige"
+  ✓ "hemautomation tips"
+  ✓ "tech review svensk"
+  ✓ "google home sverige"
+  ✓ "apple homekit svenska"
 
-REGLER:
-- Optimera för YouTubes sök-API (hitta KANALER, inte videos)
-- ALLA termer på svenska (engelska OK om branschstandard)
-- UNDVIK synonymer/varianter av samma sak ("bilar test" och "biltester" ger SAMMA resultat)
-- Varje term ska vara 2-4 ord lång
-- Tänk: "vilka OLIKA typer av kreatörer" når samma målgrupp?
+✅ REGLER:
+- Exakt 10 söktermer (inte 20)
+- ALLA på svenska eller med svenska-signalord ("sverige", "svensk", "svenska")
+- Varje term 2-4 ord
+- Fokusera på PRODUKTRECENSIONER, UNBOXING, TESTER, TIPS inom exakt produktkategorin
+- Unika termer som ger OLIKA kreatörer (inte varianter)
+- INTE bredda till livsstil, boende, inredning, renovering, fastighet, bygg
+- Tänk: "vad söker en PERSON som vill KÖPA denna produkt på YouTube?"
 
-Svara med ENBART en JSON-array av 20 strängar, ingen annan text.`
+Svara med ENBART en JSON-array av 10 strängar, ingen annan text.`
       }],
     });
 
@@ -436,7 +458,7 @@ Svara med ENBART en JSON-array av 20 strängar, ingen annan text.`
 
     const cleaned = terms
       .filter(t => typeof t === 'string' && t.length > 2)
-      .slice(0, 20);
+      .slice(0, 10);
 
     console.log(`[AI-Search] YouTube-söktermer (${cleaned.length}): ${cleaned.join(', ')}`);
     return cleaned;

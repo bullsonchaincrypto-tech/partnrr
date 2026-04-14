@@ -7,28 +7,40 @@ const youtube = google.youtube('v3');
  * Sök YouTube-kanaler med riktiga API-data.
  * Returnerar verifierade kanaldata — inga gissningar.
  */
+const EARLY_EXIT_AT = 50;        // Stopp när vi har 50 unika kanaler (spara API-credits)
+
 export async function searchYouTubeChannels(searchQueries, maxResultsPerQuery = 50) {
   const apiKey = process.env.YOUTUBE_API_KEY;
   if (!apiKey) throw new Error('YOUTUBE_API_KEY saknas i .env — aktivera YouTube Data API v3 i Google Cloud Console och skapa en API-nyckel.');
 
   const allChannelIds = new Set();
   let totalHits = 0;
+  let searchesMade = 0;
 
-  // Steg 1: Sök kanaler med varje sökterm
+  // Steg 1: Sök kanaler med varje sökterm — avbryt när vi nått EARLY_EXIT_AT unika
   for (const query of searchQueries) {
+    // Early-exit: vi har tillräckligt, sluta slösa credits
+    if (allChannelIds.size >= EARLY_EXIT_AT) {
+      const skipped = searchQueries.length - searchesMade;
+      console.log(`[YouTube] Early-exit: ${allChannelIds.size} unika kanaler ≥ ${EARLY_EXIT_AT}, hoppar över ${skipped} återstående sökningar (sparar ${skipped * 100} units)`);
+      break;
+    }
     try {
       const searchRes = await youtube.search.list({
         key: apiKey,
         q: query,
         type: 'channel',
-        // Ingen regionCode — det filtrerar bort svenska kanaler som inte explicit satt land=SE.
-        // relevanceLanguage räcker för att prioritera svenskt innehåll.
+        // regionCode + relevanceLanguage → prioriterar svenskt innehåll
+        // regionCode=SE filtrerar inte bort kanaler utan land-metadata, men
+        // påverkar rankningen så svenska kanaler hamnar högst
+        regionCode: 'SE',
         relevanceLanguage: 'sv',
         maxResults: maxResultsPerQuery,
         part: 'snippet',
       });
 
       trackApiCost({ service: 'youtube', endpoint: 'search.list' });
+      searchesMade++;
 
       const items = searchRes.data.items || [];
       const beforeSize = allChannelIds.size;
@@ -41,8 +53,8 @@ export async function searchYouTubeChannels(searchQueries, maxResultsPerQuery = 
       totalHits += items.length;
       console.log(`[YouTube] "${query}" → ${items.length} träffar, ${newUnique} nya unika (totalt: ${allChannelIds.size})`);
     } catch (err) {
+      searchesMade++;
       console.error(`YouTube search error for "${query}":`, err.message);
-      // Om kvoten är slut (403) — avbryt hela loopen, fortsätta är meningslöst
       if (err.code === 403 || err.status === 403 || err.message?.includes('quota')) {
         console.error(`[YouTube] ⚠️ Kvot-fel — avbryter resterande ${searchQueries.length - searchQueries.indexOf(query) - 1} sökningar`);
         break;
@@ -50,7 +62,7 @@ export async function searchYouTubeChannels(searchQueries, maxResultsPerQuery = 
     }
   }
 
-  console.log(`[YouTube] Totalt: ${totalHits} träffar → ${allChannelIds.size} unika kanaler (${searchQueries.length} söktermer)`);
+  console.log(`[YouTube] Totalt: ${totalHits} träffar → ${allChannelIds.size} unika kanaler (${searchesMade}/${searchQueries.length} sökningar körda = ${searchesMade * 100} API units)`);
 
   if (allChannelIds.size === 0) {
     return [];
@@ -77,13 +89,25 @@ export async function searchYouTubeChannels(searchQueries, maxResultsPerQuery = 
         const snippet = ch.snippet || {};
         const branding = ch.brandingSettings?.channel || {};
 
-        // Filtrera bort kanaler som explicit har ett ANNAT land än SE.
-        // Kanaler utan land (vanligt bland svenska kanaler) släpps igenom.
         const country = (snippet.country || '').toUpperCase();
-        const allowedCountries = new Set(['', 'SE']);
-        if (!allowedCountries.has(country)) {
-          console.log(`[SparkCollab] Filtrerar bort "${snippet.title}" (land: ${country})`);
+        const title = snippet.title || '';
+        const description = snippet.description || '';
+        const defaultLang = (snippet.defaultLanguage || '').toLowerCase();
+
+        // Filtrera bort kanaler som explicit har ett ANNAT land än SE
+        if (country && country !== 'SE') {
+          console.log(`[SparkCollab] Filtrerar bort "${title}" (land: ${country})`);
           continue;
+        }
+
+        // Kanaler UTAN land-metadata: kräv att namn/beskrivning ser svenskt ut
+        // (annars smyger massor av internationella kanaler igenom)
+        if (!country) {
+          const langVerdict = detectSwedishContent(title, description, defaultLang);
+          if (!langVerdict.swedish) {
+            console.log(`[SparkCollab] Filtrerar bort "${title}" (ingen country, ej svensk bio: ${langVerdict.reason})`);
+            continue;
+          }
         }
 
         channels.push({
@@ -111,7 +135,7 @@ export async function searchYouTubeChannels(searchQueries, maxResultsPerQuery = 
   }
 
   const filteredCount = channelIds.length - channels.length;
-  console.log(`[YouTube] Country-filter: ${channelIds.length} → ${channels.length} kanaler (${filteredCount} borttagna pga land ≠ SE)`);
+  console.log(`[YouTube] Svenska-filter: ${channelIds.length} → ${channels.length} kanaler (${filteredCount} borttagna: annat land ELLER ej svensk bio)`);
 
   // Returnera utan sortering — routen hanterar sortering (nisch > följare)
   return channels;
@@ -150,6 +174,73 @@ export async function getChannelDetails(channelId) {
 }
 
 // --- Hjälpfunktioner ---
+
+/**
+ * Avgör om en YouTube-kanal utan country-metadata är svensk baserat på
+ * titel, beskrivning och defaultLanguage. Används som sekundär check
+ * för kanaler som saknar explicit land=SE.
+ *
+ * Returnerar { swedish: boolean, reason: string }
+ */
+function detectSwedishContent(title, description, defaultLanguage) {
+  const text = `${title} ${description}`.toLowerCase();
+
+  // 1. Om defaultLanguage är satt till svenska → svensk
+  if (defaultLanguage === 'sv' || defaultLanguage.startsWith('sv-')) {
+    return { swedish: true, reason: 'defaultLanguage=sv' };
+  }
+  // 1b. Om defaultLanguage är ett TYDLIGT annat språk → ej svensk
+  const nonSwedishLangs = ['en', 'es', 'de', 'fr', 'it', 'pt', 'ru', 'nl', 'pl', 'tr', 'ar', 'hi', 'ja', 'ko', 'zh', 'id', 'vi', 'th'];
+  if (defaultLanguage && nonSwedishLangs.some(l => defaultLanguage === l || defaultLanguage.startsWith(l + '-'))) {
+    return { swedish: false, reason: `defaultLanguage=${defaultLanguage}` };
+  }
+
+  // 2. Svenska-specifika tecken (åäö) = stark signal
+  const swedishChars = (text.match(/[åäö]/g) || []).length;
+  if (swedishChars >= 3) {
+    return { swedish: true, reason: `${swedishChars} svenska tecken (åäö)` };
+  }
+
+  // 3. Svenska signalord (flera = starkt indicium)
+  const swedishMarkers = [
+    // Uttryckliga Sverige-ord
+    'sverige', 'svensk', 'svenska', 'stockholm', 'göteborg', 'malmö', 'uppsala',
+    // Vanliga svenska ord som är sällsynta i andra språk
+    'och', 'att', 'för', 'jag', 'tillsammans', 'varför', 'något', 'därför',
+    'kanal', 'prenumerera', 'videor', 'välkommen', 'hej', 'vlogg',
+    // Svenska verb-ändelser
+    'spelar', 'testar', 'bygger', 'recenserar', 'berättar', 'visar',
+  ];
+  const swedishHits = swedishMarkers.filter(w => new RegExp(`\\b${w}\\b`, 'i').test(text)).length;
+
+  // 4. Engelska signalord (dominerande = ej svensk)
+  const englishMarkers = [
+    'subscribe', 'welcome to my channel', 'new video', 'every week',
+    'hello guys', 'hey guys', 'in this video', 'check out',
+    'we are', 'our channel', 'follow me',
+  ];
+  const englishHits = englishMarkers.filter(w => text.includes(w)).length;
+
+  if (englishHits >= 2 && swedishHits === 0) {
+    return { swedish: false, reason: `${englishHits} engelska fraser, 0 svenska` };
+  }
+
+  if (swedishHits >= 2) {
+    return { swedish: true, reason: `${swedishHits} svenska markörer` };
+  }
+
+  // 5. Om det mest är emoji/URL/tom text — låt gå (ge kanalen fördel av tvivlet)
+  const cleanText = text.replace(/[^\p{L}\s]/gu, '').trim();
+  if (cleanText.length < 30) {
+    return { swedish: true, reason: 'för lite text för att avgöra — ger fördel' };
+  }
+
+  // 6. Default: avvisa om vi inte hittat svenska signaler
+  return {
+    swedish: swedishHits > 0,
+    reason: swedishHits > 0 ? `${swedishHits} svensk markör` : 'inga svenska signaler'
+  };
+}
 
 function formatSubscribers(count) {
   const n = parseInt(count);

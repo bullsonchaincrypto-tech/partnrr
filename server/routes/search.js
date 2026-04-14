@@ -115,37 +115,21 @@ router.post('/influencers', async (req, res) => {
       }
     }
 
-    if (nonYoutubePlatforms.length > 0 && isApifyDiscoveryConfigured()) {
-      console.log(`[Search] Steg 2: Apify Discovery — IG + TT search-scrapers (user mode)...`);
-      try {
-        // Generera 5 svenska söktermer — samma används för både IG och TT
-        // eftersom båda nu använder user-search (sökord → profiler)
-        let searchTerms = [];
-        try {
-          searchTerms = await generateInstagramSearchTerms(
-            foretag.beskrivning || foretag.namn,
-            foretag.namn
-          );
-        } catch (err) {
-          console.warn(`[Search] generateInstagramSearchTerms misslyckades: ${err.message}`);
-        }
-
-        // Ingen fallback — vi kör med det Claude ger oss
-        console.log(`[Search] Discovery-söktermer (${searchTerms.length}): ${searchTerms.join(' | ')}`);
-
-        apifyDiscoveryData = await discoverInfluencers(
-          { igSearchTerms: searchTerms, ttSearchTerms: searchTerms },
-          nonYoutubePlatforms,
-          { timeoutSecs: 120 }
-        );
-        sources.apify_ig_discovery = apifyDiscoveryData.instagram?.length || 0;
-        sources.apify_tt_discovery = apifyDiscoveryData.tiktok?.length || 0;
-        console.log(`[Search] Apify Discovery: ${sources.apify_ig_discovery} IG + ${sources.apify_tt_discovery} TT creators`);
-      } catch (err) {
-        console.error(`[Search] Apify Discovery misslyckades:`, err.message);
-        sources.apify_ig_discovery = 0;
-        sources.apify_tt_discovery = 0;
-      }
+    // ============================================================
+    // PAUSAD: IG + TT discovery via Apify-scrapers
+    // ============================================================
+    // Anledning: IG search-scrapers (både Reels och Google) gav övervägande
+    // företagskonton/internationella/privata profiler. TikTok video-search
+    // gav samma problem. Vi letar efter ett bättre alternativ för
+    // influencer-discovery på dessa plattformar.
+    //
+    // Sponsor-flödet använder fortfarande sina egna scrapers (orörda).
+    if (false && nonYoutubePlatforms.length > 0 && isApifyDiscoveryConfigured()) {
+      // Avstängd block — se kommentar ovan
+    } else if (nonYoutubePlatforms.length > 0) {
+      console.log(`[Search] Steg 2: IG/TT discovery PAUSAD — letar efter bättre alternativ`);
+      sources.apify_ig_discovery = 0;
+      sources.apify_tt_discovery = 0;
     }
 
     // ============================================================

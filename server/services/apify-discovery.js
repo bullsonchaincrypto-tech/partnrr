@@ -39,6 +39,31 @@ function sanitizeString(str) {
   return str.replace(/[\uD800-\uDFFF]/g, '');
 }
 
+/**
+ * Kolla om ett konto ser ut som ett företag/e-handel snarare än en influencer.
+ * Företagskonton ska filtreras bort eftersom vi söker efter riktiga creators.
+ */
+function isBusinessAccount(username, fullName) {
+  const u = (username || '').toLowerCase();
+  const n = (fullName || '').toLowerCase();
+
+  // Domän-suffix i användarnamn (miniprojektor.se, some.com)
+  if (/\.(se|com|nu|net|shop|store|io)$/i.test(u)) return true;
+
+  // Vanliga företagssuffix i användarnamn
+  if (/_?(shop|butik|store|ab|sverige|sweden|official)$/i.test(u)) return true;
+
+  // Full name innehåller "AB" som eget ord eller företagsindikatorer
+  if (/\b(ab|aktiebolag)\b/i.test(n)) return true;
+  if (/\b(butik|shop|store|återförsäljare|kedja)\b/i.test(n)) return true;
+  if (/\b(vitvaror|elektronik|tjänst|tjanst)\b/i.test(n)) return true;
+
+  // Användarnamn som innehåller brand-mönster
+  if (/_?(elon|power|mediamarkt|netonnet)/.test(u)) return true;
+
+  return false;
+}
+
 export function isApifyConfigured() {
   return !!process.env.APIFY_API_TOKEN;
 }
@@ -118,15 +143,16 @@ export async function discoverInfluencers(hashtags, platforms = ['instagram', 't
 async function discoverInstagram(hashtags, maxResults, timeoutSecs) {
   // Bygg hashtag-URLs för Instagram
   // Använd alla 5 hashtags från Claude för bredare träffyta
-  // Använd alla 10 hashtags — 1 post per hashtag = 10 items, alla unika creators
+  // Använd alla 10 hashtags — 2 posts per hashtag = 20 items max
+  // 2 posts ger backup ifall topp-resultatet är företag/internationellt/tomt
   const directUrls = hashtags.slice(0, 10).map(tag =>
     `https://www.instagram.com/explore/tags/${encodeURIComponent(tag.replace(/^#/, ''))}/`
   );
 
   console.log(`[ApifyDiscovery] Instagram hashtag-URLs (${directUrls.length}): ${directUrls.join(', ')}`);
 
-  // 1 post per hashtag × 10 hashtags = 10 items — varje hashtag ger en unik creator
-  const resultsPerHashtag = 1;
+  // 2 posts per hashtag × 10 hashtags = 20 items max
+  const resultsPerHashtag = 2;
 
   const items = await runApifyActor(
     DISCOVERY_ACTORS.instagram,
@@ -147,16 +173,42 @@ async function discoverInstagram(hashtags, maxResults, timeoutSecs) {
   }
 
   // Filtrera bort skräp-posts:
-  // Posts med 0 childPosts OCH 0 kommentarer = tomma/värdelösa resultat
-  // Dessa kostar pengar att enricha utan nytta
+  // 1. Kräv minst childPosts ELLER kommentarer ELLER några likes (inte helt tom)
+  // 2. Kräv minst 5 likes ELLER 1 kommentar — tomma reklam-posts har typiskt 0/0
+  // 3. Filtrera bort företagskonton (återförsäljare, e-handel, AB)
+  let skippedEmpty = 0;
+  let skippedBusiness = 0;
+  let skippedLowEngagement = 0;
+
   const qualityPosts = items.filter(post => {
+    const likes = post.likesCount || post.likes || 0;
     const comments = post.commentsCount || post.comments || 0;
     const childPosts = post.childPosts?.length || post.sidecardImages?.length || 0;
-    // Kräv minst childPosts ELLER kommentarer — annars skräp
-    if (childPosts === 0 && comments === 0) return false;
+    const owner = post.ownerUsername || post.owner?.username || '';
+    const fullName = post.ownerFullName || post.owner?.fullName || '';
+
+    // Helt tom post
+    if (childPosts === 0 && comments === 0 && likes === 0) {
+      skippedEmpty++;
+      return false;
+    }
+
+    // Företagskonto — filtrera bort
+    if (isBusinessAccount(owner, fullName)) {
+      skippedBusiness++;
+      console.log(`[ApifyDiscovery] IG skip business: @${owner} (${fullName})`);
+      return false;
+    }
+
+    // För låg engagement — riktiga influencers har minst lite
+    if (likes < 5 && comments < 1) {
+      skippedLowEngagement++;
+      return false;
+    }
+
     return true;
   });
-  console.log(`[ApifyDiscovery] Instagram: ${items.length} posts hittade, ${qualityPosts.length} med engagement (filtrerade bort ${items.length - qualityPosts.length} tomma), extraherar creators...`);
+  console.log(`[ApifyDiscovery] Instagram: ${items.length} posts → ${qualityPosts.length} efter filter (skippat: ${skippedEmpty} tomma, ${skippedBusiness} företag, ${skippedLowEngagement} låg engagement)`);
 
   // Extrahera unika creators från kvalitets-posts
   const creatorMap = new Map();

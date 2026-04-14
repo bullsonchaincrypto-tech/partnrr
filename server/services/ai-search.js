@@ -574,24 +574,44 @@ export async function generateInstagramSearchTerms(beskrivning, companyName) {
 Företag: ${companyName}
 Beskrivning: ${beskrivning}
 
-Generera exakt 5 SÖKORD (inte hashtags) som hittar svenska influencers i denna nisch på Instagram.
+Generera exakt 5 SÖKORD som hittar svenska INDIVIDER/CREATORS (inte företag) på Instagram.
 
-VIKTIGT:
-- Söktermer matas till Instagrams användarsökning — de hittar profiler vars
-  användarnamn ELLER bio matchar orden
-- Använd 1-3 ord per sökterm
-- Bland söktermen ska svenska signalord ingå: "sverige", "svensk", "svenska"
-- Fokusera på nisch + svenskhet, inte generella engelska ord
+KRITISKT VIKTIGT — UNDVIK FÖRETAG, HITTA PERSONER:
+Söktermer som är rena topic-ord (t.ex. "tech sverige", "hemautomation") matchar
+nästan ALLTID företagskonton eftersom företag SEO-optimerar sina bios/namn med
+exakt dessa ord. Vi vill hitta PERSONER som skapar content.
+
+REGLER:
+- VARJE sökterm MÅSTE innehålla ett creator-ord. Välj minst ett per sökterm:
+  • "youtuber" / "youtubare"
+  • "bloggare"
+  • "influencer"
+  • "tiktokare"
+  • "instagrammare"
+  • "skapare" / "content creator"
+  • "recension" / "recenserar" / "reviewer"
+  • "tipsar"
+  • "vlogger"
+  • "tiktokmamma" / "mommyblogger" (för family-nischer)
+- Kombinera creator-ordet med nisch + "sverige"/"svensk"
+- 2-3 ord per sökterm
+- ALDRIG rent topic-ord som enda sökord (t.ex. "hemautomation" eller "tech sverige")
 - Varje sökterm ska hitta OLIKA typer av creators (inte varianter)
 
-Bra exempel för ett företag som säljer hemelektronik:
-["svensk teknikbloggare", "tech sverige", "smarta hemmet", "teknikrecension svensk", "hemautomation"]
+DÅLIGA EXEMPEL (hittar bara företag):
+❌ "tech sverige"        → matchar 'Svenska Teknikingenjörer AB', 'Smart Home Sverige'
+❌ "smarta hemmet"       → matchar 'Smarta Hem i Sverige AB'
+❌ "hemautomation"       → matchar produktföretag
+❌ "fantasy fotboll"     → matchar bettingsajter
 
-Bra exempel för ett företag som säljer träningskläder:
-["svensk träning", "fitness sverige", "löparblogg", "träningsinspiration", "yoga svensk"]
+BRA exempel för ett företag som säljer hemelektronik:
+["teknik youtuber sverige", "svensk teknikbloggare", "hemautomation youtubare", "smarta hem tipsar", "svensk tech recension"]
 
-Bra exempel för ett fantasy fotboll-företag:
-["fotbollsanalys sverige", "fantasy fotboll svensk", "allsvenskan tips", "fotbollstipstare", "svensk fotbollsbloggare"]
+BRA exempel för ett företag som säljer träningskläder:
+["svensk träningsinfluencer", "löparblogg sverige", "yoga youtuber svensk", "fitness creator sverige", "gymtipsar svensk"]
+
+BRA exempel för ett fantasy fotboll-företag:
+["fotbollstipsare sverige", "fantasy fotboll youtubare", "allsvenskan bloggare", "svensk fotbollsanalytiker", "tipsar fotboll svensk"]
 
 Svara med ENBART en JSON-array av 5 söktermer som strängar, ingen annan text.`
       }],
@@ -609,10 +629,29 @@ Svara med ENBART en JSON-array av 5 söktermer som strängar, ingen annan text.`
     const terms = JSON.parse(jsonMatch[0]);
     if (!Array.isArray(terms)) return [];
 
-    const cleaned = terms
+    // Varje sökterm MÅSTE innehålla ett creator-ord, annars matchar den mest företag
+    const CREATOR_KEYWORDS = [
+      'youtuber', 'youtubare', 'bloggare', 'influencer', 'influencers',
+      'tiktokare', 'tiktoker', 'instagrammare', 'skapare', 'creator', 'creators',
+      'recension', 'recenserar', 'reviewer', 'tipsar', 'tipsare',
+      'vlogger', 'vloggare', 'analytiker', 'mamma', 'pappa', 'blogg',
+    ];
+    const hasCreatorWord = (s) => {
+      const lower = s.toLowerCase();
+      return CREATOR_KEYWORDS.some(kw => lower.includes(kw));
+    };
+
+    const rawCleaned = terms
       .filter(t => typeof t === 'string' && t.trim().length > 2)
-      .map(t => t.replace(/#/g, '').trim())
-      .slice(0, 5);
+      .map(t => t.replace(/#/g, '').trim());
+
+    const withCreatorWord = rawCleaned.filter(hasCreatorWord);
+    const rejected = rawCleaned.filter(t => !hasCreatorWord(t));
+    if (rejected.length > 0) {
+      console.warn(`[AI-Search] Avvisar ${rejected.length} söktermer utan creator-ord: ${rejected.join(' | ')}`);
+    }
+
+    const cleaned = withCreatorWord.slice(0, 5);
 
     console.log(`[AI-Search] Instagram-söktermer (${cleaned.length}): ${cleaned.join(' | ')}`);
     return cleaned;

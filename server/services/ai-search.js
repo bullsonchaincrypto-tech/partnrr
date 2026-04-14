@@ -84,6 +84,14 @@ async function setCachedSerpResults(cacheKey, data) {
   }
 }
 
+// Exporterade versioner för återanvändning från search.js (YouTube-cache)
+export async function getCachedSearch(cacheKey) {
+  return getCachedSerpResults(cacheKey);
+}
+export async function setCachedSearch(cacheKey, data) {
+  return setCachedSerpResults(cacheKey, data);
+}
+
 // ============================================================
 // CLAUDE API HELPERS
 // ============================================================
@@ -392,7 +400,7 @@ export async function generateYouTubeSearchTerms(beskrivning, companyName) {
 Företag: ${companyName}
 Beskrivning: ${beskrivning}
 
-Generera exakt 10 PRECISA svenska söktermer för YouTubes sök-API.
+Generera exakt 6 PRECISA svenska söktermer för YouTubes sök-API.
 
 🎯 KRITISKT — HÅLL DIG TILL EXAKT PRODUKTKATEGORIN:
 Analysera företagets beskrivning NOGA och generera bara termer som matchar EXAKT det företaget säljer.
@@ -432,15 +440,16 @@ Rätt termer för en hemelektronik-butik:
   ✓ "apple homekit svenska"
 
 ✅ REGLER:
-- Exakt 10 söktermer (inte 20)
+- Exakt 6 söktermer (få men starka — varje term måste räknas)
 - ALLA på svenska eller med svenska-signalord ("sverige", "svensk", "svenska")
 - Varje term 2-4 ord
 - Fokusera på PRODUKTRECENSIONER, UNBOXING, TESTER, TIPS inom exakt produktkategorin
-- Unika termer som ger OLIKA kreatörer (inte varianter)
+- MAXIMERA VARIATION: varje term ska fånga en UNIK typ av kreatör
+  (inte varianter av samma sökning — t.ex. "smart hem test" och "smart hem recension" ger samma kreatörer)
 - INTE bredda till livsstil, boende, inredning, renovering, fastighet, bygg
 - Tänk: "vad söker en PERSON som vill KÖPA denna produkt på YouTube?"
 
-Svara med ENBART en JSON-array av 10 strängar, ingen annan text.`
+Svara med ENBART en JSON-array av 6 strängar, ingen annan text.`
       }],
     });
 
@@ -458,7 +467,7 @@ Svara med ENBART en JSON-array av 10 strängar, ingen annan text.`
 
     const cleaned = terms
       .filter(t => typeof t === 'string' && t.length > 2)
-      .slice(0, 10);
+      .slice(0, 6);
 
     console.log(`[AI-Search] YouTube-söktermer (${cleaned.length}): ${cleaned.join(', ')}`);
     return cleaned;

@@ -6,7 +6,8 @@ import { findEmailsForChannels } from '../services/email-finder.js';
 import { searchSponsors, searchContacts, isApolloConfigured } from '../services/apollo.js';
 import { enrichInfluencers, enrichSingleProfile, isApifyConfigured } from '../services/social-enrichment.js';
 import { scoreAndRankInfluencers, scoreInfluencer } from '../services/scoring.js';
-import { searchInfluencersAI, generateNischKeywords, buildSearchQueries, generateYouTubeSearchTerms, generateDiscoveryHashtags, generateInstagramSearchTerms } from '../services/ai-search.js';
+import { searchInfluencersAI, generateNischKeywords, buildSearchQueries, generateYouTubeSearchTerms, generateDiscoveryHashtags, generateInstagramSearchTerms, getCachedSearch, setCachedSearch } from '../services/ai-search.js';
+import crypto from 'crypto';
 import { discoverInfluencers, isApifyConfigured as isApifyDiscoveryConfigured } from '../services/apify-discovery.js';
 
 const router = Router();
@@ -651,9 +652,25 @@ router.post('/sponsors/contacts', async (req, res) => {
 // ============================================================
 
 /**
- * Sök YouTube via befintlig pipeline
+ * Sök YouTube via befintlig pipeline — med 24h cache.
+ * Cache-nyckel: hash av (beskrivning + namn + nischLabels).
+ * Besparar YouTube API-credits när samma företag söker om inom 24h.
  */
 async function searchYouTube(foretag, nischLabels) {
+  // ── Cache-check (samma företagsbeskrivning inom 24h → återanvänd resultaten) ──
+  const cacheInput = `yt:${foretag.namn || ''}|${foretag.beskrivning || ''}|${(nischLabels || []).sort().join(',')}`;
+  const cacheKey = 'yt-' + crypto.createHash('sha256').update(cacheInput).digest('hex').slice(0, 32);
+
+  try {
+    const cached = await getCachedSearch(cacheKey);
+    if (cached && Array.isArray(cached)) {
+      console.log(`[Search] YouTube CACHE HIT — återanvänder ${cached.length} kanaler (0 API units)`);
+      return cached;
+    }
+  } catch (err) {
+    console.warn(`[Search] YouTube-cache läsning fel (fortsätter utan): ${err.message}`);
+  }
+
   // Generera smarta söktermer via Claude baserat på företagsbeskrivningen
   let searchQueries = [];
 
@@ -699,7 +716,7 @@ async function searchYouTube(foretag, nischLabels) {
     }
   }
 
-  return channels
+  const normalized = channels
     .map(ch => ({
       name: ch.namn,
       handle: ch.kanalnamn,
@@ -719,6 +736,18 @@ async function searchYouTube(foretag, nischLabels) {
       audience_demographics: null,
       estimated_price_sek: null,
     }));
+
+  // ── Cache-skriv (24h TTL — använder samma tabell som SerpAPI-cache) ──
+  if (normalized.length > 0) {
+    try {
+      await setCachedSearch(cacheKey, normalized);
+      console.log(`[Search] YouTube cache-write: ${normalized.length} kanaler sparade (24h TTL)`);
+    } catch (err) {
+      console.warn(`[Search] YouTube-cache skrivning fel: ${err.message}`);
+    }
+  }
+
+  return normalized;
 }
 
 /**

@@ -24,10 +24,15 @@ const router = Router();
  */
 router.post('/influencers', async (req, res) => {
   try {
-    const { company_profile_id, platforms, filters, exclude_handles } = req.body;
+    const { company_profile_id, platforms, filters, exclude_handles, bust_cache } = req.body;
+    const bustCache = bust_cache === true || req.query.bust_cache === '1' || req.query.bust_cache === 'true';
 
     const foretag = await queryOne('SELECT * FROM foretag WHERE id = ?', [Number(company_profile_id)]);
     if (!foretag) return res.status(404).json({ error: 'Företag hittades inte' });
+
+    if (bustCache) {
+      console.log('[Search] ⚡ bust_cache=true — skippar YouTube-cache, tvingar färsk sökning');
+    }
 
     // Hämta company profile (enrichment + brief-svar)
     let companyProfile;
@@ -73,7 +78,7 @@ router.post('/influencers', async (req, res) => {
       // YouTube Data API (alltid för YouTube-specifik data)
       if (platform === 'youtube') {
         searchPromises.push(
-          searchYouTube(foretag, nischLabels)
+          searchYouTube(foretag, nischLabels, { bustCache })
             .then(results => {
               sources.youtube_api = results.length;
               return results;
@@ -656,19 +661,23 @@ router.post('/sponsors/contacts', async (req, res) => {
  * Cache-nyckel: hash av (beskrivning + namn + nischLabels).
  * Besparar YouTube API-credits när samma företag söker om inom 24h.
  */
-async function searchYouTube(foretag, nischLabels) {
+async function searchYouTube(foretag, nischLabels, { bustCache = false } = {}) {
   // ── Cache-check (samma företagsbeskrivning inom 24h → återanvänd resultaten) ──
   const cacheInput = `yt:${foretag.namn || ''}|${foretag.beskrivning || ''}|${(nischLabels || []).sort().join(',')}`;
   const cacheKey = 'yt-' + crypto.createHash('sha256').update(cacheInput).digest('hex').slice(0, 32);
 
-  try {
-    const cached = await getCachedSearch(cacheKey);
-    if (cached && Array.isArray(cached)) {
-      console.log(`[Search] YouTube CACHE HIT — återanvänder ${cached.length} kanaler (0 API units)`);
-      return cached;
+  if (bustCache) {
+    console.log(`[Search] YouTube CACHE BYPASS (bust_cache=true) — kör färsk sökning`);
+  } else {
+    try {
+      const cached = await getCachedSearch(cacheKey);
+      if (cached && Array.isArray(cached)) {
+        console.log(`[Search] YouTube CACHE HIT — återanvänder ${cached.length} kanaler (0 API units)`);
+        return cached;
+      }
+    } catch (err) {
+      console.warn(`[Search] YouTube-cache läsning fel (fortsätter utan): ${err.message}`);
     }
-  } catch (err) {
-    console.warn(`[Search] YouTube-cache läsning fel (fortsätter utan): ${err.message}`);
   }
 
   // Generera smarta söktermer via Claude baserat på företagsbeskrivningen

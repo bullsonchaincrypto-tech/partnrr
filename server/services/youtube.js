@@ -7,7 +7,11 @@ const youtube = google.youtube('v3');
  * Sök YouTube-kanaler med riktiga API-data.
  * Returnerar verifierade kanaldata — inga gissningar.
  */
-const EARLY_EXIT_AT = 50;        // Stopp när vi har 50 unika kanaler (spara API-credits)
+// Early-exit räknar RAW kanaler (innan svenska-filter). Eftersom ~70% av YouTubes
+// resultat är icke-svenska och filtreras bort, behöver vi ~150-200 raw för att få
+// ihop ~50 svenska kanaler. Vi sätter därför taket högt = i praktiken kör alla
+// söktermer alltid (6 × 100 = 600 units, vilket är inom kvotmarginalen).
+const EARLY_EXIT_AT = 200;       // Säkerhetsventil — triggar i praktiken aldrig vid 6 söktermer
 
 export async function searchYouTubeChannels(searchQueries, maxResultsPerQuery = 50) {
   const apiKey = process.env.YOUTUBE_API_KEY;

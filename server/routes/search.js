@@ -707,15 +707,36 @@ async function searchYouTube(foretag, nischLabels, { bustCache = false } = {}) {
 
   // Om vi fick för få resultat, lägg till breda fallback-söktermer
   if (channels.length < 20 && nischLabels.length > 0) {
+    // Strippa engelska "magnetord" från nischLabels innan vi bygger fallback-termer.
+    // nischLabels kan innehålla saker som "tech hemelektronik gadgets" som drar in
+    // internationellt innehåll. Vi översätter/rensar till rent-svenska former.
+    const ENGLISH_TO_SWEDISH = {
+      'tech': 'teknik', 'gadget': 'pryl', 'gadgets': 'prylar',
+      'home': 'hem', 'review': 'recension', 'reviews': 'recensioner',
+      'unboxing': 'test', 'gaming': 'spel', 'lifestyle': 'livsstil',
+      'food': 'mat', 'travel': 'resa', 'fashion': 'mode',
+    };
+    const ENGLISH_DROP = new Set(['tech', 'gadget', 'gadgets', 'home', 'unboxing', 'gaming', 'vs', 'app', 'apps']);
+
+    const cleanLabel = (label) => label
+      .toLowerCase()
+      .split(/\s+/)
+      .map(w => ENGLISH_TO_SWEDISH[w] || w)
+      .filter(w => !ENGLISH_DROP.has(w))
+      .join(' ')
+      .trim();
+
+    const cleanedLabels = [...new Set(nischLabels.map(cleanLabel).filter(Boolean))];
+
     const broadTerms = [
-      ...nischLabels.map(l => `${l} svensk youtuber`),
-      ...nischLabels.map(l => `${l} vlogg sverige`),
-      'svenska youtube kanaler underhållning',
+      ...cleanedLabels.map(l => `${l} svensk youtuber`),
+      ...cleanedLabels.map(l => `${l} sverige`),
+      'svenska youtubers',
       'populära svenska youtubers',
-    ].filter(t => !searchQueries.includes(t));
+    ].filter(t => t.trim().length > 5 && !searchQueries.includes(t));
 
     if (broadTerms.length > 0) {
-      console.log(`[Search] YouTube: Bara ${channels.length} resultat — kör ${broadTerms.length} breda fallback-söktermer`);
+      console.log(`[Search] YouTube: Bara ${channels.length} resultat — kör ${broadTerms.length} breda fallback-söktermer (rent svenska): ${broadTerms.join(', ')}`);
       const extraChannels = await searchYouTubeChannels(broadTerms, 50);
       // Merge utan dubbletter
       const existingIds = new Set(channels.map(c => c.channelId));

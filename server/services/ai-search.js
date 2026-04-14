@@ -498,8 +498,46 @@ Svara med ENBART en JSON-array av 6 strängar, ingen annan text.`
     ]);
 
     const SWEDISH_MARKERS = ['sverige', 'svensk', 'svenska', 'sve'];
+
+    // Garanterat-svenska ord: ord som existerar nästan uteslutande på svenska.
+    // Om en sökterm innehåller minst ETT av dessa räknas den som svenska,
+    // även om den saknar åäö och saknar "sverige"-markör.
+    const GUARANTEED_SWEDISH_WORDS = new Set([
+      // Recension/test-vokabulär
+      'recension', 'recensioner', 'recenserar', 'recenserad',
+      'uppkopplade', 'uppkopplad', 'uppkoppling',
+      'smarta', 'smartare', 'smartast',
+      'prylar', 'pryl', 'prylen', 'prylarna',
+      'hemautomation', 'hemautomatisering',
+      'hemmet', 'hemma', 'hemmabyggt',
+      // Tech-relaterade men svenska
+      'teknikrecension', 'teknikrecensioner', 'tekniktips',
+      'inredningstips', 'köksprylar', 'köksgrejer',
+      // Vanliga svenska adjektiv/verb-former
+      'trådlös', 'trådlöst', 'trådlösa',  // har åäö men listad för säkerhet
+      'helautomatisk', 'helautomatiska',
+      'såklart', 'såhär', 'såna', 'sånt',
+      // Guide/lärande
+      'nybörjarguide', 'nybörjar',
+      'genomgång', 'genomgången',
+      // Hem-relaterat
+      'hushåll', 'hushållet',
+      'lägenhet', 'lägenheten',
+      'köket', 'köksmaskiner',
+      // Teknik-substantiv
+      'högtalare', 'högtalarna',
+      'hörlurar', 'hörlurarna',
+      'dammsugare', 'robotdammsugare',
+      'kaffebryggare', 'espressomaskin',
+      'kameror', 'övervakning',
+    ]);
+
     const hasSwedishChar = (s) => /[åäöÅÄÖ]/.test(s);
     const hasSwedishMarker = (s) => SWEDISH_MARKERS.some(m => s.toLowerCase().includes(m));
+    const hasGuaranteedSwedishWord = (s) => {
+      const words = s.toLowerCase().split(/\s+/);
+      return words.some(w => GUARANTEED_SWEDISH_WORDS.has(w));
+    };
     const hasEnglishMagnet = (s) => {
       const words = s.toLowerCase().split(/\s+/);
       return words.some(w => ENGLISH_MAGNETS.has(w));
@@ -514,9 +552,13 @@ Svara med ENBART en JSON-array av 6 strängar, ingen annan text.`
       console.warn(`[AI-Search] Avvisar ${removedEnglish.length} engelska termer: ${removedEnglish.join(' | ')}`);
     }
 
-    // Kräv att termen har svensk markering (åäö ELLER sverige/svensk-ord)
-    const swedish = noEnglish.filter(t => hasSwedishChar(t) || hasSwedishMarker(t));
-    const removedNoMarker = noEnglish.filter(t => !hasSwedishChar(t) && !hasSwedishMarker(t));
+    // Kräv att termen har svensk markering:
+    // - åäö-tecken, ELLER
+    // - sverige/svensk/svenska/sve, ELLER
+    // - garanterat-svenska ord (uppkopplade, smarta, prylar, recension, etc.)
+    const isSwedishTerm = (t) => hasSwedishChar(t) || hasSwedishMarker(t) || hasGuaranteedSwedishWord(t);
+    const swedish = noEnglish.filter(isSwedishTerm);
+    const removedNoMarker = noEnglish.filter(t => !isSwedishTerm(t));
     if (removedNoMarker.length > 0) {
       console.warn(`[AI-Search] Avvisar ${removedNoMarker.length} termer utan svensk markör: ${removedNoMarker.join(' | ')}`);
     }

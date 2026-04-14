@@ -426,28 +426,49 @@ Om företaget säljer kaffe:
   ✗ "frukost recept" → mat
   ✗ "café interiör" → design
 
-✅ HÅLL DIG TILL KÄRNAN:
+🇸🇪 ALLA TERMER MÅSTE VARA PÅ RENT SVENSKA — INGA ENGELSKA ORD:
+Engelska ord drar in internationellt YouTube-innehåll som vi sedan måste filtrera bort.
+Vi tappar 70% av träffarna när vi använder engelska — använd alltid svenska motsvarigheter.
+
+❌ ENGELSKA ORD ATT UNDVIKA (även i kombination):
+  ✗ "tech" → använd "teknik"
+  ✗ "review" → använd "recension" eller "test"
+  ✗ "unboxing" → använd "uppackning" eller bara "test"
+  ✗ "guide" → använd "guide" är OK (etablerat låneord)
+  ✗ "tips" → svenska låneord, OK
+  ✗ "smart home" → använd "smart hem" eller "smarta hemmet"
+  ✗ "google home", "apple homekit", "alexa" → produktnamn drar in globalt innehåll. Använd nisch-ord istället.
+  ✗ "gadget" → använd "pryl" eller "prylar"
+
+✅ HÅLL DIG TILL KÄRNAN — RENT SVENSKA:
 Rätt termer för en hemelektronik-butik:
   ✓ "smart hem test"
   ✓ "smarta prylar recension"
-  ✓ "teknik unboxing"
-  ✓ "smart lampa guide"
-  ✓ "wifi router test"
+  ✓ "teknikrecension svenska"
+  ✓ "smart lampa test"
   ✓ "smarta högtalare sverige"
   ✓ "hemautomation tips"
-  ✓ "tech review svensk"
-  ✓ "google home sverige"
-  ✓ "apple homekit svenska"
+  ✓ "smarta hemmet svensk"
+  ✓ "trådlös router test"
+  ✓ "robotdammsugare recension"
+  ✓ "uppkopplade prylar svenska"
+
+Rätt termer för träningskläder:
+  ✓ "träningsoutfit haul", "löparkläder test", "gymkläder recension svensk"
+
+Rätt termer för kaffe:
+  ✓ "kaffebryggare test", "espressomaskin recension", "kaffeprylar svenska"
 
 ✅ REGLER:
 - Exakt 6 söktermer (få men starka — varje term måste räknas)
-- ALLA på svenska eller med svenska-signalord ("sverige", "svensk", "svenska")
+- 🇸🇪 ALLA TERMER PÅ SVENSKA — INGA RENT ENGELSKA ORD som "tech", "review", "unboxing"
+- ALLA termer SKA innehålla minst ett av: "sverige", "svensk", "svenska", ELLER ha åäö, ELLER vara helt svenska ord (t.ex. "recension", "uppkopplade")
 - Varje term 2-4 ord
-- Fokusera på PRODUKTRECENSIONER, UNBOXING, TESTER, TIPS inom exakt produktkategorin
+- Fokusera på RECENSIONER, TESTER, TIPS inom exakt produktkategorin
 - MAXIMERA VARIATION: varje term ska fånga en UNIK typ av kreatör
-  (inte varianter av samma sökning — t.ex. "smart hem test" och "smart hem recension" ger samma kreatörer)
+  (inte varianter av samma sökning)
 - INTE bredda till livsstil, boende, inredning, renovering, fastighet, bygg
-- Tänk: "vad söker en PERSON som vill KÖPA denna produkt på YouTube?"
+- INTE produktnamn på engelska (Google Home, Apple HomeKit) — de finns på alla språk
 
 Svara med ENBART en JSON-array av 6 strängar, ingen annan text.`
       }],
@@ -465,9 +486,42 @@ Svara med ENBART en JSON-array av 6 strängar, ingen annan text.`
     const terms = JSON.parse(jsonMatch[0]);
     if (!Array.isArray(terms)) return [];
 
-    const cleaned = terms
-      .filter(t => typeof t === 'string' && t.length > 2)
-      .slice(0, 6);
+    // Filtrera bort termer som innehåller rent engelska "magnetord" som drar
+    // in internationellt innehåll. Tillåt etablerade låneord (tips, guide, app, wifi).
+    const ENGLISH_MAGNETS = new Set([
+      'tech', 'review', 'reviews', 'unboxing', 'gadget', 'gadgets',
+      'home', 'homekit', 'alexa', 'best', 'top', 'vs',
+      'apple', 'google', 'amazon', 'microsoft', 'samsung',
+      'tutorial', 'tutorials', 'how to', 'howto', 'diy',
+      'lifestyle', 'fitness', 'beauty', 'fashion', 'food',
+      'gaming', 'esports', 'travel', 'vlog', 'vlogs',
+    ]);
+
+    const SWEDISH_MARKERS = ['sverige', 'svensk', 'svenska', 'sve'];
+    const hasSwedishChar = (s) => /[åäöÅÄÖ]/.test(s);
+    const hasSwedishMarker = (s) => SWEDISH_MARKERS.some(m => s.toLowerCase().includes(m));
+    const hasEnglishMagnet = (s) => {
+      const words = s.toLowerCase().split(/\s+/);
+      return words.some(w => ENGLISH_MAGNETS.has(w));
+    };
+
+    const all = terms.filter(t => typeof t === 'string' && t.length > 2);
+
+    // Avvisa termer med engelska magnetord
+    const noEnglish = all.filter(t => !hasEnglishMagnet(t));
+    const removedEnglish = all.filter(t => hasEnglishMagnet(t));
+    if (removedEnglish.length > 0) {
+      console.warn(`[AI-Search] Avvisar ${removedEnglish.length} engelska termer: ${removedEnglish.join(' | ')}`);
+    }
+
+    // Kräv att termen har svensk markering (åäö ELLER sverige/svensk-ord)
+    const swedish = noEnglish.filter(t => hasSwedishChar(t) || hasSwedishMarker(t));
+    const removedNoMarker = noEnglish.filter(t => !hasSwedishChar(t) && !hasSwedishMarker(t));
+    if (removedNoMarker.length > 0) {
+      console.warn(`[AI-Search] Avvisar ${removedNoMarker.length} termer utan svensk markör: ${removedNoMarker.join(' | ')}`);
+    }
+
+    const cleaned = swedish.slice(0, 6);
 
     console.log(`[AI-Search] YouTube-söktermer (${cleaned.length}): ${cleaned.join(', ')}`);
     return cleaned;

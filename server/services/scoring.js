@@ -307,11 +307,48 @@ export async function generateMatchMotivation(influencer, companyProfile, scoreR
  * och ge varje en match_score (0-100) + motivation.
  * Detta ger mycket bättre resultat eftersom Claude kan tolka kontext.
  */
+// Maxbatch-storlek innan vi delar upp anropet. 80 profiler ≈ 3,200 output tokens
+// (välunder max_tokens=8000) → säker marginal mot trunkering.
+const SCORING_BATCH_SIZE = 80;
+
 async function scoreWithClaude(influencers, companyProfile, nischLabels = []) {
   const apiKey = process.env.ANTHROPIC_API_KEY;
   if (!apiKey || influencers.length === 0) return null;
 
-  // Formatera influencer-data kompakt
+  // BATCHA stora dataset så vi inte överskrider output token-limit
+  if (influencers.length > SCORING_BATCH_SIZE) {
+    console.log(`[Scoring] ${influencers.length} influencers > ${SCORING_BATCH_SIZE} → batchar i ${Math.ceil(influencers.length / SCORING_BATCH_SIZE)} omgångar`);
+    const allScores = [];
+    let runningOffset = 0;
+    for (let i = 0; i < influencers.length; i += SCORING_BATCH_SIZE) {
+      const batch = influencers.slice(i, i + SCORING_BATCH_SIZE);
+      const batchScores = await scoreWithClaudeSingleBatch(batch, companyProfile, nischLabels, runningOffset);
+      if (!batchScores) {
+        console.warn(`[Scoring] Batch ${Math.floor(i / SCORING_BATCH_SIZE) + 1} misslyckades — fortsätter med övriga`);
+      } else {
+        allScores.push(...batchScores);
+      }
+      runningOffset += batch.length;
+    }
+    if (allScores.length === 0) return null;
+    console.log(`[Scoring] ✅ Klar batching: ${allScores.length}/${influencers.length} influencers scorade`);
+    return allScores;
+  }
+
+  // Liten lista — kör som ett enskilt anrop (med offset 0)
+  return scoreWithClaudeSingleBatch(influencers, companyProfile, nischLabels, 0);
+}
+
+/**
+ * Internt anrop: scorea EN batch av influencers med Claude Sonnet.
+ * `globalOffset` används för att returnera korrekta globala index så
+ * att caller kan matcha tillbaka mot original-listan.
+ */
+async function scoreWithClaudeSingleBatch(influencers, companyProfile, nischLabels = [], globalOffset = 0) {
+  const apiKey = process.env.ANTHROPIC_API_KEY;
+  if (!apiKey || influencers.length === 0) return null;
+
+  // Formatera influencer-data kompakt — använd LOKALA index (0..N-1) för Claude
   const infData = influencers.map((inf, i) => ({
     index: i,
     namn: inf.name || inf.namn || 'Okänd',
@@ -377,7 +414,7 @@ ${JSON.stringify(infData, null, 1)}
 Bedöm VARJE influencer. Svara med ENBART JSON-array:`;
 
   try {
-    console.log(`[Scoring] Claude Sonnet bedömer ${influencers.length} influencers...`);
+    console.log(`[Scoring] Claude Sonnet bedömer ${influencers.length} influencers (offset=${globalOffset})...`);
     const res = await fetch('https://api.anthropic.com/v1/messages', {
       method: 'POST',
       headers: {
@@ -387,30 +424,63 @@ Bedöm VARJE influencer. Svara med ENBART JSON-array:`;
       },
       body: JSON.stringify({
         model: 'claude-sonnet-4-6',
-        max_tokens: 4000,
+        // Höjt från 4000 → 8000. Per profil ~40 output tokens × 80 batch = 3200
+        // tokens; med 8000 har vi gott om marginal mot trunkering.
+        max_tokens: 8000,
         system: systemPrompt,
         messages: [{ role: 'user', content: userMessage }],
       }),
     });
 
     if (!res.ok) {
-      console.warn(`[Scoring] Claude API ${res.status} — faller tillbaka på algoritmisk scoring`);
+      const errText = await res.text().catch(() => '');
+      console.warn(`[Scoring] Claude API ${res.status} — faller tillbaka på algoritmisk scoring. ${errText.slice(0, 200)}`);
       return null;
     }
 
     const data = await res.json();
     const text = data.content?.[0]?.text || '';
+    const stopReason = data.stop_reason;
 
-    // Parsa JSON från svaret
-    const match = text.match(/\[[\s\S]*\]/);
-    if (!match) {
+    // Varna om Claude trunkerades (max_tokens nått)
+    if (stopReason === 'max_tokens') {
+      console.warn(`[Scoring] ⚠ Claude-svaret trunkerades (stop_reason=max_tokens). Försöker parsa partiellt svar...`);
+    }
+
+    // Parsa JSON från svaret. Om svaret trunkerades kan vi extrahera
+    // alla kompletta objekt fram till sista parsbara komma.
+    let scores;
+    const fullMatch = text.match(/\[[\s\S]*\]/);
+    if (fullMatch) {
+      try {
+        scores = JSON.parse(fullMatch[0]);
+      } catch {
+        scores = null;
+      }
+    }
+    if (!scores) {
+      // Fallback: extrahera så många kompletta objekt vi kan från ett trunkerat svar
+      const objects = [];
+      const objRegex = /\{\s*"index"\s*:\s*\d+[^{}]*\}/g;
+      let m;
+      while ((m = objRegex.exec(text)) !== null) {
+        try { objects.push(JSON.parse(m[0])); } catch {}
+      }
+      if (objects.length > 0) {
+        console.warn(`[Scoring] Parsade ${objects.length} kompletta objekt från trunkerat svar`);
+        scores = objects;
+      }
+    }
+    if (!scores) {
       console.warn('[Scoring] Kunde inte parsa Claude-svar');
       return null;
     }
 
-    const scores = JSON.parse(match[0]);
-    console.log(`[Scoring] ✅ Claude bedömde ${scores.length} influencers`);
-    return scores;
+    // Översätt LOKALA index till GLOBALA så caller kan matcha tillbaka korrekt
+    const globalScores = scores.map(s => ({ ...s, index: (s.index || 0) + globalOffset }));
+
+    console.log(`[Scoring] ✅ Claude bedömde ${globalScores.length}/${influencers.length} influencers (offset=${globalOffset})`);
+    return globalScores;
   } catch (err) {
     console.error('[Scoring] Claude scoring misslyckades:', err.message);
     return null;

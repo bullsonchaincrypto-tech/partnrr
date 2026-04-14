@@ -774,10 +774,20 @@ function getNischLabels(bransch, beskrivning) {
     ];
 
     const keywords = [];
+    // Använd word-boundary matchning istället för substring för att undvika
+    // falska positiva träffar (t.ex. "te" matchar "produkter")
+    const escapeRegex = (s) => s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
     for (const mapping of keywordMap) {
-      if (mapping.terms.some(term => desc.includes(term))) {
-        keywords.push(mapping.label);
-      }
+      const matches = mapping.terms.some(term => {
+        // För fleordsord (t.ex. "smart hem") använd substring
+        // För enkelord använd word-boundary
+        if (term.includes(' ')) {
+          return desc.includes(term);
+        }
+        const re = new RegExp(`\\b${escapeRegex(term)}\\b`, 'i');
+        return re.test(desc);
+      });
+      if (matches) keywords.push(mapping.label);
     }
     if (keywords.length > 0) return keywords;
   }

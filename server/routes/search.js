@@ -222,19 +222,34 @@ router.post('/influencers', async (req, res) => {
     console.log(`[Search] ${allResults.length} unika profiler efter merge`);
 
     // ============================================================
-    // FAS 3.5: Begränsa till max 25 profiler FÖRE enrichment
-    // Sortera på ai_score (bäst först) så enrichment bara körs på toppen
+    // FAS 3.5: Claude Sonnet scorar ALLA profiler FÖRE klippet
+    // Kostar mer (stort prompt) men ger sann match_score-sortering.
+    // Tidigare klippte vi på ai_score som ofta saknades → slumpmässigt urval.
+    // ============================================================
+    console.log(`[Search] Kör scoring-pipeline på ${allResults.length} profiler (Claude Sonnet)...`);
+    const preCutScored = await scoreAndRankInfluencers(allResults, companyProfile, {
+      generateMotivations: true,
+      topN: 5,
+      nischLabels: nischLabels || [],
+    });
+
+    // Använd scorad lista framåt
+    allResults = preCutScored;
+
+    // ============================================================
+    // FAS 3.6: Klipp till max 25 profiler baserat på match_score
+    // Nu har alla profiler en verkligt Sonnet-beräknad score
     // ============================================================
     const MAX_PROFILES = 25;
     if (allResults.length > MAX_PROFILES) {
-      allResults.sort((a, b) => (b.ai_score || 0) - (a.ai_score || 0));
-      console.log(`[Search] Klipper ${allResults.length} → ${MAX_PROFILES} profiler (topp AI-score behålls)`);
+      // scoreAndRankInfluencers har redan sorterat på match_score (högst först)
+      console.log(`[Search] Klipper ${allResults.length} → ${MAX_PROFILES} profiler (topp match_score behålls, lägsta kvar: ${allResults[MAX_PROFILES - 1]?.match_score ?? 'N/A'})`);
       allResults = allResults.slice(0, MAX_PROFILES);
     }
 
     // ============================================================
     // FAS 4: Apify Enrichment — verifiera followers + bio
-    // Körs på allResults som redan är Claudes urval (~30 profiler)
+    // Körs på allResults (max 25) som redan är Sonnets urval
     // ============================================================
     if (isApifyConfigured()) {
       const needsEnrichment = allResults.filter(
@@ -294,15 +309,23 @@ router.post('/influencers', async (req, res) => {
     }
 
     // ============================================================
-    // FAS 5: Scoring pipeline (med riktig followers-data)
-    // E-postsökning EFTER scoring — SerpAPI bara på utvalda profiler
+    // FAS 5: Enrichment kan ha ändrat followers/bio — re-score topp 25
+    // om enrichment tillförde ny data (t.ex. follower-cap kan nu triggas)
+    // För YouTube-only-sökningar hoppas detta över (ingen enrichment)
     // ============================================================
-    console.log(`[Search] Kör scoring-pipeline...`);
-    const scored = await scoreAndRankInfluencers(allResults, companyProfile, {
-      generateMotivations: true,
-      topN: 5,
-      nischLabels: nischLabels || [],
-    });
+    const enrichmentChangedData = (sources.apify_enriched || 0) > 0;
+    let scored;
+    if (enrichmentChangedData) {
+      console.log(`[Search] Re-scorar ${allResults.length} efter enrichment...`);
+      scored = await scoreAndRankInfluencers(allResults, companyProfile, {
+        generateMotivations: true,
+        topN: 5,
+        nischLabels: nischLabels || [],
+      });
+    } else {
+      // Inget nytt att scora på — använd pre-cut-scoringen direkt
+      scored = allResults;
+    }
 
     // ============================================================
     // FAS 6: Filtrera bort irrelevanta resultat

@@ -157,8 +157,10 @@ function inferIndustry(meta, domain, html) {
   ].join(' ').toLowerCase();
 
   // Bransch-gissning
+  // OBS: fantasy_sports-heuristiken borttagen 2026-04-14 — den var
+  // RankLeague-specifik och gav falska positiv på generiska svenska ord
+  // som 'lag', 'poäng', 'tävling' som förekommer i många andra branscher.
   const industries = [
-    { id: 'fantasy_sports', keywords: ['fantasy', 'rank', 'ranking', 'league', 'points', 'wins', 'picks', 'predict', 'prediction', 'teams', 'score', 'matchday', 'gameweek', 'lineup', 'roster', 'draft', 'bet', 'betting', 'odds', 'tippa', 'tävling', 'poäng', 'lag'] },
     { id: 'gaming', keywords: ['gaming', 'spel', 'esport', 'game', 'gamer'] },
     { id: 'tech', keywords: ['tech', 'software', 'saas', 'app', 'digital', 'ai', 'data'] },
     { id: 'ecommerce', keywords: ['shop', 'butik', 'köp', 'handla', 'webshop', 'e-handel'] },

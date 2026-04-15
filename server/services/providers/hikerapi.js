@@ -72,32 +72,32 @@ async function hikerFetch(endpoint, params = {}) {
 // ============================================================
 
 /**
- * IG keyword-search via Hiker. Hiker exponerar inte direkt reels-search;
- * vi använder en vanlig user/hashtag-search istället.
- * Endpoint: GET /v2/search/keyword?query=...
+ * IG reels-search via Hiker — Hiker exponerar INTE free-text reels-search.
+ * Som best-effort fallback: behandla query som hashtag-kandidat (första ordet
+ * strippat från icke-alfanumeriska tecken) och använd hashtag-medias-endpoint.
+ * Degraderar till mindre relevanta resultat, men är bättre än noll.
  */
 export async function searchReels(term, limit = 30) {
-  // TODO: Verifiera Hikers exakta endpoint mot https://hikerapi.com/docs.
-  const raw = await hikerFetch('/v2/search/keyword', { query: term });
-  const items = (raw?.items || raw?.users || raw?.results || [])
-    .slice(0, limit)
-    .map(u => normalizeHikerUserToRaw(u, term, 'main'));
-  return { items, raw };
+  const hashtagGuess = String(term || '').split(/\s+/)[0].replace(/[^a-zåäö0-9_]/gi, '').toLowerCase();
+  if (!hashtagGuess || hashtagGuess.length < 3) {
+    return { items: [], raw: null };
+  }
+  return searchIgHashtag(hashtagGuess, limit);
 }
 
 /**
- * Hikers hashtag-endpoint.
- * Endpoint: GET /v2/hashtag/medias/recent?name=...&amount=...
+ * Hikers hashtag-medias endpoint (recent).
+ * Endpoint: GET /v2/hashtag/medias/recent?name=...
+ * (Verifierat mot Hiker OpenAPI spec — paginerad, vi tar första sidan.)
  */
 export async function searchIgHashtag(tag, limit = 20) {
   const cleanTag = String(tag || '').replace(/^#/, '');
   const raw = await hikerFetch('/v2/hashtag/medias/recent', {
     name: cleanTag,
-    amount: limit,
   });
-  const items = (raw?.medias || raw?.items || []).map(m =>
-    normalizeHikerMediaToRaw(m, `#${cleanTag}`)
-  );
+  const medias = raw?.response?.items || raw?.medias || raw?.items || raw || [];
+  const arr = Array.isArray(medias) ? medias : [];
+  const items = arr.slice(0, limit).map(m => normalizeHikerMediaToRaw(m, `#${cleanTag}`));
   return { items, raw };
 }
 

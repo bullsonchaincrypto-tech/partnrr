@@ -79,34 +79,34 @@ async function scFetch(endpoint, params = {}) {
 
 /**
  * IG Reels-search via keyword.
- * Endpoint: GET /v1/instagram/reels/search?query=...&amount=...
- * (Verifiera mot https://docs.scrapecreators.com/instagram)
+ * Endpoint: GET /v2/instagram/reels/search?query=...
+ * (Verifierat mot https://docs.scrapecreators.com/v2/instagram/reels/search)
+ * OBS: SC returnerar paginerat set — vi tar bara första sidan (~12-20 reels).
+ * Parametern `limit` är enbart mjuk cap på client-sidan.
  */
 export async function searchReels(term, limit = 30) {
-  // TODO: Verifiera exakt endpoint-path mot SC docs vid första live-anrop.
-  const raw = await scFetch('/v1/instagram/reels/search', {
+  const raw = await scFetch('/v2/instagram/reels/search', {
     query: term,
-    amount: limit,
   });
-  const items = (raw?.reels || raw?.items || raw?.data || []).map(r =>
-    normalizeIgReelToRaw(r, term)
-  );
+  const reels = raw?.reels || raw?.items || raw?.data || [];
+  const items = reels.slice(0, limit).map(r => normalizeIgReelToRaw(r, term));
   return { items, raw };
 }
 
 /**
- * IG hashtag-search.
- * Endpoint: GET /v1/instagram/hashtag?tag=...&amount=...
+ * IG hashtag-search — EJ SUPPORTAT av ScrapeCreators.
+ * SC har /v1/instagram/song/reels och /v2/instagram/reels/search men ingen
+ * dedikerad hashtag-medias-endpoint. Vi faller tillbaka på reels-search med
+ * hashtag som query-string (SC's sökning matchar på hashtag-innehåll i caption).
  */
 export async function searchIgHashtag(tag, limit = 20) {
   const cleanTag = String(tag || '').replace(/^#/, '');
-  const raw = await scFetch('/v1/instagram/hashtag', {
-    tag: cleanTag,
-    amount: limit,
+  // Kör som reel-search med "#tag" som query
+  const raw = await scFetch('/v2/instagram/reels/search', {
+    query: `#${cleanTag}`,
   });
-  const items = (raw?.posts || raw?.items || raw?.data || []).map(p =>
-    normalizeIgReelToRaw(p, `#${cleanTag}`)
-  );
+  const reels = raw?.reels || raw?.items || raw?.data || [];
+  const items = reels.slice(0, limit).map(r => normalizeIgReelToRaw(r, `#${cleanTag}`));
   return { items, raw };
 }
 
@@ -125,32 +125,34 @@ export async function getIgProfile(handle) {
 
 /**
  * TikTok video-search via keyword.
- * Endpoint: GET /v1/tiktok/search/videos?query=...&amount=...
+ * Endpoint: GET /v1/tiktok/search/keyword?query=...&region=SE
+ * (Verifierat mot https://docs.scrapecreators.com/v1/tiktok/search/keyword)
  */
 export async function searchTikTokVideo(term, limit = 30) {
-  const raw = await scFetch('/v1/tiktok/search/videos', {
+  const raw = await scFetch('/v1/tiktok/search/keyword', {
     query: term,
-    amount: limit,
+    region: 'SE',
   });
-  const items = (raw?.videos || raw?.items || raw?.data || []).map(v =>
-    normalizeTtVideoToRaw(v, term)
-  );
+  const items = (raw?.search_item_list || raw?.videos || raw?.items || raw?.data || [])
+    .slice(0, limit)
+    .map(v => normalizeTtVideoToRaw(v, term));
   return { items, raw };
 }
 
 /**
  * TikTok hashtag-search.
- * Endpoint: GET /v1/tiktok/hashtag?tag=...&amount=...
+ * Endpoint: GET /v1/tiktok/search/hashtag?hashtag=...&region=SE
+ * (Verifierat mot https://docs.scrapecreators.com/v1/tiktok/search/hashtag)
  */
 export async function searchTikTokHashtag(tag, limit = 20) {
   const cleanTag = String(tag || '').replace(/^#/, '');
-  const raw = await scFetch('/v1/tiktok/hashtag', {
-    tag: cleanTag,
-    amount: limit,
+  const raw = await scFetch('/v1/tiktok/search/hashtag', {
+    hashtag: cleanTag,
+    region: 'SE',
   });
-  const items = (raw?.videos || raw?.items || raw?.data || []).map(v =>
-    normalizeTtVideoToRaw(v, `#${cleanTag}`)
-  );
+  const items = (raw?.search_item_list || raw?.videos || raw?.items || raw?.data || [])
+    .slice(0, limit)
+    .map(v => normalizeTtVideoToRaw(v, `#${cleanTag}`));
   return { items, raw };
 }
 

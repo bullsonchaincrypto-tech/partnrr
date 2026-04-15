@@ -61,7 +61,7 @@ router.post('/influencers', async (req, res) => {
         });
 
         // Fire-and-forget cost-guard (non-blocking för response)
-        costGuard().catch(() => {});
+        costGuard().catch(err => console.warn(`[V9 costGuard] ${err.message}`));
 
         // Hämta tillbaka sparade rader från DB (persist har redan kört)
         // för att få riktiga DB-id:er som frontend använder.

@@ -257,42 +257,65 @@ export async function runV9Pipeline({
 }
 
 async function runPipelineInner(foretag, companyProfile, platforms, userQuery, bust_cache, metrics, t0) {
+  console.log(`[V9] ==================== PIPELINE START foretag_id=${foretag.id} ====================`);
+  console.log(`[V9] Company: "${foretag.namn}" bransch="${foretag.bransch || '(tom)'}" beskrivning="${(foretag.beskrivning || '').slice(0, 100)}"`);
+  console.log(`[V9] Platforms: ${platforms.join(', ')}, user_query: ${userQuery || '(ingen)'}`);
+
   // === Fas 0: Brief ===
+  console.log(`[V9] >>> Fas 0: Brief Interpreter`);
   const brief = await interpretBrief(foretag, companyProfile, userQuery);
+  console.log(`[V9] <<< Fas 0 klar: niche="${brief.primary_niche}", tier=${brief.size_tier_hint}, must_have=${(brief.must_have_signals || []).length}, exclusions=${(brief.exclusions || []).length}, hashtags=${(brief.hashtag_hints || []).length}`);
 
   // === Fas 1: Search terms ===
+  console.log(`[V9] >>> Fas 1: Sökterms-generering (Sonnet ×2)`);
   const queries = await generateAllSearchTerms(foretag, brief);
+  console.log(`[V9] <<< Fas 1 klar. YT-termer: [${(queries.yt_terms || []).join(' | ')}]`);
+  console.log(`[V9]     IG-termer: [${(queries.ig_terms || []).join(' | ')}]`);
+  console.log(`[V9]     Hashtags: [${(queries.hashtag_terms || []).join(' | ')}]`);
+  console.log(`[V9]     Long-tail: [${(queries.long_tail_terms || []).join(' | ')}]`);
 
   // === Fas 2: Discovery ===
+  console.log(`[V9] >>> Fas 2: Parallel Discovery`);
   let candidates = await discoverCandidates(brief, queries, foretag, platforms, metrics);
+  const discPlat = platformCounts(candidates);
+  console.log(`[V9] <<< Fas 2 klar. ${candidates.length} kandidater (yt=${discPlat.youtube} ig=${discPlat.instagram} tt=${discPlat.tiktok})`);
 
   // === Fas 2.5: Cross-platform merge ===
+  console.log(`[V9] >>> Fas 2.5: Cross-platform merge`);
   candidates = mergeCrossPlatform(candidates);
-  console.log(`[V9] After cross-platform merge: ${candidates.length} unique entities`);
+  const multiPlat = candidates.filter(c => c.is_multi_platform).length;
+  console.log(`[V9] <<< Fas 2.5 klar. ${candidates.length} unika entiteter (${multiPlat} multi-plattform)`);
 
   // === Fas 2.6: Comment discovery (additive) ===
+  console.log(`[V9] >>> Fas 2.6: Comment Discovery (${process.env.USE_COMMENT_DISCOVERY === 'true' ? 'AKTIV' : 'SKIPPAD'})`);
   const { handles: commentHandles, depth_map } = await discoverFromComments(
     candidates.filter(c => c.platform === 'youtube'),
     10,
     metrics,
   );
-  // Annotera existing candidates med comment_depth
   for (const c of candidates) {
     const depth = depth_map.get((c.handle || '').toLowerCase());
     if (depth) c.comment_depth = depth;
   }
+  console.log(`[V9] <<< Fas 2.6 klar. ${commentHandles.length} community-handles hittade`);
 
   // === Fas 2.7: Bio-link harvest (additive) ===
+  console.log(`[V9] >>> Fas 2.7: Bio-link Harvest (${process.env.USE_BIO_HARVEST === 'true' ? 'AKTIV' : 'SKIPPAD'})`);
   const { newCandidates: harvested } = await harvestBioLinks(candidates, metrics);
   candidates = mergeCrossPlatform([...candidates, ...harvested]);
+  console.log(`[V9] <<< Fas 2.7 klar. +${harvested.length} nya, totalt ${candidates.length}`);
 
   // === Fas 2.8: List discovery (additive) ===
+  console.log(`[V9] >>> Fas 2.8: List Discovery (${process.env.USE_LIST_DISCOVERY === 'true' ? 'AKTIV' : 'SKIPPAD'})`);
   const listCands = await discoverFromLists(brief, metrics);
   candidates = mergeCrossPlatform([...candidates, ...listCands]);
+  console.log(`[V9] <<< Fas 2.8 klar. +${listCands.length} från listor, totalt ${candidates.length}`);
 
   // === Fas 1.5: Query refinement (conditional, additive) ===
+  console.log(`[V9] >>> Fas 1.5: Query Refinement (${process.env.USE_QUERY_REFINEMENT === 'true' ? 'AKTIV' : 'SKIPPAD'})`);
   const refinedCands = await refineQueriesFromCaptions(candidates, brief, queries, foretag, metrics);
   candidates = mergeCrossPlatform([...candidates, ...refinedCands]);
+  console.log(`[V9] <<< Fas 1.5 klar. +${refinedCands.length} refined, totalt ${candidates.length}`);
 
   // === Fas 3: Swedish Gate ===
   const { passed: swedishPassed, rejected: swedishRejected } = applySwedishGate(candidates);
@@ -314,32 +337,56 @@ async function runPipelineInner(foretag, companyProfile, platforms, userQuery, b
   console.log(`[V9] Brand Filter: ${brandKept.length} kept, ${brands.length} rejected as brand`);
 
   // === Fas 5: Haiku Classifier ===
+  console.log(`[V9] >>> Fas 5: Haiku Classifier`);
   const { confirmed, reserve } = await classifyWithHaiku(brandKept);
   metrics.after_haiku = confirmed.length;
+  const confPlat = platformCounts(confirmed);
+  console.log(`[V9] <<< Fas 5 klar. confirmed=${confirmed.length} reserve=${reserve.length} (yt=${confPlat.youtube} ig=${confPlat.instagram} tt=${confPlat.tiktok})`);
 
   // === Fas 5.5: Lookalike Expansion ===
+  console.log(`[V9] >>> Fas 5.5: Lookalike Expansion (${process.env.USE_LOOKALIKE_EXPANSION === 'true' ? 'AKTIV' : 'SKIPPAD'})`);
   const lookalikes = await expandWithLookalikes(confirmed, brief, metrics);
   const allForEnrichment = [...confirmed, ...lookalikes];
+  console.log(`[V9] <<< Fas 5.5 klar. +${lookalikes.length} lookalikes, totalt till enrichment: ${allForEnrichment.length}`);
 
   // === Fas 6: Enrichment ===
+  console.log(`[V9] >>> Fas 6: Profile Enrichment`);
   const enriched = await enrichProfiles(allForEnrichment);
+  console.log(`[V9] <<< Fas 6 klar. ${enriched.length} enriched (inkl skipped)`);
 
   // === Fas 7: Two-Stage Scoring ===
+  console.log(`[V9] >>> Fas 7: Two-Stage Scoring`);
   const scored = await scoreCandidates(enriched, brief, companyProfile);
+  const highScore = scored.filter(c => (c.match_score || 0) >= 60).length;
+  const midScore = scored.filter(c => (c.match_score || 0) >= 40 && (c.match_score || 0) < 60).length;
+  const lowScore = scored.filter(c => (c.match_score || 0) < 40).length;
+  console.log(`[V9] <<< Fas 7 klar. Scored ${scored.length}: high(>=60)=${highScore} mid(40-59)=${midScore} low(<40)=${lowScore}`);
 
   // === Fas 7.5: Obscurity Validation ===
+  console.log(`[V9] >>> Fas 7.5: Obscurity Validation (${process.env.USE_OBSCURITY_VALIDATION === 'true' ? 'AKTIV' : 'SKIPPAD'})`);
   const validated = await validateObscurity(scored, brief, metrics);
+  console.log(`[V9] <<< Fas 7.5 klar`);
 
   // === Fas 8: Dynamic Cut + Reserve Refill ===
+  console.log(`[V9] >>> Fas 8: Dynamic Cut + Reserve Refill`);
   const { final, reserveUsed } = finalCut(validated, reserve);
   metrics.reserve_used = reserveUsed;
+  const finalPlat = platformCounts(final);
+  console.log(`[V9] <<< Fas 8 klar. Final: ${final.length} (yt=${finalPlat.youtube} ig=${finalPlat.instagram} tt=${finalPlat.tiktok}), reserve used: ${reserveUsed}`);
 
   // === Fas 9: Email Finder ===
+  console.log(`[V9] >>> Fas 9: Email Finder (Serper waterfall)`);
   await findEmailsForFinal(final);
+  const emailHits = final.filter(c => c.email).length;
+  console.log(`[V9] <<< Fas 9 klar. ${emailHits}/${Math.min(25, final.length)} email-träffar`);
 
   // === Fas 10: Persistens ===
+  console.log(`[V9] >>> Fas 10: Persistens`);
   metrics.duration_ms = Date.now() - t0;
   await persistResults(foretag.id, final, brief, metrics);
+  console.log(`[V9] <<< Fas 10 klar. ${final.length} sparade i DB.`);
+
+  console.log(`[V9] ==================== PIPELINE END ${metrics.duration_ms}ms — ${final.length} resultat (${emailHits} med e-post) ====================`);
 
   return {
     results: final,
@@ -351,6 +398,8 @@ async function runPipelineInner(foretag, companyProfile, platforms, userQuery, b
       afterSwedish: metrics.after_swedish_gate,
       afterBrand: metrics.after_brand_filter,
       afterHaiku: metrics.after_haiku,
+      final: final.length,
+      emailHits,
     },
   };
 }

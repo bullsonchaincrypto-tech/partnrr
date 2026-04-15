@@ -51,7 +51,10 @@ async function getCachedEmail(handle) {
       [handle]
     );
     return r?.email || null;
-  } catch { return null; }
+  } catch (err) {
+    console.warn(`[EmailFinder v9] cache read failed @${handle}: ${err.message}`);
+    return null;
+  }
 }
 
 async function setCachedEmail(handle, email, method = 'v9-serper') {

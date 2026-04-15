@@ -255,7 +255,10 @@ async function getCachedHashtag(tag, platform) {
       [tag, platform]
     );
     return r?.data || null;
-  } catch { return null; }
+  } catch (err) {
+    console.warn(`[Discovery] hashtag-cache read failed #${tag}/${platform}: ${err.message}`);
+    return null;
+  }
 }
 
 async function setCachedHashtag(tag, platform, data) {

@@ -84,10 +84,12 @@ async function fetchSafe(url, { timeout = 8000 } = {}) {
 async function findEmailViaSerper(c) {
   const name = c.name || c.handle;
   const handle = String(c.handle || '').replace(/^@/, '');
+  // OBS: Serper's lågnivå-plan avvisar queries med "@handle" + flera ORs
+  // som "Query not allowed. Contact support." — vi använder enklare format.
   const queries = [
-    `"@${handle}" email OR kontakt OR contact`,
-    `"${name}" email ${c.platform}`,
-    `"${name}" "${handle}" samarbete OR business OR mail`,
+    `${name} ${c.platform} kontakt`,
+    `${handle} ${c.platform} email`,
+    `${name} samarbete ${c.platform}`,
   ];
 
   for (const q of queries) {

@@ -63,13 +63,72 @@ router.post('/influencers', async (req, res) => {
         // Fire-and-forget cost-guard (non-blocking för response)
         costGuard().catch(() => {});
 
+        // Hämta tillbaka sparade rader från DB (persist har redan kört)
+        // för att få riktiga DB-id:er som frontend använder.
+        const savedRows = await queryAll(
+          'SELECT * FROM influencers WHERE foretag_id = ? ORDER BY id ASC',
+          [foretag.id]
+        );
+
+        // Transformera till V1-kompatibel shape — frontend förväntar
+        // { results: [...], total, sources, filters_applied }.
+        const enriched = savedRows.map((row) => {
+          // Matcha rätt v9 Candidate baserat på handle+plattform
+          const cand = (v9Result.results || []).find(
+            c => c.handle === row.kanalnamn && c.platform === row.plattform
+          ) || {};
+          return {
+            ...row,
+            foljare_exakt: cand.followers ?? cand.total_reach ?? parseInt(row.foljare) ?? 0,
+            match_score: cand.match_score ?? 0,
+            score_details: {
+              nischfit: cand.nischfit,
+              audience_fit: cand.audience_fit,
+              obscurity: cand.obscurity,
+              authenticity: cand.authenticity,
+            },
+            score_breakdown: null,
+            ai_motivation: cand.motivation || null,
+            engagement_rate: null,
+            avg_views: null,
+            estimated_price_sek: null,
+            sweden_audience_pct: null,
+            fake_follower_pct: null,
+            growth_rate_30d: null,
+            audience_demographics: null,
+            thumbnail: cand.thumbnail || null,
+            beskrivning: cand.bio || row.beskrivning || null,
+            datakalla: 'ai-discovery-v9',
+            enrichment_kalla: 'v9-pipeline',
+            verifierad: !!(cand.is_verified || cand.verifierad),
+            videoCount: 0,
+            viewCount: 0,
+            // V9-specifik metadata
+            is_multi_platform: !!cand.is_multi_platform,
+            platform_count: cand.platform_count || 1,
+            discovery_source: cand.discovery_source || 'main',
+            swedish_confidence: cand.swedish_confidence,
+            brand_score: cand.brand_score ?? null,
+            obscurity_validated: !!cand.obscurity_validated,
+          };
+        }).sort((a, b) => (b.match_score || 0) - (a.match_score || 0));
+
+        const sources = {
+          youtube_api: (v9Result.results || []).filter(c => c.platform === 'youtube').length,
+          instagram_v9: (v9Result.results || []).filter(c => c.platform === 'instagram').length,
+          tiktok_v9: (v9Result.results || []).filter(c => c.platform === 'tiktok').length,
+        };
+
         return res.json({
-          influencers: v9Result.results,
+          results: enriched,
+          total: enriched.length,
+          sources,
+          filters_applied: filters || null,
+          pipeline: 'v9',
           cached: v9Result.cached,
           duration_ms: v9Result.duration_ms,
           cost_usd: v9Result.cost_usd,
-          metrics: v9Result.metrics,
-          pipeline: 'v9',
+          v9_metrics: v9Result.metrics,
         });
       } catch (err) {
         if (err.status === 429) {

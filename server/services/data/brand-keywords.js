@@ -70,7 +70,9 @@ export const COMMERCIAL_CATEGORIES = new Set([
 ]);
 
 // --- BRAND-MÖNSTER I HANDLES ---
-export const BRAND_HANDLE_REGEX = /\b(official|officiell|store|shop|butik|brand|sverige|sweden|ab|hq)\b/i;
+// OBS: Vi använder (?:^|[_\W]) istället för \b eftersom _ räknas som word-char i JS regex,
+// vilket annars skulle missa "acme_official" (vanligt brand-handle-mönster).
+export const BRAND_HANDLE_REGEX = /(?:^|[_\W])(official|officiell|store|shop|butik|brand|sverige|sweden|ab|hq)(?=$|[_\W])/i;
 
 // --- E-HANDELS-URL-MÖNSTER ---
 export const ECOMMERCE_URL_PATTERNS = [

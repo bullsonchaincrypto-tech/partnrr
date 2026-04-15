@@ -131,19 +131,31 @@ export async function classifyWithHaiku(candidates) {
       continue;
     }
 
+    const breakdown = { creator: 0, brand: 0, uncertain: 0, missing: 0 };
+    const dropped = [];
     batch.forEach((cand, idx) => {
       const r = results.find(x => x.index === idx);
-      if (!r) return;
+      if (!r) { breakdown.missing++; return; }
       const conf = typeof r.confidence === 'number' ? r.confidence : 0.5;
+      breakdown[r.class] = (breakdown[r.class] || 0) + 1;
+
       if (r.class === 'creator') {
         confirmed.push({ ...cand, haiku_class: 'creator', haiku_confidence: conf });
-      } else if (r.class === 'uncertain' && conf >= 0.5 && (cand.brand_score || 0) <= 1) {
+      } else if (r.class === 'uncertain' && conf >= 0.4 && (cand.brand_score || 0) <= 1) {
+        // Sänkt från 0.5 → 0.4 eftersom IG-reel-data är för tunn för hög konfidens.
         confirmed.push({ ...cand, haiku_class: 'creator', haiku_confidence: conf });
-      } else if (r.class === 'uncertain' && conf >= 0.3 && (cand.brand_score || 0) <= 2 && reserve.length < 30) {
+      } else if (r.class === 'uncertain' && conf >= 0.25 && (cand.brand_score || 0) <= 2 && reserve.length < 30) {
+        // Sänkt från 0.3 → 0.25 för samma anledning.
         reserve.push({ ...cand, haiku_class: 'uncertain', haiku_confidence: conf });
+      } else {
+        dropped.push({ handle: cand.handle, platform: cand.platform, class: r.class, conf, bio: (cand.bio || '').slice(0, 50) });
       }
-      // 'brand' eller låg confidence → dropped
     });
+    console.log(`[HaikuClassifier] Batch breakdown — creator:${breakdown.creator}, brand:${breakdown.brand}, uncertain:${breakdown.uncertain}, missing:${breakdown.missing}`);
+    // Sample 3 dropped för diagnos
+    for (const d of dropped.slice(0, 3)) {
+      console.log(`[HaikuClassifier]   DROP @${d.handle} (${d.platform}) class=${d.class} conf=${d.conf.toFixed(2)} bio="${d.bio}"`);
+    }
     console.log(`[HaikuClassifier] Batch ${Math.floor(i / BATCH_SIZE) + 1}/${Math.ceil(candidates.length / BATCH_SIZE)} processed (${batch.length} profiler)`);
   }
 

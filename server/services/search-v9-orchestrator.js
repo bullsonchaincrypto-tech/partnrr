@@ -336,9 +336,18 @@ async function runPipelineInner(foretag, companyProfile, platforms, userQuery, b
   metrics.after_brand_filter = brandKept.length;
   console.log(`[V9] Brand Filter: ${brandKept.length} kept, ${brands.length} rejected as brand`);
 
-  // === Fas 5: Haiku Classifier ===
+  // === Fas 4.5 (NYHET): Pre-enrichment för IG/TT (tunn reel-data) ===
+  // IG/TT discovery ger bara reel-metadata (tom bio, null followers). Haiku
+  // behöver profil-data för att fatta bra beslut. YT har redan full data
+  // från channels.list i Fas 2. Vi berikar bara IG/TT här.
+  console.log(`[V9] >>> Fas 4.5: Pre-enrichment för IG/TT (hämtar full profil innan Haiku)`);
+  const preEnriched = await enrichProfiles(brandKept);
+  const preE_Plat = platformCounts(preEnriched);
+  console.log(`[V9] <<< Fas 4.5 klar. ${preEnriched.length} kandidater med berikad data (yt=${preE_Plat.youtube} ig=${preE_Plat.instagram} tt=${preE_Plat.tiktok})`);
+
+  // === Fas 5: Haiku Classifier (körs på berikad data) ===
   console.log(`[V9] >>> Fas 5: Haiku Classifier`);
-  const { confirmed, reserve } = await classifyWithHaiku(brandKept);
+  const { confirmed, reserve } = await classifyWithHaiku(preEnriched);
   metrics.after_haiku = confirmed.length;
   const confPlat = platformCounts(confirmed);
   console.log(`[V9] <<< Fas 5 klar. confirmed=${confirmed.length} reserve=${reserve.length} (yt=${confPlat.youtube} ig=${confPlat.instagram} tt=${confPlat.tiktok})`);

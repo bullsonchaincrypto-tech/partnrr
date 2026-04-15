@@ -91,34 +91,28 @@ export function finalCut(scored, reservePool, {
 // ============================================================
 
 async function persistResults(foretag_id, final, brief, metrics) {
-  // 1. Radera tidigare V9-rader (datakalla='ai-discovery-v9')
-  await runSql('DELETE FROM influencers WHERE foretag_id = $1 AND datakalla = $2',
-    [foretag_id, 'ai-discovery-v9']);
+  // 1. Radera tidigare sökresultat för detta företag
+  // (V1-pipen använder samma tabell; vi rensar alla rader för foretag_id)
+  await runSql('DELETE FROM influencers WHERE foretag_id = $1', [foretag_id]);
 
-  // 2. Insert final-set
+  // 2. Insert final-set — enbart kolumner som finns i V1-schemat.
+  //    Rich V9-metadata (match_score, obscurity, etc) sparas i search_metrics.
   for (const c of final) {
     try {
       await runSql(`
         INSERT INTO influencers (
-          foretag_id, kanalnamn, plattform, namn, beskrivning, foljare_exakt,
-          nisch, thumbnail, kontakt_epost, kontakt_info, datakalla,
-          match_score, ai_motivation, verifierad
-        ) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14)`,
+          foretag_id, kanalnamn, plattform, namn, foljare,
+          nisch, kontakt_epost, kontakt_info
+        ) VALUES ($1,$2,$3,$4,$5,$6,$7,$8)`,
         [
           foretag_id,
-          c.handle || c.kanalnamn || 'unknown',
+          c.handle || 'unknown',
           c.platform,
           c.name || c.handle || '',
-          (c.bio || '').slice(0, 2000),
-          c.followers ?? null,
+          c.followers != null ? String(c.followers) : null,
           brief.primary_niche || '',
-          c.thumbnail || null,
           c.email || null,
-          c.kontakt_info || null,
-          'ai-discovery-v9',
-          Math.round(c.match_score || 0),
-          (c.motivation || '').slice(0, 500),
-          !!(c.is_verified || c.verifierad),
+          c.kontakt_info || (c.motivation ? `match:${Math.round(c.match_score || 0)} — ${c.motivation}`.slice(0, 500) : null),
         ]
       );
     } catch (err) {

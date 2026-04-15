@@ -41,24 +41,26 @@ async function mxValidate(email) {
   }
 }
 
+// OBS: V1's email_cache-schema är { id, kanalnamn UNIQUE, email, method, updated_at }.
+// Vi återanvänder den så email-cachen delas mellan V1 och V9 (vilket är vad vi vill).
 async function getCachedEmail(handle) {
   try {
     const r = await queryOne(
       `SELECT email FROM email_cache
-       WHERE handle = $1 AND created_at > NOW() - INTERVAL '30 days'`,
+       WHERE kanalnamn = $1 AND updated_at > NOW() - INTERVAL '30 days'`,
       [handle]
     );
     return r?.email || null;
   } catch { return null; }
 }
 
-async function setCachedEmail(handle, email) {
+async function setCachedEmail(handle, email, method = 'v9-serper') {
   try {
     await runSql(
-      `INSERT INTO email_cache (handle, email, created_at)
-       VALUES ($1, $2, NOW())
-       ON CONFLICT (handle) DO UPDATE SET email = EXCLUDED.email, created_at = NOW()`,
-      [handle, email]
+      `INSERT INTO email_cache (kanalnamn, email, method, updated_at)
+       VALUES ($1, $2, $3, NOW())
+       ON CONFLICT (kanalnamn) DO UPDATE SET email = EXCLUDED.email, method = EXCLUDED.method, updated_at = NOW()`,
+      [handle, email, method]
     );
   } catch (err) {
     console.warn(`[EmailFinder v9] cache write failed: ${err.message}`);
@@ -146,7 +148,7 @@ export async function findEmailsForFinal(finalCandidates) {
         if (email && await mxValidate(email)) {
           c.email = email;
           c.email_source = 'yt-description';
-          await setCachedEmail(c.handle, email);
+          await setCachedEmail(c.handle, email, 'v9-yt-description');
           stats.yt++;
           return;
         }
@@ -157,7 +159,7 @@ export async function findEmailsForFinal(finalCandidates) {
       if (result) {
         c.email = result.email;
         c.email_source = result.source;
-        await setCachedEmail(c.handle, result.email);
+        await setCachedEmail(c.handle, result.email, `v9-${result.source}`);
         if (result.source === 'serp-snippet') stats.snippet++;
         else stats.page++;
       } else {

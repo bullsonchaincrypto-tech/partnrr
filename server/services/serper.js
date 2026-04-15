@@ -53,8 +53,11 @@ export async function serperSearch(q, { gl = 'se', hl = 'sv', num = 10, location
     });
     status = res.status;
     if (!res.ok) {
-      errMsg = `HTTP ${res.status}`;
-      throw new Error(`[Serper] ${res.status}`);
+      // Försök läsa Serper's error-body för bättre diagnos
+      let bodyTxt = '';
+      try { bodyTxt = (await res.text()).slice(0, 300); } catch {}
+      errMsg = `HTTP ${res.status}${bodyTxt ? ` — ${bodyTxt}` : ''}`;
+      throw new Error(`[Serper] ${res.status} — ${bodyTxt || 'no body'}`);
     }
     const data = await res.json();
     success = true;

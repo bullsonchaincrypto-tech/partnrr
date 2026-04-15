@@ -31,6 +31,16 @@ import { notifyAlert } from './alerts.js';
 const GLOBAL_TIMEOUT_MS = 180_000;
 const LOCK_STALE_SEC = 300;
 
+/** Räkna kandidater per plattform för diagnos-logging. */
+function platformCounts(list) {
+  const out = { youtube: 0, instagram: 0, tiktok: 0, other: 0 };
+  for (const c of list) {
+    if (c.platform in out) out[c.platform]++;
+    else out.other++;
+  }
+  return out;
+}
+
 // ============================================================
 // === FAS 8: DYNAMIC CUT + RESERVE REFILL =====================
 // ============================================================
@@ -287,7 +297,16 @@ async function runPipelineInner(foretag, companyProfile, platforms, userQuery, b
   // === Fas 3: Swedish Gate ===
   const { passed: swedishPassed, rejected: swedishRejected } = applySwedishGate(candidates);
   metrics.after_swedish_gate = swedishPassed.length;
+  const sgPassByPlat = platformCounts(swedishPassed);
+  const sgRejByPlat = platformCounts(swedishRejected);
   console.log(`[V9] Swedish Gate: ${swedishPassed.length} passed, ${swedishRejected.length} rejected`);
+  console.log(`[V9]   Passed: yt=${sgPassByPlat.youtube} ig=${sgPassByPlat.instagram} tt=${sgPassByPlat.tiktok}`);
+  console.log(`[V9]   Rejected: yt=${sgRejByPlat.youtube} ig=${sgRejByPlat.instagram} tt=${sgRejByPlat.tiktok}`);
+  // Sampla några rejected IG-kandidater för diagnos
+  const rejectedIg = swedishRejected.filter(c => c.platform === 'instagram').slice(0, 3);
+  for (const c of rejectedIg) {
+    console.log(`[V9]   IG-reject @${c.handle}: confidence=${c.swedish_confidence}, bio="${(c.bio || '').slice(0, 60)}" caption="${(c.caption_sample || '').slice(0, 60)}"`);
+  }
 
   // === Fas 4: Brand Filter ===
   const { kept: brandKept, brands } = applyBrandFilter(swedishPassed);

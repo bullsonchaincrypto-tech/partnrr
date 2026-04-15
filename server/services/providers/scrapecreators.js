@@ -133,9 +133,20 @@ export async function searchTikTokVideo(term, limit = 30) {
     query: term,
     region: 'SE',
   });
-  const items = (raw?.search_item_list || raw?.videos || raw?.items || raw?.data || [])
-    .slice(0, limit)
-    .map(v => normalizeTtVideoToRaw(v, term));
+  // TT-responsen kan ha olika shapes beroende på SC:s interna version. Prova
+  // flera nyckel-kandidater för items-array.
+  const candidates = raw?.search_item_list
+    || raw?.videos
+    || raw?.items
+    || raw?.data
+    || raw?.aweme_list
+    || [];
+  const arr = Array.isArray(candidates) ? candidates : [];
+  if (arr.length === 0 && raw && typeof raw === 'object') {
+    // Diagnos-logg: visa top-level-nycklar i raw-responsen för första miss
+    console.log(`[ScrapeCreators][TT] "${term}" raw-nycklar: ${Object.keys(raw).join(', ')}`);
+  }
+  const items = arr.slice(0, limit).map(v => normalizeTtVideoToRaw(v, term));
   return { items, raw };
 }
 

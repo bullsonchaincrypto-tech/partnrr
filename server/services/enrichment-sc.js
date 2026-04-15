@@ -55,9 +55,16 @@ function mergeIgProfile(original, profileResponse) {
     || u.biography_with_entities?.text
     || original.bio
     || '';
-  // Diagnos-log vid första fetch om bio fortfarande tom
+  // Djupare diagnos om bio fortfarande tom — visa även inre nycklar
   if (!bio && profileResponse) {
-    console.log(`[Enrichment][IG] @${original.handle}: tom bio efter parse. Top-level nycklar: ${Object.keys(profileResponse).join(', ')}`);
+    const topKeys = Object.keys(profileResponse).join(', ');
+    const dataKeys = profileResponse.data ? `data.{${Object.keys(profileResponse.data).join(', ')}}` : '';
+    const userKeys = profileResponse?.data?.user
+      ? `data.user.{${Object.keys(profileResponse.data.user).slice(0, 15).join(', ')}}`
+      : profileResponse?.user
+        ? `user.{${Object.keys(profileResponse.user).slice(0, 15).join(', ')}}`
+        : '';
+    console.log(`[Enrichment][IG] @${original.handle}: tom bio. Shape: top=[${topKeys}] ${dataKeys} ${userKeys}`);
   }
   return {
     ...original,
@@ -102,6 +109,8 @@ export async function enrichProfiles(candidates) {
   for (let i = 0; i < top.length; i += CHUNK_SIZE) {
     const chunk = top.slice(i, i + CHUNK_SIZE);
     const results = await Promise.all(chunk.map(async c => {
+      // Skippa om redan berikat av Fas 4.5 (pre-enrichment) — sparar SC-credits
+      if (c._already_enriched) return c;
       try {
         if (c.platform === 'instagram') {
           const p = await provider.getIgProfile(c.handle);

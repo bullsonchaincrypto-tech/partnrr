@@ -83,11 +83,19 @@ export function finalCut(scored, reservePool, {
     reserveUsed = refill.length;
   }
 
-  // 6. Hård golv: minst 15 om vi har råmaterial
+  // 6. Hård golv: minst 15 OM vi har kvalitativt material.
+  // Tidigare bugg: om alla scores var <25 (irrelevanta för nisch), fyllde vi
+  // ändå på med skräp. Nu: bara padda om det finns minst några med >= 30
+  // (dvs pipelinen hittade något användbart).
   if (final.length < 15) {
-    const padding = sorted.filter(c => !final.includes(c)).slice(0, 15 - final.length);
-    final = [...final, ...padding];
-    console.warn(`[FinalCut] Very low yield — returning ${final.length} with relaxed threshold`);
+    const hasQualityMaterial = sorted.some(c => (c.match_score || 0) >= 30);
+    if (hasQualityMaterial) {
+      const padding = sorted.filter(c => !final.includes(c)).slice(0, 15 - final.length);
+      final = [...final, ...padding];
+      console.warn(`[FinalCut] Very low yield — padding till ${final.length} (kvalitetsmaterial finns)`);
+    } else {
+      console.warn(`[FinalCut] Very low yield AND inget material >= 30 — returnerar bara ${final.length} riktigt relevanta istället för skräp`);
+    }
   }
 
   console.log(`[FinalCut] deep_scored: ${sorted.filter(c => !c.provisional).length}, provisional: ${sorted.filter(c => c.provisional).length}, reserve-pool: ${reservePool.length}`);
@@ -340,8 +348,12 @@ async function runPipelineInner(foretag, companyProfile, platforms, userQuery, b
   // IG/TT discovery ger bara reel-metadata (tom bio, null followers). Haiku
   // behöver profil-data för att fatta bra beslut. YT har redan full data
   // från channels.list i Fas 2. Vi berikar bara IG/TT här.
+  // OBS: Vi markerar dessa som "already enriched" så Fas 6 INTE dubbelanropar
+  // och dränerar SC-credits.
   console.log(`[V9] >>> Fas 4.5: Pre-enrichment för IG/TT (hämtar full profil innan Haiku)`);
   const preEnriched = await enrichProfiles(brandKept);
+  // Flagga som berikad — Fas 6 skippar dem då
+  for (const c of preEnriched) c._already_enriched = true;
   const preE_Plat = platformCounts(preEnriched);
   console.log(`[V9] <<< Fas 4.5 klar. ${preEnriched.length} kandidater med berikad data (yt=${preE_Plat.youtube} ig=${preE_Plat.instagram} tt=${preE_Plat.tiktok})`);
 

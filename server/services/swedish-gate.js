@@ -70,6 +70,23 @@ export function classifySwedish(c) {
     sig.S8 = true;
   }
 
+  // ========================================================
+  // HARD REJECTS (för att skärpa svensk-filter)
+  // ========================================================
+
+  // HR1: YouTube med country-fält som INTE är SE → reject direkt.
+  // V1 hade samma hard-filter och det fungerade bra.
+  if (c.platform === 'youtube' && c.country && c.country !== 'SE') {
+    sig.HR_YT_NON_SE = c.country;
+    return { pass: false, confidence: 'hard-reject', signals: sig };
+  }
+
+  // HR2: default_language är non-Swedish explicit → reject
+  if (c.default_language && !SWEDISH_LANG_CODES.has(c.default_language)) {
+    sig.HR_LANG_NON_SV = c.default_language;
+    return { pass: false, confidence: 'hard-reject', signals: sig };
+  }
+
   // Verdict
   const hard = sig.S1 || sig.S2_country || sig.S2_lang || sig.S3 || sig.S4;
   const soft = sig.S5 || sig.S6 || sig.S7 || sig.S8;
@@ -77,13 +94,19 @@ export function classifySwedish(c) {
   if (hard) return { pass: true, confidence: 'hard', signals: sig };
   if (soft) return { pass: true, confidence: 'soft', signals: sig };
 
-  // Pending = vi har inte tillräcklig data för att avgöra. Pipen behåller dem
-  // för Fas 6 enrichment + omvärdering, men de prioriteras lägre.
+  // Pending = otillräcklig data. Tidigare släppte vi igenom dessa, men det
+  // gav för många false-positives. Nu: reject utom om IG/TT med tom bio
+  // (då ger vi dem en chans att berikas i Fas 6).
   const hasMinimalData = bio.length >= 20 || caption.length >= 20;
-  if (!hasMinimalData) return { pass: true, confidence: 'pending', signals: sig };
+  const isIgOrTt = c.platform === 'instagram' || c.platform === 'tiktok';
 
-  // Vi har data och inga svenska signaler → reject
-  return { pass: false, confidence: 'pending', signals: sig };
+  // IG/TT utan data → pending (Fas 6 enrichment kan fylla i)
+  if (isIgOrTt && !hasMinimalData) {
+    return { pass: true, confidence: 'pending', signals: sig };
+  }
+
+  // Allt annat utan svensk signal → reject
+  return { pass: false, confidence: 'no-signal-reject', signals: sig };
 }
 
 /**

@@ -59,10 +59,26 @@ describe('classifySwedish — soft signals', () => {
 });
 
 describe('classifySwedish — pending/reject', () => {
-  it('tom bio → pending', () => {
-    const r = classifySwedish({ bio: '', name: '', handle: 'foo' });
+  it('tom bio på IG/TT → pending (Fas 6 kan fylla på)', () => {
+    const r = classifySwedish({ platform: 'instagram', bio: '', name: '', handle: 'foo' });
     assert.equal(r.confidence, 'pending');
     assert.equal(r.pass, true);
+  });
+
+  it('tom bio utan plattform → reject (inget att jobba med)', () => {
+    const r = classifySwedish({ bio: '', name: '', handle: 'foo' });
+    assert.equal(r.pass, false);
+  });
+
+  it('YT med country=GB → hard-reject direkt', () => {
+    const r = classifySwedish({
+      platform: 'youtube',
+      country: 'GB',
+      bio: 'creator from london',
+      name: 'John',
+    });
+    assert.equal(r.pass, false);
+    assert.equal(r.confidence, 'hard-reject');
   });
 
   it('tydligt engelsk bio utan signaler → reject', () => {
@@ -77,13 +93,13 @@ describe('classifySwedish — pending/reject', () => {
 describe('applySwedishGate', () => {
   it('separerar passed/rejected', () => {
     const cands = [
-      { bio: 'svensk creator från Stockholm' },
-      { bio: 'I am from Brazil and make food videos every single day for my many followers.' },
-      { bio: '', name: 'unknown' },
+      { platform: 'instagram', bio: 'svensk creator från Stockholm' },
+      { platform: 'youtube', bio: 'I am from Brazil and make food videos every single day.' },
+      { platform: 'instagram', bio: '', name: 'unknown' },  // IG tom → pending
     ];
     const { passed, rejected } = applySwedishGate(cands);
-    assert.equal(passed.length, 2);  // 1 hard, 1 pending
-    assert.equal(rejected.length, 1);
+    assert.equal(passed.length, 2);  // 1 hard (svensk), 1 pending (IG tom)
+    assert.equal(rejected.length, 1);  // Brazil-YT
     // Mutates cand med metadata
     assert.ok(cands[0].swedish_confidence);
     assert.ok(cands[0].swedish_signals);

@@ -178,23 +178,40 @@ function dedupeByHandle(arrays) {
 }
 
 async function discoverIG(queries, metrics) {
-  const reelPromises = (queries.ig_terms || []).map(t =>
-    provider.searchReels(t, 30).catch(err => {
-      console.warn(`[Discovery][IG] reels "${t}" → ${err.message}`);
-      return { items: [] };
-    })
+  const igTerms = queries.ig_terms || [];
+  console.log(`[Discovery][IG] Söker ${igTerms.length} reel-termer:`);
+  for (const t of igTerms) console.log(`[Discovery][IG]   • "${t}"`);
+
+  const reelPromises = igTerms.map(t =>
+    provider.searchReels(t, 30)
+      .then(r => {
+        console.log(`[Discovery][IG] reels "${t}" → ${(r.items || []).length} items`);
+        return r;
+      })
+      .catch(err => {
+        console.warn(`[Discovery][IG] reels "${t}" → ${err.message}`);
+        return { items: [] };
+      })
   );
   const reelResults = await Promise.all(reelPromises);
   const fromReels = dedupeByHandle(reelResults.map(r => r.items || []));
+  console.log(`[Discovery][IG] Reel-fas klar: ${fromReels.length} unika kandidater`);
 
   let fromHashtags = [];
   if (fromReels.length < 60 && process.env.USE_HASHTAG_DISCOVERY === 'true') {
     metrics.hashtag_triggered = true;
-    const hashtagPromises = (queries.hashtag_terms || []).map(async tag => {
+    const hashtags = queries.hashtag_terms || [];
+    console.log(`[Discovery][IG] Triggar hashtag-discovery (reels<60), testar ${hashtags.length} hashtags:`);
+    for (const t of hashtags) console.log(`[Discovery][IG]   • #${t}`);
+    const hashtagPromises = hashtags.map(async tag => {
       try {
         const cached = await getCachedHashtag(tag, 'instagram');
-        if (cached) return cached;
+        if (cached) {
+          console.log(`[Discovery][IG] hashtag #${tag} → CACHE-HIT (${(cached.items || []).length} items)`);
+          return cached;
+        }
         const data = await provider.searchIgHashtag(tag, 20);
+        console.log(`[Discovery][IG] hashtag #${tag} → ${(data.items || []).length} items`);
         await setCachedHashtag(tag, 'instagram', data);
         return data;
       } catch (err) {
@@ -204,6 +221,11 @@ async function discoverIG(queries, metrics) {
     });
     const hashtagResults = await Promise.all(hashtagPromises);
     fromHashtags = dedupeByHandle(hashtagResults.map(r => r.items || []));
+    console.log(`[Discovery][IG] Hashtag-fas klar: ${fromHashtags.length} unika kandidater`);
+  } else if (fromReels.length >= 60) {
+    console.log(`[Discovery][IG] Skippar hashtag-discovery (reels>=60)`);
+  } else {
+    console.log(`[Discovery][IG] Skippar hashtag-discovery (USE_HASHTAG_DISCOVERY=false)`);
   }
   return dedupeByHandle([fromReels, fromHashtags]);
 }
@@ -213,22 +235,38 @@ async function discoverIG(queries, metrics) {
 // ============================================================
 
 async function discoverTT(queries, metrics) {
-  const videoPromises = (queries.ig_terms || []).map(t =>
-    provider.searchTikTokVideo(t, 30).catch(err => {
-      console.warn(`[Discovery][TT] video "${t}" → ${err.message}`);
-      return { items: [] };
-    })
+  const terms = queries.ig_terms || [];
+  console.log(`[Discovery][TT] Söker ${terms.length} video-termer:`);
+  for (const t of terms) console.log(`[Discovery][TT]   • "${t}"`);
+
+  const videoPromises = terms.map(t =>
+    provider.searchTikTokVideo(t, 30)
+      .then(r => {
+        console.log(`[Discovery][TT] video "${t}" → ${(r.items || []).length} items`);
+        return r;
+      })
+      .catch(err => {
+        console.warn(`[Discovery][TT] video "${t}" → ${err.message}`);
+        return { items: [] };
+      })
   );
   const videoResults = await Promise.all(videoPromises);
   const fromVideos = dedupeByHandle(videoResults.map(r => r.items || []));
+  console.log(`[Discovery][TT] Video-fas klar: ${fromVideos.length} unika kandidater`);
 
   let fromHashtags = [];
   if (fromVideos.length < 60 && process.env.USE_HASHTAG_DISCOVERY === 'true') {
-    const hashtagPromises = (queries.hashtag_terms || []).map(async tag => {
+    const hashtags = queries.hashtag_terms || [];
+    console.log(`[Discovery][TT] Triggar hashtag-discovery, testar ${hashtags.length} hashtags:`);
+    const hashtagPromises = hashtags.map(async tag => {
       try {
         const cached = await getCachedHashtag(tag, 'tiktok');
-        if (cached) return cached;
+        if (cached) {
+          console.log(`[Discovery][TT] hashtag #${tag} → CACHE-HIT (${(cached.items || []).length} items)`);
+          return cached;
+        }
         const data = await provider.searchTikTokHashtag(tag, 20);
+        console.log(`[Discovery][TT] hashtag #${tag} → ${(data.items || []).length} items`);
         await setCachedHashtag(tag, 'tiktok', data);
         return data;
       } catch (err) {
@@ -238,6 +276,11 @@ async function discoverTT(queries, metrics) {
     });
     const hashtagResults = await Promise.all(hashtagPromises);
     fromHashtags = dedupeByHandle(hashtagResults.map(r => r.items || []));
+    console.log(`[Discovery][TT] Hashtag-fas klar: ${fromHashtags.length} unika kandidater`);
+  } else if (fromVideos.length >= 60) {
+    console.log(`[Discovery][TT] Skippar hashtag-discovery (videos>=60)`);
+  } else {
+    console.log(`[Discovery][TT] Skippar hashtag-discovery (USE_HASHTAG_DISCOVERY=false)`);
   }
   return dedupeByHandle([fromVideos, fromHashtags]);
 }

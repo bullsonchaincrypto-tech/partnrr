@@ -9,6 +9,8 @@ import { scoreAndRankInfluencers, scoreInfluencer } from '../services/scoring.js
 import { searchInfluencersAI, generateNischKeywords, buildSearchQueries, generateYouTubeSearchTerms, generateDiscoveryHashtags, generateInstagramSearchTerms, getCachedSearch, setCachedSearch } from '../services/ai-search.js';
 import crypto from 'crypto';
 import { discoverInfluencers, isApifyConfigured as isApifyDiscoveryConfigured } from '../services/apify-discovery.js';
+import { shouldUseV9, costGuard, v9Summary24h } from '../services/v9-rollout.js';
+import { runV9Pipeline } from '../services/search-v9-orchestrator.js';
 
 const router = Router();
 
@@ -32,6 +34,51 @@ router.post('/influencers', async (req, res) => {
 
     if (bustCache) {
       console.log('[Search] ⚡ bust_cache=true — skippar YouTube-cache, tvingar färsk sökning');
+    }
+
+    // ============================================================
+    // === V9 PIPELINE GATE =======================================
+    // Om USE_V9_PIPELINE=true OCH rollout-bucket matchar → kör V9.
+    // Annars fall-through till befintlig V1/Apify-pipe nedan.
+    // ============================================================
+    if (shouldUseV9(foretag.id)) {
+      console.log(`[Search] V9 pipeline aktiv för foretag_id=${foretag.id} (rollout=${process.env.V9_SEARCH_ROLLOUT_PCT || 0}%)`);
+      try {
+        let companyProfileV9;
+        try {
+          companyProfileV9 = foretag.company_profile ? JSON.parse(foretag.company_profile) : {};
+        } catch { companyProfileV9 = {}; }
+        companyProfileV9.namn = foretag.namn;
+        companyProfileV9.bransch = foretag.bransch || foretag.beskrivning || '';
+        companyProfileV9.beskrivning = foretag.beskrivning || '';
+
+        const v9Result = await runV9Pipeline({
+          foretag,
+          companyProfile: companyProfileV9,
+          platforms: platforms || ['youtube', 'instagram', 'tiktok'],
+          userQuery: req.body.user_query || null,
+          bust_cache: bustCache,
+        });
+
+        // Fire-and-forget cost-guard (non-blocking för response)
+        costGuard().catch(() => {});
+
+        return res.json({
+          influencers: v9Result.results,
+          cached: v9Result.cached,
+          duration_ms: v9Result.duration_ms,
+          cost_usd: v9Result.cost_usd,
+          metrics: v9Result.metrics,
+          pipeline: 'v9',
+        });
+      } catch (err) {
+        if (err.status === 429) {
+          return res.status(429).json({ error: err.message });
+        }
+        console.error(`[Search][V9] Pipeline error: ${err.message}\n${err.stack}`);
+        // Fail-open: fall tillbaka till V1 vid V9-error (kritisk för tillgänglighet)
+        console.warn('[Search][V9] Fallback till V1/Apify-pipen pga V9-fel');
+      }
     }
 
     // Hämta company profile (enrichment + brief-svar)

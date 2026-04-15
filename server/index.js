@@ -35,6 +35,7 @@ import blacklistRoutes from './routes/blacklist.js';
 import reportRoutes from './routes/reports.js';
 import adminRoutes from './routes/admin.js';
 import testStatusRoutes from './routes/test-status.js';
+import v9MetricsRoutes from './routes/v9-metrics.js';
 import { startScheduler as startFollowupScheduler, getSettings as getFollowupSettings } from './services/followup-scheduler.js';
 
 const app = express();
@@ -81,6 +82,7 @@ app.use('/api/kampanjer', kampanjRoutes);
 app.use('/api/sign', signingRoutes);
 app.use('/api/team', teamRoutes);
 app.use('/api/search', searchRoutes);
+app.use('/api/v9', v9MetricsRoutes);
 app.use('/api/agents', agentRoutes);
 app.use('/api/chat', chatRoutes);
 app.use('/api/gmail-watcher', gmailWatcherRoutes);

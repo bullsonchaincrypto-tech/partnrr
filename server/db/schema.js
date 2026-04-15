@@ -629,6 +629,92 @@ export async function initDb() {
       FOREIGN KEY (user_id) REFERENCES team_members(id)
     )
     `,
+    // ============================================================
+    // === V9 PIPELINE TABLES (added 2026-04-15) ==================
+    // Inactive bakom USE_V9_PIPELINE feature-flag.
+    // V1/Apify-pipen är opåverkad.
+    // ============================================================
+    `
+    CREATE TABLE IF NOT EXISTS hashtag_cache (
+      id SERIAL PRIMARY KEY,
+      tag TEXT NOT NULL,
+      platform TEXT NOT NULL,
+      data JSONB NOT NULL,
+      created_at TIMESTAMP DEFAULT NOW(),
+      UNIQUE (tag, platform)
+    )
+    `,
+    `
+    CREATE TABLE IF NOT EXISTS obscurity_cache (
+      id SERIAL PRIMARY KEY,
+      handle TEXT NOT NULL,
+      platform TEXT NOT NULL,
+      niche TEXT NOT NULL,
+      google_rank INTEGER,
+      google_count BIGINT,
+      created_at TIMESTAMP DEFAULT NOW(),
+      UNIQUE (handle, platform, niche)
+    )
+    `,
+    `
+    CREATE TABLE IF NOT EXISTS list_discovery_cache (
+      id SERIAL PRIMARY KEY,
+      query_hash TEXT NOT NULL UNIQUE,
+      data JSONB NOT NULL,
+      created_at TIMESTAMP DEFAULT NOW()
+    )
+    `,
+    `
+    CREATE TABLE IF NOT EXISTS search_metrics (
+      id SERIAL PRIMARY KEY,
+      foretag_id INTEGER,
+      duration_ms INTEGER,
+      cost_usd NUMERIC(10,4),
+      raw_candidates INTEGER,
+      after_swedish_gate INTEGER,
+      after_brand_filter INTEGER,
+      after_haiku INTEGER,
+      final_count INTEGER,
+      multi_platform_count INTEGER,
+      reserve_used INTEGER DEFAULT 0,
+      hashtag_triggered BOOLEAN DEFAULT FALSE,
+      lookalike_triggered BOOLEAN DEFAULT FALSE,
+      obscurity_validation_run BOOLEAN DEFAULT FALSE,
+      query_refinement_triggered BOOLEAN DEFAULT FALSE,
+      comment_discovery_channels_found INTEGER DEFAULT 0,
+      bio_harvest_new_handles INTEGER DEFAULT 0,
+      list_discovery_handles_found INTEGER DEFAULT 0,
+      fof_lookalike_added INTEGER DEFAULT 0,
+      cache_hit BOOLEAN DEFAULT FALSE,
+      scrapecreators_calls INTEGER DEFAULT 0,
+      serper_calls INTEGER DEFAULT 0,
+      hikerapi_calls INTEGER DEFAULT 0,
+      created_at TIMESTAMP DEFAULT NOW()
+    )
+    `,
+    `
+    CREATE TABLE IF NOT EXISTS provider_events (
+      id SERIAL PRIMARY KEY,
+      provider TEXT NOT NULL,
+      endpoint TEXT NOT NULL,
+      status_code INTEGER,
+      duration_ms INTEGER,
+      success BOOLEAN,
+      error_message TEXT,
+      created_at TIMESTAMP DEFAULT NOW()
+    )
+    `,
+    `
+    CREATE INDEX IF NOT EXISTS idx_provider_events_recent
+      ON provider_events (provider, created_at DESC)
+    `,
+    `
+    CREATE TABLE IF NOT EXISTS search_locks (
+      foretag_id INTEGER PRIMARY KEY,
+      locked_at TIMESTAMP DEFAULT NOW(),
+      locked_by TEXT
+    )
+    `,
   ];
 
   for (const sql of tables) {

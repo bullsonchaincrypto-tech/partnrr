@@ -29,29 +29,61 @@ function sortForEnrichment(candidates) {
   });
 }
 
+// SC:s Instagram-profile-respons kan ha flera olika shapes:
+//   { user: { biography, full_name, ... } }
+//   { data: { user: { biography, ... } } }
+//   { biography, full_name, ... } (flat, utan wrapper)
+// Denna helper försöker alla varianter.
+function unwrapIgProfile(raw) {
+  if (!raw || typeof raw !== 'object') return {};
+  // Testa nested .data.user, .user, sedan raw direkt
+  return raw?.data?.user || raw?.user || raw?.data || raw || {};
+}
+
+function unwrapTtProfile(raw) {
+  if (!raw || typeof raw !== 'object') return {};
+  return raw?.data?.user || raw?.user || raw?.userInfo?.user
+    || raw?.data || raw || {};
+}
+
 function mergeIgProfile(original, profileResponse) {
-  const u = profileResponse?.user || {};
+  const u = unwrapIgProfile(profileResponse);
+  // Prova alla rimliga bio-fält SC kan returnera
+  const bio = u.biography
+    || u.bio
+    || u.biography_with_entities?.raw_text
+    || u.biography_with_entities?.text
+    || original.bio
+    || '';
+  // Diagnos-log vid första fetch om bio fortfarande tom
+  if (!bio && profileResponse) {
+    console.log(`[Enrichment][IG] @${original.handle}: tom bio efter parse. Top-level nycklar: ${Object.keys(profileResponse).join(', ')}`);
+  }
   return {
     ...original,
-    name: u.full_name || original.name,
-    bio: (u.biography || original.bio || '').slice(0, 1000),
-    followers: u.follower_count != null ? u.follower_count : original.followers,
-    external_url: u.external_url || original.external_url,
-    is_business_account: u.is_business === true,
-    business_category: u.category || original.business_category,
-    is_verified: !!(u.is_verified || original.is_verified),
+    name: u.full_name || u.name || original.name,
+    bio: bio.slice(0, 1000),
+    followers: u.follower_count ?? u.followers_count ?? u.followers ?? original.followers,
+    external_url: u.external_url || u.external_lynx_url || original.external_url,
+    is_business_account: u.is_business === true || u.is_business_account === true,
+    business_category: u.category || u.category_name || original.business_category,
+    is_verified: !!(u.is_verified || u.verified || original.is_verified),
     platforms_data: { ...(original.platforms_data || {}), instagram: profileResponse },
   };
 }
 
 function mergeTtProfile(original, profileResponse) {
-  const u = profileResponse?.user || profileResponse || {};
+  const u = unwrapTtProfile(profileResponse);
+  const bio = u.signature || u.biography || u.bio || original.bio || '';
+  if (!bio && profileResponse) {
+    console.log(`[Enrichment][TT] @${original.handle}: tom bio efter parse. Top-level nycklar: ${Object.keys(profileResponse).join(', ')}`);
+  }
   return {
     ...original,
-    name: u.nickname || u.full_name || original.name,
-    bio: (u.signature || u.biography || original.bio || '').slice(0, 1000),
-    followers: u.follower_count ?? u.fans ?? original.followers,
-    is_verified: !!(u.verified || original.is_verified),
+    name: u.nickname || u.full_name || u.unique_id || original.name,
+    bio: bio.slice(0, 1000),
+    followers: u.follower_count ?? u.followerCount ?? u.fans ?? original.followers,
+    is_verified: !!(u.verified || u.is_verified || original.is_verified),
     platforms_data: { ...(original.platforms_data || {}), tiktok: profileResponse },
   };
 }

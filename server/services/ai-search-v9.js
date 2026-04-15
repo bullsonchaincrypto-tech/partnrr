@@ -57,6 +57,11 @@ negative_terms (3-5): ord/fraser som starkt indikerar brand snarare än creator.
 const IG_SYSTEM = `Du genererar söktermer för Instagram + TikTok video-discovery. Målet är
 svenska KREATÖRER (människor/familjer, ej företag) i nischen <PRIMARY_NICHE>.
 
+KRITISKT: Instagram/TikTok search saknar region-filter. Våra queries MÅSTE
+därför anchoras hårt mot svenska för att undvika internationella träffar.
+Queries som "fantasy fotboll svenska" drar in engelska reels med "svenska"
+någonstans i captionen. Vi behöver STARKARE anchors.
+
 Returnera STRIKT JSON:
 {
   "ig_terms": [8 strängar],
@@ -64,20 +69,31 @@ Returnera STRIKT JSON:
 }
 
 Regler för ig_terms (8 st):
-1. Varje term måste innehålla minst ett CREATOR-ord:
+1. MINST ETT AV dessa STARKA svenska anchors per term:
+   (a) åäö-tecken i ordet (prioriterat — matchar bara svenskt innehåll)
+   (b) "på svenska" som fras
+   (c) ett svenskt stadsnamn (Stockholm, Göteborg, Malmö, Uppsala, Lund)
+   (d) ".se" eller "sverige.se"
+   (e) en sammansatt svensk term (fotbollsproffs, träningsvlogg, matrecept)
+2. Varje term måste innehålla minst ett CREATOR-ord:
    "youtuber", "bloggare", "influencer", "tiktokare", "creator",
    "recenserar", "tipsar", "berättar", "visar", "skapar"
-2. Svensk markör krävs: åäö ELLER "sverige/svensk/svenska".
 3. 2-4 ord per term.
-4. Samma förbjudna magnet- och brand-ord som för YT-terms.
+4. FÖRBJUDNA: engelska magnet-ord (review, tutorial, tips — ENGELSKA) och
+   brand-ord (officiell, shop, etc.)
 5. Variation över flera content-typer.
+
+Exempel PRIO-ordning för en nisch "fantasy fotboll":
+Bra (åäö + creator):   "svensk fotbollsbloggare tips"
+Bra (stadsnamn):        "stockholm fantasy creator"
+Bra (sammansatt):       "fotbollsproffs berättar svenska"
+Dåligt (för svagt):     "fantasy fotboll svensk" (SC matchar eng reels)
 
 Regler för hashtag_terms (6 st):
 1. Svenska nisch-hashtags, utan #-tecken.
 2. Matcha regex: /^[a-zåäö0-9_]{4,30}$/i
-3. Undvik generiska internationella (tech, gadget, food utan svensk prefix).
-4. Mix av svenska sammansättningar, nischspecifika svenska, ort-baserade om
-   relevant.`;
+3. Föredra sammansatta som "svensktiktok", "fantasyfotbollsverige".
+4. Mix av generiska svenska (svensktiktok, svenskfotboll) + nisch-specifika.`;
 
 // ============================================================
 // === HELPERS =================================================

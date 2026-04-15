@@ -180,9 +180,11 @@ async function acquireSearchLock(foretag_id) {
       `DELETE FROM search_locks
        WHERE locked_at < NOW() - INTERVAL '${LOCK_STALE_SEC} seconds'`
     );
+    // OBS: RETURNING foretag_id explicit → bypass db/schema.js runSql's
+    // auto-append av 'RETURNING id' (search_locks har ingen id-kolumn).
     await runSql(
       `INSERT INTO search_locks (foretag_id, locked_at, locked_by)
-       VALUES ($1, NOW(), $2)`,
+       VALUES ($1, NOW(), $2) RETURNING foretag_id`,
       [foretag_id, `v9-${process.pid}`]
     );
     return true;

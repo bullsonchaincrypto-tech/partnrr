@@ -47,30 +47,49 @@ async function searchYTPass(term, order, publishedAfter) {
 }
 
 async function gatherYTChannelIds(queries) {
-  const allTerms = [
-    ...queries.yt_terms.map(t => ({ term: t, order: 'relevance' })),
-    ...queries.yt_terms.map(t => ({ term: t, order: 'viewCount' })),
-  ];
+  // OBS: V9 använde tidigare BÅDE relevance och viewCount-passes per term
+  // (dubblerade quota från 600 till 1600 units). Nu: endast relevance per term
+  // för att matcha V1's quota-budget (~800 units för 8 termer).
+  const allTerms = queries.yt_terms.map(t => ({ term: t, order: 'relevance' }));
   if (process.env.USE_LONG_TAIL_QUERIES === 'true') {
     for (const t of queries.long_tail_terms || []) {
       allTerms.push({ term: t, order: 'relevance' });
     }
   }
 
+  console.log(`[Discovery][YT] Söker ${allTerms.length} termer (quota: ~${allTerms.length * 100} units):`);
+  for (const { term } of allTerms) console.log(`[Discovery][YT]   • "${term}"`);
+
   const channelIdSet = new Set();
+  const perQueryResults = [];
   const promises = allTerms.map(({ term, order }) =>
     searchYTPass(term, order, YT_PUBLISHED_AFTER)
       .then(data => {
-        for (const item of data.items || []) {
+        const items = data.items || [];
+        let newChannels = 0;
+        for (const item of items) {
           const id = item.snippet?.channelId;
-          if (id) channelIdSet.add(id);
+          if (id && !channelIdSet.has(id)) {
+            channelIdSet.add(id);
+            newChannels++;
+          }
         }
+        perQueryResults.push({ term, videos: items.length, newChannels });
       })
       .catch(err => {
         console.warn(`[Discovery][YT] "${term}" (${order}) → ${err.message}`);
+        perQueryResults.push({ term, videos: 0, newChannels: 0, error: err.message });
       })
   );
   await Promise.all(promises);
+
+  for (const r of perQueryResults) {
+    const info = r.error
+      ? `FEL: ${r.error}`
+      : `${r.videos} videos, ${r.newChannels} nya kanaler`;
+    console.log(`[Discovery][YT] "${r.term}" → ${info}`);
+  }
+  console.log(`[Discovery][YT] Totalt: ${channelIdSet.size} unika kanaler, ~${allTerms.length * 100} search-units förbrukade`);
   return [...channelIdSet];
 }
 

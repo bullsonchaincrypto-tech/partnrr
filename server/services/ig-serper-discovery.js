@@ -8,7 +8,7 @@
 //   5 AI-genererade keywords × 5 städer = 25 queries
 //   5 keywords × "Sverige"              =  5 queries
 //   5 keywords × "Sweden"               =  5 queries
-//   Totalt: 35 queries × 3 pages = 105 credits → ~1050 resultat
+//   Totalt: 35 queries × 3 pages = 105 credits, num:50 → ~5250 resultat
 //
 // OBS: num:100 blockeras av Serper för site:-dork queries (400 "Query not allowed").
 //      Pagination (page=1,2,3) funkar — varje page kostar 1 credit.
@@ -147,7 +147,7 @@ export async function discoverIGViaSerper(keywords, metrics = {}) {
         const data = await serperSearch(q, {
           gl: 'se',
           hl: 'sv',
-          num: 10,        // Serper blockerar num:100 med site:-dorks — håll på 10
+          num: 50,        // num:100 blockeras av Serper för site:-dorks, men 50 funkar (testat)
           tbs: 'qdr:m',  // Senaste månaden
           page,
         });

@@ -32,8 +32,9 @@ function getKey() {
  * @param {number} [opts.num=10] - Antal resultat
  * @param {string} [opts.location] - Specifik plats t.ex. "Stockholm, Sweden"
  * @param {string} [opts.tbs] - Tidsfilter t.ex. "qdr:m" (senaste månaden)
+ * @param {number} [opts.page=1] - Sidnummer (1-indexerat). Varje sida = 1 credit.
  */
-export async function serperSearch(q, { gl = 'se', hl = 'sv', num = 10, location, tbs } = {}) {
+export async function serperSearch(q, { gl = 'se', hl = 'sv', num = 10, location, tbs, page } = {}) {
   const t0 = Date.now();
   const ac = new AbortController();
   const timer = setTimeout(() => ac.abort(), TIMEOUT_MS);
@@ -44,6 +45,7 @@ export async function serperSearch(q, { gl = 'se', hl = 'sv', num = 10, location
     const body = { q, gl, hl, num };
     if (location) body.location = location;
     if (tbs) body.tbs = tbs;
+    if (page && page > 1) body.page = page;
     const res = await fetch(URL, {
       method: 'POST',
       headers: {

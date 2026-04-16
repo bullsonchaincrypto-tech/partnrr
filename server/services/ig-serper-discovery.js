@@ -8,10 +8,11 @@
 //   5 AI-genererade keywords × 5 städer = 25 queries
 //   5 keywords × "Sverige"              =  5 queries
 //   5 keywords × "Sweden"               =  5 queries
-//   Totalt: 35 queries à 1 Serper-credit × num:10 = ~350 resultat
+//   Totalt: 35 queries × 3 pages = 105 credits → ~1050 resultat
 //
 // OBS: num:100 blockeras av Serper för site:-dork queries (400 "Query not allowed").
-// Budget: 35 credits per sökning.
+//      Pagination (page=1,2,3) funkar — varje page kostar 1 credit.
+// Budget: ~105 credits per sökning (konfigurerbar via SERPER_PAGES_PER_QUERY env).
 // Output: RawCandidate[] med handle, namn (från title), bio (snippet).
 // Profil-berikining sker i Fas 6 via Apify.
 
@@ -102,6 +103,7 @@ function parseNameFromTitle(title, handle) {
 // ============================================================
 
 const BATCH_SIZE = 5; // Parallella Serper-anrop per batch
+const PAGES_PER_QUERY = parseInt(process.env.SERPER_PAGES_PER_QUERY) || 3; // Sidor per query (1 credit/sida)
 
 /**
  * @param {string[]} keywords - 5 AI-genererade nisch-keywords
@@ -115,7 +117,8 @@ export async function discoverIGViaSerper(keywords, metrics = {}) {
   }
 
   const queries = buildDorkQueries(keywords);
-  console.log(`[Discovery][IG-Serper] ${queries.length} queries (${keywords.length} keywords × ${CITIES.length + GEO_VARIANTS.length} geo-varianter, num:100, ${queries.length} credits)`);
+  const totalCredits = queries.length * PAGES_PER_QUERY;
+  console.log(`[Discovery][IG-Serper] ${queries.length} queries × ${PAGES_PER_QUERY} pages = ${totalCredits} credits (${keywords.length} keywords × ${CITIES.length + GEO_VARIANTS.length} geo-varianter)`);
   for (const kw of keywords) console.log(`[Discovery][IG-Serper]   keyword: "${kw}"`);
 
   const handleMap = new Map();       // handle → candidate
@@ -126,17 +129,27 @@ export async function discoverIGViaSerper(keywords, metrics = {}) {
   // Initiera per-query stats
   for (const { label } of queries) queryStats.set(label, { profiles: new Set(), totalResults: 0 });
 
+  // Expandera queries med pages: [{q, label, page}, ...]
+  const expandedQueries = [];
+  for (const { q, label } of queries) {
+    for (let p = 1; p <= PAGES_PER_QUERY; p++) {
+      expandedQueries.push({ q, label, page: p });
+    }
+  }
+
   // Kör i batches om 5 parallellt
-  for (let i = 0; i < queries.length; i += BATCH_SIZE) {
-    const batch = queries.slice(i, i + BATCH_SIZE);
-    const results = await Promise.all(batch.map(async ({ q, label }, batchIdx) => {
+  for (let i = 0; i < expandedQueries.length; i += BATCH_SIZE) {
+    const batch = expandedQueries.slice(i, i + BATCH_SIZE);
+    const results = await Promise.all(batch.map(async ({ q, label, page }, batchIdx) => {
       const qIdx = i + batchIdx + 1;
+      const pageLabel = PAGES_PER_QUERY > 1 ? ` [p${page}]` : '';
       try {
         const data = await serperSearch(q, {
           gl: 'se',
           hl: 'sv',
           num: 10,        // Serper blockerar num:100 med site:-dorks — håll på 10
           tbs: 'qdr:m',  // Senaste månaden
+          page,
         });
         const organic = data.organic || [];
         // Räkna profiler (inte alla results, bara de med giltigt handle)
@@ -145,10 +158,10 @@ export async function discoverIGViaSerper(keywords, metrics = {}) {
           const h = extractHandleFromUrl(item.link);
           if (h) profileCount++;
         }
-        console.log(`[Discovery][IG-Serper] Q${qIdx}/${queries.length} ${label}: ${organic.length} results, ${profileCount} profiler`);
+        console.log(`[Discovery][IG-Serper] Q${qIdx}/${expandedQueries.length} ${label}${pageLabel}: ${organic.length} results, ${profileCount} profiler`);
         return { organic, label };
       } catch (err) {
-        console.warn(`[Discovery][IG-Serper] Q${qIdx}/${queries.length} ${label} FAIL: ${err.message}`);
+        console.warn(`[Discovery][IG-Serper] Q${qIdx}/${expandedQueries.length} ${label}${pageLabel} FAIL: ${err.message}`);
         failedQueries++;
         return { organic: [], label };
       }
@@ -222,13 +235,13 @@ export async function discoverIGViaSerper(keywords, metrics = {}) {
     console.log(`[Discovery][IG-Serper]   @${c.handle} (×${c._serper_appearances}): "${c.name}" — queries: [${c._serper_queries.join(', ')}]`);
   }
 
-  metrics.serper_ig_queries = queries.length;
+  metrics.serper_ig_queries = expandedQueries.length;
   metrics.serper_ig_total_organic = totalOrganic;
   metrics.serper_ig_unique_handles = candidates.length;
   metrics.serper_ig_failed_queries = failedQueries;
-  metrics.serper_calls = (metrics.serper_calls || 0) + queries.length;
+  metrics.serper_calls = (metrics.serper_calls || 0) + expandedQueries.length;
 
-  console.log(`[Discovery][IG-Serper] Klart: ${candidates.length} unika handles från ${totalOrganic} organiska resultat (${failedQueries} misslyckade queries, ${queries.length} credits)`);
+  console.log(`[Discovery][IG-Serper] Klart: ${candidates.length} unika handles från ${totalOrganic} organiska resultat (${failedQueries} misslyckade, ${expandedQueries.length} credits = ${queries.length} queries × ${PAGES_PER_QUERY} pages)`);
   return candidates;
 }
 

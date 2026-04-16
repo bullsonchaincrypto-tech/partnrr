@@ -154,7 +154,8 @@ Scora varje profil på FYRA dimensioner (var och en 0-100):
 4. AUTENTICITET (15% vikt) — Datakvalitet:
    - Riktig bio, extern URL, postar nyligen → hög
    - Tom bio, inget externt → låg
-   - Saknar data (followers null) → max 30
+   - Saknar followers-data (null) → autenticitet max 40 (okänt ≠ dåligt)
+   - Har bio/caption men saknar followers → autenticitet max 50
    - comment_depth >= 2 → +10 authenticity
    - platform_count >= 3 → +5 authenticity
 
@@ -163,7 +164,8 @@ match_score = round(nischfit*0.40 + audience_fit*0.20 + obscurity*0.25 + authent
 Hårda capar på match_score:
 - < 1000 followers → cap 40
 - < 500 followers → cap 25
-- < 100 eller null → cap 10
+- < 100 followers (bekräftat) → cap 10
+- followers = null (okänt, data saknas) → cap 50 (straffa INTE okänt lika hårt som noll)
 - Inget must-have-signal speglat i bio/captions → nischfit cap 60
 
 Returnera STRIKT JSON-array:
@@ -217,12 +219,19 @@ export function parseScoredWithTruncation(raw) {
 }
 
 export function applyFollowerCap(c) {
-  const f = c.followers ?? c.total_reach ?? 0;
+  const raw = c.followers ?? c.total_reach;
   let cap = 100;
-  if (f == null || f === 0) cap = 10;
-  else if (f < 100) cap = 10;
-  else if (f < 500) cap = 25;
-  else if (f < 1000) cap = 40;
+  if (raw == null) {
+    // Okänt antal följare (t.ex. SC nere) — straffa INTE hårt.
+    // Cap 50 = kan fortfarande rankas men inte slå ut berikade profiler.
+    cap = 50;
+  } else if (raw === 0 || raw < 100) {
+    cap = 10;
+  } else if (raw < 500) {
+    cap = 25;
+  } else if (raw < 1000) {
+    cap = 40;
+  }
   return Math.min(c.match_score || 0, cap);
 }
 

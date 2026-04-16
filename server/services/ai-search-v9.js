@@ -103,11 +103,22 @@ Dessa används i Google-dork queries: "keyword" "Stockholm" site:instagram.com
 2. BARA SVENSKA ORD. Inga engelska ord (gadgets, smarthome, beauty, skincare,
    gaming, lifestyle, etc.). Använd svenska motsvarigheter.
 3. Tänk: vilka SVENSKA ord finns i en svensk influencers Instagram-bio?
-   Exempel för nisch "smart hem": ["teknik", "hemautomation", "prylar", "heminredning", "elektronik"]
-   Exempel för nisch "fantasy fotboll": ["fotboll", "allsvenskan", "sport", "tränare", "speltips"]
-   Exempel för nisch "hudvård": ["hudvård", "skönhet", "hälsa", "ansiktsvård", "välmående"]
+   Välj ord som är ENTYDIGA för nischen — undvik ord med dubbla betydelser.
+
+   BRA exempel per nisch:
+   "smart hem":       ["teknik", "recension", "prylar", "uppkopplad", "dator"]
+   "fantasy fotboll": ["fotboll", "allsvenskan", "speltips", "tränare", "tipsproffs"]
+   "hudvård":         ["hudvård", "skönhet", "ansiktsvård", "rutiner", "välmående"]
+
+   DÅLIGA exempel (undvik dessa!):
+   "elektronik"    → matchar elektronisk MUSIK, inte teknik-content
+   "heminredning"  → matchar inrednings-konton, inte smart hem
+   "smarthems"     → påhittat ord, ger 0 träffar
+   "automation"    → för brett, matchar industriföretag
+
 4. Blanda nisch-specifika singelord med bredare kategori-ord.
-5. Minst 2 av 5 ska vara breda/generiska svenska ord relaterade till nischen.`;
+5. Minst 2 av 5 ska vara breda/generiska svenska ord relaterade till nischen.
+6. TESTA MENTALT: "Skulle detta ord stå i en CREATORS bio?" Om inte, byt ut det.`;
 
 // ============================================================
 // === HELPERS =================================================

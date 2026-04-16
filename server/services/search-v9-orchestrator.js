@@ -64,7 +64,7 @@ function logSourceQueryBreakdown(tag, list) {
 export function finalCut(scored, reservePool, {
   targetMin = parseInt(process.env.V9_TARGET_MIN_RESULTS) || 20,
   capMax = parseInt(process.env.V9_FINAL_CAP_MAX) || 40,
-  threshold = 25,
+  threshold = 15,
 } = {}) {
   // 1. Follower-cap safety net
   for (const c of scored) c.match_score = applyFollowerCap(c);
@@ -99,18 +99,25 @@ export function finalCut(scored, reservePool, {
     reserveUsed = refill.length;
   }
 
-  // 6. Hård golv: minst 15 OM vi har kvalitativt material.
-  // Tidigare bugg: om alla scores var <25 (irrelevanta för nisch), fyllde vi
-  // ändå på med skräp. Nu: bara padda om det finns minst några med >= 30
-  // (dvs pipelinen hittade något användbart).
-  if (final.length < 15) {
-    const hasQualityMaterial = sorted.some(c => (c.match_score || 0) >= 30);
+  // 6. Hård golv: minst 10 OM vi har kvalitativt material.
+  // Sänkt krav: >=20 istället för >=30, och minst 10 istf 15.
+  // Detta hanterar fallet då SC-enrichment är nere och alla profiler
+  // saknar followers-data (cappas hårt av follower-cap).
+  if (final.length < 10) {
+    const hasQualityMaterial = sorted.some(c => (c.match_score || 0) >= 20);
     if (hasQualityMaterial) {
-      const padding = sorted.filter(c => !final.includes(c)).slice(0, 15 - final.length);
+      const padding = sorted.filter(c => !final.includes(c)).slice(0, 10 - final.length);
       final = [...final, ...padding];
-      console.warn(`[FinalCut] Very low yield — padding till ${final.length} (kvalitetsmaterial finns)`);
+      console.warn(`[FinalCut] Very low yield — padding till ${final.length} (kvalitetsmaterial finns >=20)`);
     } else {
-      console.warn(`[FinalCut] Very low yield AND inget material >= 30 — returnerar bara ${final.length} riktigt relevanta istället för skräp`);
+      // Absolut sista fallback: returnera top-N ändå om vi har HAR kandidater
+      // men alla scorade lågt p.g.a. saknad data
+      if (sorted.length >= 5 && final.length === 0) {
+        final = sorted.slice(0, Math.min(10, sorted.length));
+        console.warn(`[FinalCut] Emergency fallback — ALLA scores <20 men ${sorted.length} kandidater finns. Returnerar top ${final.length} ändå.`);
+      } else {
+        console.warn(`[FinalCut] Very low yield AND inget material >= 20 — returnerar bara ${final.length} riktigt relevanta istället för skräp`);
+      }
     }
   }
 

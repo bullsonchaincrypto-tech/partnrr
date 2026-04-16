@@ -5,19 +5,20 @@
 // Använder site:instagram.com Google-dorks via Serper.dev.
 //
 // Strategi:
-//   5 AI-genererade keywords × 5 städer = 25 queries
+//   5 AI-genererade keywords × 3 städer = 15 queries
 //   5 keywords × "Sverige"              =  5 queries
-//   5 keywords × "Sweden"               =  5 queries
-//   Totalt: 35 queries à 1 Serper-credit = $0.069
+//   Totalt: 20 queries à 1 Serper-credit × num:100 = 2000 resultat
 //
+// Budget: max 20 credits per sökning.
 // Output: RawCandidate[] med handle, namn (från title), bio (snippet).
-// Profil-berikining sker i Fas 4.5 / Fas 6 via SC getIgProfile.
+// Profil-berikining sker i Fas 6 via Apify.
 
 import { serperSearch } from './serper.js';
 
-const TOP_5_CITIES = ['Stockholm', 'Göteborg', 'Malmö', 'Uppsala', 'Linköping'];
-const GEO_VARIANTS = ['Sverige', 'Sweden'];
+const CITIES = ['Stockholm', 'Göteborg', 'Malmö'];
+const GEO_VARIANTS = ['Sverige'];
 const DORK_EXCLUDES = '-inurl:/p/ -inurl:/reel -inurl:/channel -inurl:/explore';
+const MAX_QUERIES = 20; // Hård budget-cap
 
 // Paths som INTE är profil-URLs
 const NON_PROFILE_SLUGS = new Set([
@@ -37,7 +38,7 @@ const NON_PROFILE_SLUGS = new Set([
 export function buildDorkQueries(keywords) {
   const queries = [];
   for (const kw of keywords) {
-    for (const city of TOP_5_CITIES) {
+    for (const city of CITIES) {
       queries.push({
         q: `"${kw}" "${city}" ${DORK_EXCLUDES} site:instagram.com`,
         label: `"${kw}" × ${city}`,
@@ -49,6 +50,11 @@ export function buildDorkQueries(keywords) {
         label: `"${kw}" × ${geo}`,
       });
     }
+  }
+  // Hård budget-cap
+  if (queries.length > MAX_QUERIES) {
+    console.warn(`[IG-Serper] ${queries.length} queries genererade, cappar till ${MAX_QUERIES}`);
+    return queries.slice(0, MAX_QUERIES);
   }
   return queries;
 }
@@ -113,7 +119,7 @@ export async function discoverIGViaSerper(keywords, metrics = {}) {
   }
 
   const queries = buildDorkQueries(keywords);
-  console.log(`[Discovery][IG-Serper] ${queries.length} queries (${keywords.length} keywords × ${TOP_5_CITIES.length + GEO_VARIANTS.length} geo-varianter)`);
+  console.log(`[Discovery][IG-Serper] ${queries.length} queries (${keywords.length} keywords × ${CITIES.length + GEO_VARIANTS.length} geo-varianter, num:100, budget max ${MAX_QUERIES} credits)`);
   for (const kw of keywords) console.log(`[Discovery][IG-Serper]   keyword: "${kw}"`);
 
   const handleMap = new Map();       // handle → candidate

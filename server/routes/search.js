@@ -69,6 +69,15 @@ router.post('/influencers', async (req, res) => {
           'SELECT * FROM influencers WHERE foretag_id = ? ORDER BY id ASC',
           [foretag.id]
         );
+        console.log(`[Search][V9] savedRows från DB: ${savedRows.length} rader`);
+        if (savedRows.length > 0) {
+          console.log(`[Search][V9]   Första rad: id=${savedRows[0].id} kanalnamn="${savedRows[0].kanalnamn}" plattform="${savedRows[0].plattform}"`);
+        }
+        console.log(`[Search][V9] v9Result.results: ${(v9Result.results || []).length} kandidater`);
+        if ((v9Result.results || []).length > 0) {
+          const first = v9Result.results[0];
+          console.log(`[Search][V9]   Första kandidat: handle="${first.handle}" platform="${first.platform}"`);
+        }
 
         // Transformera till V1-kompatibel shape — frontend förväntar
         // { results: [...], total, sources, filters_applied }.
@@ -112,6 +121,12 @@ router.post('/influencers', async (req, res) => {
             obscurity_validated: !!cand.obscurity_validated,
           };
         }).sort((a, b) => (b.match_score || 0) - (a.match_score || 0));
+
+        console.log(`[Search][V9] enriched: ${enriched.length} rader, match_scores: [${enriched.slice(0, 5).map(e => e.match_score).join(', ')}...]`);
+        // Logga matchning: hur många DB-rader hittade sin V9-kandidat?
+        const matched = enriched.filter(e => e.match_score > 0).length;
+        const unmatched = enriched.filter(e => e.match_score === 0).length;
+        console.log(`[Search][V9] Matchning: ${matched} med score, ${unmatched} utan (handle-mismatch?)`);
 
         const sources = {
           youtube_api: (v9Result.results || []).filter(c => c.platform === 'youtube').length,

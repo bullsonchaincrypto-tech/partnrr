@@ -1,17 +1,18 @@
 // ============================================================
-// V9 Pipeline — Fas 6: Profile Enrichment
+// V9 Pipeline — Fas 6: Profile Enrichment (Apify-baserad)
 // ============================================================
 // För top 55 (sorterade på multi-platform → swedish_confidence → engagement)
-// hämtar full profile-data från IG/TT-providers. YT redan komplett från Fas 2.
+// hämtar full profile-data via Apify Instagram/TikTok Profile Scrapers.
+// YT redan komplett från Fas 2.
 //
+// Tidigare: ScrapeCreators (SC) — ersatt med Apify pga SC credits slut (402).
 // Post-enrichment re-verifierar Swedish Gate (för 'pending') och Brand Filter.
 
-import * as provider from './providers/social-provider.js';
+import { enrichInstagramProfiles, enrichTikTokProfiles } from './social-enrichment.js';
 import { applySwedishGate } from './swedish-gate.js';
 import { classifyBrand } from './brand-detector.js';
 
 const TOP_N = 55;
-const CHUNK_SIZE = 10;
 
 function sortForEnrichment(candidates) {
   return [...candidates].sort((a, b) => {
@@ -29,69 +30,43 @@ function sortForEnrichment(candidates) {
   });
 }
 
-// SC:s Instagram-profile-respons kan ha flera olika shapes:
-//   { user: { biography, full_name, ... } }
-//   { data: { user: { biography, ... } } }
-//   { biography, full_name, ... } (flat, utan wrapper)
-// Denna helper försöker alla varianter.
-function unwrapIgProfile(raw) {
-  if (!raw || typeof raw !== 'object') return {};
-  // Testa nested .data.user, .user, sedan raw direkt
-  return raw?.data?.user || raw?.user || raw?.data || raw || {};
-}
-
-function unwrapTtProfile(raw) {
-  if (!raw || typeof raw !== 'object') return {};
-  return raw?.data?.user || raw?.user || raw?.userInfo?.user
-    || raw?.data || raw || {};
-}
-
-function mergeIgProfile(original, profileResponse) {
-  const u = unwrapIgProfile(profileResponse);
-  // Prova alla rimliga bio-fält SC kan returnera
-  const bio = u.biography
-    || u.bio
-    || u.biography_with_entities?.raw_text
-    || u.biography_with_entities?.text
-    || original.bio
-    || '';
-  // Djupare diagnos om bio fortfarande tom — visa även inre nycklar
-  if (!bio && profileResponse) {
-    const topKeys = Object.keys(profileResponse).join(', ');
-    const dataKeys = profileResponse.data ? `data.{${Object.keys(profileResponse.data).join(', ')}}` : '';
-    const userKeys = profileResponse?.data?.user
-      ? `data.user.{${Object.keys(profileResponse.data.user).slice(0, 15).join(', ')}}`
-      : profileResponse?.user
-        ? `user.{${Object.keys(profileResponse.user).slice(0, 15).join(', ')}}`
-        : '';
-    console.log(`[Enrichment][IG] @${original.handle}: tom bio. Shape: top=[${topKeys}] ${dataKeys} ${userKeys}`);
-  }
+/**
+ * Merga Apify Instagram-enrichment in i V9-kandidat.
+ * Apify instagram-profile-scraper returnerar:
+ *   { username, fullName, biography, followersCount, followsCount,
+ *     postsCount, verified, isBusinessAccount, businessCategoryName,
+ *     externalUrl, profilePicUrl, ... }
+ */
+function mergeApifyIgProfile(original, apifyData) {
+  if (!apifyData) return original;
+  const bio = apifyData.bio || apifyData.biography || original.bio || '';
   return {
     ...original,
-    name: u.full_name || u.name || original.name,
+    name: apifyData.full_name || apifyData.fullName || original.name,
     bio: bio.slice(0, 1000),
-    followers: u.follower_count ?? u.followers_count ?? u.followers ?? original.followers,
-    external_url: u.external_url || u.external_lynx_url || original.external_url,
-    is_business_account: u.is_business === true || u.is_business_account === true,
-    business_category: u.category || u.category_name || original.business_category,
-    is_verified: !!(u.is_verified || u.verified || original.is_verified),
-    platforms_data: { ...(original.platforms_data || {}), instagram: profileResponse },
+    followers: apifyData.followers || apifyData.followersCount || original.followers,
+    external_url: apifyData.website || apifyData.externalUrl || original.external_url,
+    is_business_account: apifyData.is_business || apifyData.isBusinessAccount || false,
+    business_category: apifyData.category || apifyData.businessCategoryName || original.business_category,
+    is_verified: !!(apifyData.is_verified_platform || apifyData.is_verified || apifyData.verified || original.is_verified),
+    engagement_signal: apifyData.engagement_rate || original.engagement_signal || 0,
+    _already_enriched: true,
   };
 }
 
-function mergeTtProfile(original, profileResponse) {
-  const u = unwrapTtProfile(profileResponse);
-  const bio = u.signature || u.biography || u.bio || original.bio || '';
-  if (!bio && profileResponse) {
-    console.log(`[Enrichment][TT] @${original.handle}: tom bio efter parse. Top-level nycklar: ${Object.keys(profileResponse).join(', ')}`);
-  }
+/**
+ * Merga Apify TikTok-enrichment in i V9-kandidat.
+ */
+function mergeApifyTtProfile(original, apifyData) {
+  if (!apifyData) return original;
+  const bio = apifyData.bio || apifyData.signature || original.bio || '';
   return {
     ...original,
-    name: u.nickname || u.full_name || u.unique_id || original.name,
+    name: apifyData.full_name || apifyData.nickname || original.name,
     bio: bio.slice(0, 1000),
-    followers: u.follower_count ?? u.followerCount ?? u.fans ?? original.followers,
-    is_verified: !!(u.verified || u.is_verified || original.is_verified),
-    platforms_data: { ...(original.platforms_data || {}), tiktok: profileResponse },
+    followers: apifyData.followers || apifyData.followerCount || original.followers,
+    is_verified: !!(apifyData.is_verified || apifyData.verified || original.is_verified),
+    _already_enriched: true,
   };
 }
 
@@ -105,30 +80,64 @@ export async function enrichProfiles(candidates) {
   const top = sorted.slice(0, TOP_N);
   console.log(`[Enrichment] Sorting done. Top ${top.length} of ${candidates.length} selected for enrichment.`);
 
-  const enriched = [];
-  for (let i = 0; i < top.length; i += CHUNK_SIZE) {
-    const chunk = top.slice(i, i + CHUNK_SIZE);
-    const results = await Promise.all(chunk.map(async c => {
-      // Skippa om redan berikat av Fas 4.5 (pre-enrichment) — sparar SC-credits
-      if (c._already_enriched) return c;
-      try {
-        if (c.platform === 'instagram') {
-          const p = await provider.getIgProfile(c.handle);
-          return mergeIgProfile(c, p);
-        }
-        if (c.platform === 'tiktok') {
-          const p = await provider.getTikTokProfile(c.handle);
-          return mergeTtProfile(c, p);
-        }
-        // YouTube är redan komplett från Fas 2.4
-        return c;
-      } catch (err) {
-        console.warn(`[Enrichment] ${c.platform}:@${c.handle} → ${err.message}`);
-        return c;
-      }
-    }));
-    enriched.push(...results);
+  // Separera per plattform (skippa redan berikade)
+  const igCandidates = top.filter(c => c.platform === 'instagram' && !c._already_enriched);
+  const ttCandidates = top.filter(c => c.platform === 'tiktok' && !c._already_enriched);
+  const ytCandidates = top.filter(c => c.platform === 'youtube' || c._already_enriched);
+
+  console.log(`[Enrichment] To enrich: IG=${igCandidates.length}, TT=${ttCandidates.length}, YT/skip=${ytCandidates.length}`);
+
+  // Kör IG och TT parallellt via Apify
+  const [igResults, ttResults] = await Promise.all([
+    igCandidates.length > 0
+      ? enrichInstagramProfiles(igCandidates.map(c => c.handle)).catch(err => {
+          console.error(`[Enrichment] Apify IG batch failed: ${err.message}`);
+          return [];
+        })
+      : Promise.resolve([]),
+    ttCandidates.length > 0
+      ? enrichTikTokProfiles(ttCandidates.map(c => c.handle)).catch(err => {
+          console.error(`[Enrichment] Apify TT batch failed: ${err.message}`);
+          return [];
+        })
+      : Promise.resolve([]),
+  ]);
+
+  // Bygg lookup maps (handle → apify data)
+  const igMap = new Map();
+  for (const r of igResults) {
+    const key = (r.username || '').toLowerCase();
+    if (key) igMap.set(key, r);
   }
+  const ttMap = new Map();
+  for (const r of ttResults) {
+    const key = (r.username || '').toLowerCase();
+    if (key) ttMap.set(key, r);
+  }
+
+  console.log(`[Enrichment] Apify returned: IG=${igMap.size}/${igCandidates.length}, TT=${ttMap.size}/${ttCandidates.length}`);
+
+  // Merga enrichment-data in i kandidater
+  let enrichedCount = 0;
+  const enriched = top.map(c => {
+    if (c._already_enriched) return c;
+
+    const handle = (c.handle || '').toLowerCase();
+
+    if (c.platform === 'instagram' && igMap.has(handle)) {
+      enrichedCount++;
+      return mergeApifyIgProfile(c, igMap.get(handle));
+    }
+    if (c.platform === 'tiktok' && ttMap.has(handle)) {
+      enrichedCount++;
+      return mergeApifyTtProfile(c, ttMap.get(handle));
+    }
+
+    // Ingen enrichment — returnera oförändrad
+    return c;
+  });
+
+  console.log(`[Enrichment] Merged enrichment for ${enrichedCount}/${top.length} candidates`);
 
   // Post-enrichment re-verifiering
   let droppedSwedish = 0;
@@ -165,4 +174,4 @@ export async function enrichProfiles(candidates) {
   return all;
 }
 
-export const __test__ = { sortForEnrichment, mergeIgProfile, mergeTtProfile };
+export const __test__ = { sortForEnrichment, mergeApifyIgProfile, mergeApifyTtProfile };

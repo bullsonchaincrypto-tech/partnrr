@@ -91,9 +91,21 @@ async function searchKeyword(keyword, metrics) {
     let skippedCommercial = 0;
     let skippedPersonal = 0;
 
+    // Debug: logga första profilen för att se fältstruktur
+    if (items.length > 0) {
+      const sample = items[0];
+      const keys = Object.keys(sample).join(', ');
+      console.log(`[Discovery][IG-Search] "${keyword}" sample keys: ${keys}`);
+      console.log(`[Discovery][IG-Search] "${keyword}" sample username fields: username=${sample.username}, login=${sample.login}, pk=${sample.pk}, id=${sample.id}, handle=${sample.handle}`);
+    }
+
     for (const p of items) {
-      const handle = (p.username || '').toLowerCase();
-      if (!handle || handle.length > 30) continue;
+      // Robust username extraction — Apify actors varierar i fältnamn
+      const handle = (p.username || p.login || p.handle || p.ownerUsername || p.user?.username || '').toLowerCase().replace(/^@/, '');
+      if (!handle || handle.length > 30) {
+        console.warn(`[Discovery][IG-Search] "${keyword}": skipping item with no parseable username. Keys: ${Object.keys(p).slice(0, 10).join(', ')}`);
+        continue;
+      }
 
       // Skippa privata konton
       if (p.isPrivate || p.is_private) {
@@ -109,8 +121,7 @@ async function searchKeyword(keyword, metrics) {
         continue;
       }
 
-      // Personliga konton (utan business/creator) — lägre prioritet men behåll
-      // De kan fortfarande vara bra creators som inte bytt kontotyp
+      // Behåll alla andra (creator, unknown, personal)
       const cat = (p.businessCategoryName || p.business_category_name || p.category || '');
 
       candidates.push({
@@ -153,20 +164,60 @@ async function searchKeyword(keyword, metrics) {
 }
 
 /**
+ * Gör serper_keywords (optimerade för Google-dork) IG-sök-vänliga.
+ * Instagram user search matchar på username + name + bio — korta, enkla termer fungerar bäst.
+ *
+ * "pälsvård hemma" → ["pälsvård"]
+ * "hundgrooming tips" → ["hundgrooming"]
+ * "katt grooming" → ["katt grooming", "kattgrooming"]
+ * "djurvård produkter" → ["djurvård"]
+ */
+function simplifyForIGSearch(keywords) {
+  // Filler-ord som inte hjälper i IG-sök
+  const FILLER = new Set([
+    'tips', 'hemma', 'bäst', 'bästa', 'bra', 'guide', 'recension',
+    'recensioner', 'produkt', 'produkter', 'köp', 'online', 'billig',
+    'billiga', 'gratis', 'blogg', 'vlogg', 'kanal', 'konto',
+    'inspiration', 'idéer', 'svenska', 'svensk', 'sverige',
+  ]);
+
+  const simplified = new Set();
+  for (const kw of keywords) {
+    const words = kw.trim().split(/\s+/).filter(w => !FILLER.has(w.toLowerCase()));
+    if (words.length === 0) {
+      // Hela keywordet var filler — behåll ursprungligt första ord
+      const first = kw.trim().split(/\s+/)[0];
+      if (first) simplified.add(first.toLowerCase());
+    } else if (words.length === 1) {
+      simplified.add(words[0].toLowerCase());
+    } else {
+      // Flera kvar: behåll som fras OCH som ihopskrivet
+      simplified.add(words.join(' ').toLowerCase());
+      simplified.add(words.join('').toLowerCase());
+    }
+  }
+  return [...simplified];
+}
+
+/**
  * Kör search-discovery för alla keywords.
- * @param {string[]} keywords - AI-genererade nisch-keywords
- * @param {string[]} hashtags - AI-genererade hashtags (används som extra keywords)
+ * @param {string[]} keywords - AI-genererade nisch-keywords (serper_keywords)
+ * @param {string[]} hashtags - AI-genererade hashtags (hashtag_terms)
  * @param {object} metrics
  * @returns {RawCandidate[]}
  */
 export async function discoverIGViaSearch(keywords, hashtags, metrics) {
-  // Kombinera keywords + hashtags för bredare sökning
+  // Förbered IG-sök-vänliga keywords
+  const fromSerper = simplifyForIGSearch(keywords || []);
+  const fromHashtags = (hashtags || []).map(h => h.replace(/^#/, '').toLowerCase());
+
+  // Kombinera, dedup, max 10 sökningar
   const allKeywords = [
-    ...new Set([
-      ...(keywords || []),
-      ...(hashtags || []).map(h => h.replace(/^#/, '')),
-    ])
-  ].slice(0, 8); // Max 8 sökningar
+    ...new Set([...fromSerper, ...fromHashtags])
+  ].slice(0, 10);
+
+  console.log(`[Discovery][IG-Search] Simplified keywords: ${fromSerper.join(', ')}`);
+  console.log(`[Discovery][IG-Search] Hashtag keywords: ${fromHashtags.join(', ')}`);
 
   if (allKeywords.length === 0) {
     console.warn('[Discovery][IG-Search] Inga keywords — returnerar tomt');

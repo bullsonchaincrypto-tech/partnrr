@@ -195,7 +195,7 @@ async function discoverIG(queries, metrics) {
   // === SEARCH MODE (default) — bästa kvalitet, full profildata direkt ===
   if (IG_DISCOVERY_MODE === 'search') {
     const serperKeywords = queries.serper_keywords || [];
-    const hashtags = queries.hashtags || [];
+    const hashtags = queries.hashtag_terms || queries.hashtags || [];
     if (serperKeywords.length > 0 || hashtags.length > 0) {
       console.log(`[Discovery][IG] MODE=search — Apify Instagram Search (${serperKeywords.length} keywords + ${hashtags.length} hashtags)`);
       return discoverIGViaSearch(serperKeywords, hashtags, metrics);
@@ -206,7 +206,7 @@ async function discoverIG(queries, metrics) {
 
   // === HASHTAG MODE ===
   if (IG_DISCOVERY_MODE === 'hashtag' || IG_DISCOVERY_MODE === 'search') {
-    const hashtags = queries.hashtags || [];
+    const hashtags = queries.hashtag_terms || queries.hashtags || [];
     if (hashtags.length > 0) {
       console.log(`[Discovery][IG] MODE=hashtag — Apify Hashtag Discovery (${hashtags.length} hashtags)`);
       return discoverIGViaHashtags(hashtags, metrics);

@@ -365,39 +365,38 @@ async function runPipelineInner(foretag, companyProfile, platforms, userQuery, b
     console.log(`[V9]   IG-reject @${c.handle}: confidence=${c.swedish_confidence}, bio="${(c.bio || '').slice(0, 60)}" caption="${(c.caption_sample || '').slice(0, 60)}"`);
   }
 
-  // === Fas 4: Brand Filter (deterministisk, gratis) ===
-  console.log(`[V9] >>> Fas 4: Brand Filter (deterministisk)`);
-  const { kept: brandKept, brands } = applyBrandFilter(swedishPassed);
-  metrics.after_brand_filter = brandKept.length;
-  console.log(`[V9] <<< Fas 4 klar. ${brandKept.length} kept, ${brands.length} rejected as brand`);
+  // === Fas 4: Enrichment (Apify) ===
+  // Enricha ALLA som passerat Swedish Gate — behövs för att Brand Filter
+  // och Haiku ska ha bio, followers, business_category att jobba med.
+  console.log(`[V9] >>> Fas 4: Profile Enrichment (${swedishPassed.length} profiler)`);
+  const enriched = await enrichProfiles(swedishPassed);
+  for (const c of enriched) c._already_enriched = true;
+  const enrichPlat = platformCounts(enriched);
+  console.log(`[V9] <<< Fas 4 klar. ${enriched.length} enriched (yt=${enrichPlat.youtube} ig=${enrichPlat.instagram} tt=${enrichPlat.tiktok})`);
 
-  // === Fas 5: Haiku Classifier (körs FÖRE enrichment för att spara Apify-credits) ===
-  // Haiku klassificerar creator/brand/uncertain baserat på tunn data (handle, bio, caption).
-  // Brands droppas här INNAN vi spenderar Apify-credits på enrichment.
-  // Post-enrichment brand-filter i Fas 6 fångar resterande brands med bättre data.
-  console.log(`[V9] >>> Fas 5: Haiku Classifier (pre-enrichment, tunn data)`);
+  // === Fas 5: Brand Filter (deterministisk, körs på enriched data) ===
+  console.log(`[V9] >>> Fas 5: Brand Filter (deterministisk, på enriched data)`);
+  const { kept: brandKept, brands } = applyBrandFilter(enriched);
+  metrics.after_brand_filter = brandKept.length;
+  console.log(`[V9] <<< Fas 5 klar. ${brandKept.length} kept, ${brands.length} rejected as brand`);
+
+  // === Fas 6: Haiku Classifier (körs på enriched + brand-filtered data) ===
+  console.log(`[V9] >>> Fas 6: Haiku Classifier (på enriched data)`);
   const { confirmed, reserve } = await classifyWithHaiku(brandKept);
   metrics.after_haiku = confirmed.length;
   const confPlat = platformCounts(confirmed);
-  console.log(`[V9] <<< Fas 5 klar. confirmed=${confirmed.length} reserve=${reserve.length} (yt=${confPlat.youtube} ig=${confPlat.instagram} tt=${confPlat.tiktok})`);
+  console.log(`[V9] <<< Fas 6 klar. confirmed=${confirmed.length} reserve=${reserve.length} (yt=${confPlat.youtube} ig=${confPlat.instagram} tt=${confPlat.tiktok})`);
   logSourceQueryBreakdown('efter Haiku', confirmed);
 
-  // === Fas 5.5: Lookalike Expansion ===
-  console.log(`[V9] >>> Fas 5.5: Lookalike Expansion (${process.env.USE_LOOKALIKE_EXPANSION === 'true' ? 'AKTIV' : 'SKIPPAD'})`);
+  // === Fas 6.5: Lookalike Expansion ===
+  console.log(`[V9] >>> Fas 6.5: Lookalike Expansion (${process.env.USE_LOOKALIKE_EXPANSION === 'true' ? 'AKTIV' : 'SKIPPAD'})`);
   const lookalikes = await expandWithLookalikes(confirmed, brief, metrics);
-  const allForEnrichment = [...confirmed, ...lookalikes];
-  console.log(`[V9] <<< Fas 5.5 klar. +${lookalikes.length} lookalikes, totalt till enrichment: ${allForEnrichment.length}`);
-
-  // === Fas 6: Enrichment (Apify — bara confirmed creators + lookalikes) ===
-  // Enrichar BARA profiler som Haiku bekräftat som creators.
-  // Sparar ~50% Apify-credits jämfört med att enricha alla.
-  console.log(`[V9] >>> Fas 6: Profile Enrichment (${allForEnrichment.length} profiler)`);
-  const enriched = await enrichProfiles(allForEnrichment);
-  console.log(`[V9] <<< Fas 6 klar. ${enriched.length} enriched (inkl skipped)`);
+  const allScored = [...confirmed, ...lookalikes];
+  console.log(`[V9] <<< Fas 6.5 klar. +${lookalikes.length} lookalikes, totalt: ${allScored.length}`);
 
   // === Fas 7: Two-Stage Scoring ===
   console.log(`[V9] >>> Fas 7: Two-Stage Scoring`);
-  const scored = await scoreCandidates(enriched, brief, companyProfile);
+  const scored = await scoreCandidates(allScored, brief, companyProfile);
   const highScore = scored.filter(c => (c.match_score || 0) >= 60).length;
   const midScore = scored.filter(c => (c.match_score || 0) >= 40 && (c.match_score || 0) < 60).length;
   const lowScore = scored.filter(c => (c.match_score || 0) < 40).length;

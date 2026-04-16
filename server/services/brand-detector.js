@@ -1,10 +1,11 @@
 // ============================================================
 // V9 Pipeline — Fas 4: Deterministic Brand Filter (8 signaler)
 // ============================================================
-// Fångar ~80% av brands gratis innan Haiku-classifier (Fas 5).
+// Körs EFTER enrichment (Fas 4) så bio/followers/category finns tillgängligt.
+// Fångar brands deterministiskt innan Haiku-classifier (Fas 6).
 // Verdict:
-//   - score >= 4 → 'brand' (REJECT)
-//   - score 2-3 → 'ambiguous' (skicka till Haiku)
+//   - score >= 3 → 'brand' (REJECT)
+//   - score 2   → 'ambiguous' (skicka till Haiku)
 //   - score 0-1 → 'creator' (passera direkt)
 
 import {
@@ -75,7 +76,7 @@ export function classifyBrand(c) {
   if (b8) { score++; sig.B8 = true; }
 
   let klass;
-  if (score >= 4) klass = 'brand';
+  if (score >= 3) klass = 'brand';
   else if (score >= 2) klass = 'ambiguous';
   else klass = 'creator';
 

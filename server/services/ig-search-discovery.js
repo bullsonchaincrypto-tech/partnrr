@@ -20,71 +20,14 @@ const SEARCH_ACTOR = 'apify/instagram-search-scraper';
 const RESULTS_PER_KEYWORD = parseInt(process.env.IG_SEARCH_RESULTS_PER_KW) || 30;
 const TIMEOUT_SECS = 120;
 
-// Kommersiella kategorier = troligen brand, inte creator
-const COMMERCIAL_CATEGORIES = new Set([
-  // Exakt-matchning (case-insensitive, "none,"-prefix hanteras i parseCategories)
-  'shopping & retail', 'retail company', 'product/service',
-  'brand', 'company', 'e-commerce website', 'business service',
-  'local business', 'restaurant', 'bar', 'hotel', 'grocery store',
-  'food & beverage company', 'health/beauty', 'automotive dealership',
-  'real estate', 'insurance company', 'bank', 'financial service',
-  'clothing store', 'jewelry/watches', 'home decor', 'furniture store',
-  'pet store', 'veterinarian', 'pet service',
-  // Tillagda från Apify-loggar 2026-04-16
-  'pet groomer', 'beauty, cosmetic & personal care', 'lifestyle services',
-  'book', 'book series',
-  'electrician', 'martial arts school', 'pet supplies', 'agriculture',
-  'interior design studio', 'gym/physical fitness center', 'sports league',
-  'school', 'nonprofit organization', 'government organization',
-  'media/news company', 'tv channel', 'radio station', 'magazine',
-  'church/religious organization', 'political organization',
-]);
-
-// Creator-kategorier = bra signal
-const CREATOR_CATEGORIES = new Set([
-  'personal blog', 'public figure', 'artist', 'content creator',
-  'creator', 'digital creator', 'video creator', 'reels creator',
-  'reels-kreatör', 'gamer', 'gaming video creator', 'blogger',
-  'musician/band', 'comedian', 'writer', 'photographer',
-  'fitness trainer', 'coach', 'entrepreneur', 'editor',
-]);
-
 /**
  * Parsa Apify-kategori — hanterar "none,product/service"-format.
- * Returnerar array av rena kategorier (utan "none").
+ * Returnerar rengjord kategori-sträng (utan "none").
  */
-function parseCategories(profile) {
+function parseCategory(profile) {
   const raw = (profile.businessCategoryName || profile.business_category_name || profile.category || '').toLowerCase().trim();
-  if (!raw) return [];
-  // Apify returnerar ibland "none,pet service" eller "none,product/service"
-  return raw.split(',').map(c => c.trim()).filter(c => c && c !== 'none');
-}
-
-/**
- * Klassificera profil baserat på isBusinessAccount + category.
- * @returns {'creator'|'business'|'personal'|'unknown'|'unknown-nocat'}
- */
-function classifyAccountType(profile) {
-  const isBiz = profile.isBusinessAccount || profile.is_business_account;
-  const cats = parseCategories(profile);
-
-  if (!isBiz) return 'personal';
-
-  // Business/Creator-konto — kolla ALLA kategorier (kan ha flera)
-  for (const cat of cats) {
-    if (COMMERCIAL_CATEGORIES.has(cat)) return 'business';
-  }
-  for (const cat of cats) {
-    if (CREATOR_CATEGORIES.has(cat)) return 'creator';
-  }
-
-  // Okänd kategori men har business-konto
-  if (cats.length > 0) {
-    const handle = profile.username || profile.handle || '?';
-    console.log(`[Discovery][IG-Search] UNKNOWN category: "${cats.join(', ')}" (handle=${handle})`);
-    return 'unknown';
-  }
-  return 'unknown-nocat';
+  if (!raw) return '';
+  return raw.split(',').map(c => c.trim()).filter(c => c && c !== 'none').join(', ');
 }
 
 /**
@@ -128,16 +71,7 @@ async function searchKeyword(keyword, metrics) {
     // Mappa till RawCandidate-format
     const candidates = [];
     let skippedPrivate = 0;
-    let skippedCommercial = 0;
     let skippedPersonal = 0;
-
-    // Debug: logga första profilen för att se fältstruktur
-    if (items.length > 0) {
-      const sample = items[0];
-      const keys = Object.keys(sample).join(', ');
-      console.log(`[Discovery][IG-Search] "${keyword}" sample keys: ${keys}`);
-      console.log(`[Discovery][IG-Search] "${keyword}" sample username fields: username=${sample.username}, login=${sample.login}, pk=${sample.pk}, id=${sample.id}, handle=${sample.handle}`);
-    }
 
     for (const p of items) {
       // Robust username extraction — Apify actors varierar i fältnamn
@@ -153,23 +87,16 @@ async function searchKeyword(keyword, metrics) {
         continue;
       }
 
-      const accountType = classifyAccountType(p);
-
-      // Filtrera bort kommersiella brands
-      if (accountType === 'business') {
-        skippedCommercial++;
-        continue;
-      }
-
       // Filtrera bort personal accounts (isBusinessAccount=false)
       // Riktiga creators har alltid Business eller Creator-konto på Instagram
-      if (accountType === 'personal') {
+      const isBiz = p.isBusinessAccount || p.is_business_account;
+      if (!isBiz) {
         skippedPersonal++;
         continue;
       }
 
-      // Behåll creator + unknown (båda har isBusinessAccount=true)
-      const cat = (p.businessCategoryName || p.business_category_name || p.category || '');
+      // Alla business/creator-konton går vidare — Haiku i Fas 6 avgör brand vs creator
+      const cat = parseCategory(p);
 
       candidates.push({
         handle,
@@ -189,13 +116,12 @@ async function searchKeyword(keyword, metrics) {
         is_verified: p.isVerified || p.is_verified || false,
         discovery_source: 'search',
         discovery_query: keyword,
-        account_type: accountType,
         _already_enriched: true, // Vi har redan all profildata
         _search_appearances: 1,
       });
     }
 
-    console.log(`[Discovery][IG-Search] "${keyword}": ${candidates.length} kept, skipped: ${skippedPrivate} private, ${skippedCommercial} commercial, ${skippedPersonal} personal`);
+    console.log(`[Discovery][IG-Search] "${keyword}": ${candidates.length} kept, skipped: ${skippedPrivate} private, ${skippedPersonal} personal (no biz account)`);
 
     if (metrics) {
       metrics.search_total_returned = (metrics.search_total_returned || 0) + items.length;
@@ -355,27 +281,19 @@ export async function discoverIGViaSearch(keywords, hashtags, igTerms, metrics) 
     }
   }
 
-  // Sortera: creators först, sen unknown-med-kategori, sen nocat, sen followers
+  // Sortera: multi-keyword appearances först, sen followers
   const sorted = Array.from(allCandidates.values()).sort((a, b) => {
-    const typeOrder = { creator: 0, unknown: 1, 'unknown-nocat': 2 };
-    const aType = typeOrder[a.account_type] ?? 1;
-    const bType = typeOrder[b.account_type] ?? 1;
-    if (aType !== bType) return aType - bType;
-
-    // 2. Multi-keyword appearances
+    // 1. Multi-keyword appearances
     if (b._search_appearances !== a._search_appearances) {
       return b._search_appearances - a._search_appearances;
     }
-
-    // 3. Followers
+    // 2. Followers
     return (b.followers || 0) - (a.followers || 0);
   });
 
   // Logga statistik
-  const typeDist = { creator: 0, unknown: 0, 'unknown-nocat': 0 };
-  for (const c of sorted) typeDist[c.account_type] = (typeDist[c.account_type] || 0) + 1;
-  console.log(`[Discovery][IG-Search] Totalt: ${sorted.length} unika profiler`);
-  console.log(`[Discovery][IG-Search] Kontotyp: creator=${typeDist.creator}, unknown=${typeDist.unknown}, personal=${typeDist.personal}`);
+  const withCat = sorted.filter(c => c.business_category).length;
+  console.log(`[Discovery][IG-Search] Totalt: ${sorted.length} unika profiler (${withCat} med kategori)`);
 
   if (metrics) {
     metrics.ig_search_queries = allKeywords.length;

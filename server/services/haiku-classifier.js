@@ -152,9 +152,16 @@ export async function classifyWithHaiku(candidates) {
       }
     });
     console.log(`[HaikuClassifier] Batch breakdown — creator:${breakdown.creator}, brand:${breakdown.brand}, uncertain:${breakdown.uncertain}, missing:${breakdown.missing}`);
-    // Sample 3 dropped för diagnos
-    for (const d of dropped.slice(0, 3)) {
-      console.log(`[HaikuClassifier]   DROP @${d.handle} (${d.platform}) class=${d.class} conf=${d.conf.toFixed(2)} bio="${d.bio}"`);
+    // Logga ALLA droppade handles (inte bara sample)
+    if (dropped.length > 0) {
+      const brandDrops = dropped.filter(d => d.class === 'brand');
+      const otherDrops = dropped.filter(d => d.class !== 'brand');
+      if (brandDrops.length > 0) {
+        console.log(`[HaikuClassifier]   BRAND-REJECT (${brandDrops.length}): ${brandDrops.map(d => `@${d.handle}`).join(', ')}`);
+      }
+      if (otherDrops.length > 0) {
+        console.log(`[HaikuClassifier]   OTHER-DROP (${otherDrops.length}): ${otherDrops.map(d => `@${d.handle}(${d.class})`).join(', ')}`);
+      }
     }
     console.log(`[HaikuClassifier] Batch ${Math.floor(i / BATCH_SIZE) + 1}/${Math.ceil(candidates.length / BATCH_SIZE)} processed (${batch.length} profiler)`);
   }

@@ -12,7 +12,9 @@ import { enrichInstagramProfiles, enrichTikTokProfiles } from './social-enrichme
 import { applySwedishGate } from './swedish-gate.js';
 import { classifyBrand } from './brand-detector.js';
 
-const TOP_N = 55;
+// Ingen cap — alla som passerat Swedish Gate ska berikas via Apify.
+// Sorteringen behålls för att multi-platform/hard-confidence batchas först.
+const TOP_N = Infinity;
 
 function sortForEnrichment(candidates) {
   return [...candidates].sort((a, b) => {
@@ -78,7 +80,7 @@ export async function enrichProfiles(candidates) {
   const t0 = Date.now();
   const sorted = sortForEnrichment(candidates);
   const top = sorted.slice(0, TOP_N);
-  console.log(`[Enrichment] Sorting done. Top ${top.length} of ${candidates.length} selected for enrichment.`);
+  console.log(`[Enrichment] All ${top.length} of ${candidates.length} candidates selected for enrichment.`);
 
   // Separera per plattform (skippa redan berikade)
   const igCandidates = top.filter(c => c.platform === 'instagram' && !c._already_enriched);

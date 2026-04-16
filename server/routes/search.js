@@ -111,7 +111,10 @@ router.post('/influencers', async (req, res) => {
                      : cand.platform === 'instagram' ? 'apify_instagram'
                      : cand.platform === 'tiktok' ? 'apify_tiktok'
                      : 'ai-discovery-v9',
-            enrichment_kalla: 'v9-pipeline',
+            enrichment_kalla: cand.platform === 'youtube' ? 'YouTube Data API v3'
+                             : cand.platform === 'instagram' ? 'Apify Instagram'
+                             : cand.platform === 'tiktok' ? 'Apify TikTok'
+                             : 'v9-pipeline',
             verifierad: !!(cand.is_verified || cand.verifierad),
             videoCount: 0,
             viewCount: 0,

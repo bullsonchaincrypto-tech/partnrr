@@ -133,8 +133,8 @@ export async function discoverIGViaSerper(keywords, metrics = {}) {
         const data = await serperSearch(q, {
           gl: 'se',
           hl: 'sv',
-          num: 10,
-          tbs: 'qdr:m', // Senaste månaden
+          num: 100,       // Max resultat — 1 credit oavsett num
+          tbs: 'qdr:m',  // Senaste månaden
         });
         const organic = data.organic || [];
         // Räkna profiler (inte alla results, bara de med giltigt handle)

@@ -99,32 +99,32 @@ Regler för hashtag_terms (6 st):
 
 Regler för serper_keywords (5 st):
 Dessa används i Google-dork queries: "keyword" "Stockholm" site:instagram.com
-1. Max 2 ord per keyword. Sammansatta svenska ord (fantasyfotboll, speltips) räknas som 1 ord.
-2. BARA SVENSKA ORD. Inga engelska ord (gadgets, smarthome, beauty, skincare,
-   gaming, lifestyle, etc.). Använd svenska motsvarigheter.
+1. 1-3 ord per keyword. SKRIV ISÄR ord — använd INTE sammansättningar!
+   Google matchar "fantasy fotboll" mycket bättre än "fantasyfotboll".
+   Sammansatta ord som inte är etablerade svenska ord ger ofta 0 träffar.
+
+   FÖRBJUDET: "fantasyfotboll", "fantasyliga", "smarthem", "hemautomation"
+   RÄTT:      "fantasy fotboll", "fantasy liga", "smart hem", "hem automation"
+
+2. BARA SVENSKA ORD (engelska OK om de används i Sverige, t.ex. "fantasy", "smart").
 3. KRITISKT: Keywords måste vara NISCH-SPECIFIKA, inte generiska!
    Om nischen är "fantasy fotboll" ska keywords handla om FANTASY, inte bara fotboll.
-   Om nischen är "smart hem" ska keywords handla om SMART HEM, inte bara teknik.
    Generiska ord som "fotboll" eller "teknik" ensamt ger tusentals irrelevanta träffar
-   (fotbollslag, teknikbutiker etc.) och är FÖRBJUDNA som ensamt keyword.
+   och är FÖRBJUDNA som ensamt keyword.
 
    BRA exempel per nisch:
-   "fantasy fotboll": ["fantasyfotboll", "fantasyliga", "managerspel", "fantasytips", "speltips"]
-   "smart hem":       ["smarthem", "hemautomation", "uppkopplat", "smartbelysning", "hemteknik"]
-   "hudvård":         ["hudvård", "ansiktsrutin", "hudtips", "skönhetsrutin", "hudvårdsrecension"]
+   "fantasy fotboll": ["fantasy fotboll", "fantasy tips", "drömlag", "speltips fotboll", "manager spel"]
+   "smart hem":       ["smart hem", "hem teknik", "uppkopplat hem", "smart belysning", "hemma prylar"]
+   "hudvård":         ["hudvård tips", "ansiktsvård", "hud rutin", "skönhets tips", "hudvård recension"]
 
    DÅLIGA exempel (FÖRBJUDNA):
-   "fotboll"       → alldeles för brett, matchar fotbollslag istället för fantasy-creators
-   "allsvenskan"   → matchar fotbollsklubbar och sportjournalister, inte fantasy-creators
-   "teknik"        → matchar teknikbutiker, inte smart hem-creators
-   "elektronik"    → matchar elektronisk MUSIK, inte teknik-content
-   "automation"    → för brett, matchar industriföretag
+   "fantasyfotboll"  → ihopskrivet påhittat ord, ger 0 träffar på Google
+   "fotboll"         → alldeles för brett, matchar fotbollslag
+   "teknik"          → matchar teknikbutiker, inte smart hem-creators
+   "elektronik"      → matchar elektronisk MUSIK
 
 4. ALLA 5 keywords ska vara nisch-specifika. Inga generiska kategori-ord.
-5. Tänk: "Skulle detta keyword BARA matcha creators i MIN NISCH, eller skulle det
-   matcha tusentals orelaterade konton?" Om det matchar orelaterade → byt ut det.
-6. Föredra sammansatta svenska ord (fantasyfotboll, hemteknik, hudtips) — de är
-   naturligt mer specifika och filtrerar bort irrelevanta träffar.`;
+5. Tänk: "Ger detta keyword träffar på Google?" Ihopskrivna nischord gör det sällan.`;
 
 // ============================================================
 // === HELPERS =================================================

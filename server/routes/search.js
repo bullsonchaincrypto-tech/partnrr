@@ -364,15 +364,9 @@ router.post('/influencers', async (req, res) => {
     allResults = preCutScored;
 
     // ============================================================
-    // FAS 3.6: Klipp till max 25 profiler baserat på match_score
-    // Nu har alla profiler en verkligt Sonnet-beräknad score
+    // FAS 3.6: Visa alla profiler — ingen cap
     // ============================================================
-    const MAX_PROFILES = 25;
-    if (allResults.length > MAX_PROFILES) {
-      // scoreAndRankInfluencers har redan sorterat på match_score (högst först)
-      console.log(`[Search] Klipper ${allResults.length} → ${MAX_PROFILES} profiler (topp match_score behålls, lägsta kvar: ${allResults[MAX_PROFILES - 1]?.match_score ?? 'N/A'})`);
-      allResults = allResults.slice(0, MAX_PROFILES);
-    }
+    console.log(`[Search] ${allResults.length} profiler går vidare (ingen cap)`);
 
     // ============================================================
     // FAS 4: Apify Enrichment — verifiera followers + bio

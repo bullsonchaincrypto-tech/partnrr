@@ -82,7 +82,8 @@ export function finalCut(scored, reservePool, {
   // 3. Dynamic cap
   const highTier = sorted.filter(c => (c.match_score || 0) >= 60).length;
   const midTier = sorted.filter(c => (c.match_score || 0) >= 40).length;
-  const finalCap = Math.min(capMax, Math.max(25, highTier + Math.min(20, midTier - highTier)));
+  // Ingen hårdkodad cap — visa alla som klarar threshold
+  const finalCap = capMax;
 
   // 4. Threshold filter + slice
   let final = sorted.filter(c => (c.match_score ?? c.provisional_score ?? 0) >= threshold).slice(0, finalCap);
@@ -434,7 +435,7 @@ async function runPipelineInner(foretag, companyProfile, platforms, userQuery, b
   console.log(`[V9] >>> Fas 9: Email Finder (Serper waterfall)`);
   await findEmailsForFinal(final);
   const emailHits = final.filter(c => c.email).length;
-  console.log(`[V9] <<< Fas 9 klar. ${emailHits}/${Math.min(25, final.length)} email-träffar`);
+  console.log(`[V9] <<< Fas 9 klar. ${emailHits}/${final.length} email-träffar`);
 
   // === Fas 10: Persistens ===
   console.log(`[V9] >>> Fas 10: Persistens`);

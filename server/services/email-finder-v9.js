@@ -128,10 +128,10 @@ async function findEmailViaSerper(c) {
 }
 
 /**
- * Mutates first 25 candidates in place with .email + .email_source.
+ * Mutates ALL candidates in place with .email + .email_source.
  */
 export async function findEmailsForFinal(finalCandidates) {
-  const top25 = finalCandidates.slice(0, 25);
+  const top25 = finalCandidates; // Ingen cap — sök email för alla
   const stats = { cache: 0, yt: 0, snippet: 0, page: 0, failed: 0 };
 
   // Chunk 5 parallellt

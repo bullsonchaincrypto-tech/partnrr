@@ -865,6 +865,8 @@ export default function Step2HittaInfluencers({ foretag, outreachType, influence
                                 inf.datakalla?.startsWith('apify_tt_discovery') ? '🎵 Apify TT Discovery' :
                                 inf.datakalla?.startsWith('apify_') ? '✅ Apify' :
                                 inf.datakalla === 'serpapi_direct' ? '🔍 SerpAPI' :
+                                inf.datakalla === 'apify_instagram' ? '📸 Apify Instagram' :
+                                inf.datakalla === 'apify_tiktok' ? '🎵 Apify TikTok' :
                                 inf.datakalla || 'YouTube API'
                               }</p>
                               {inf.enrichment_kalla && (

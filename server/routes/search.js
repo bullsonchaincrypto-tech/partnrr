@@ -107,7 +107,10 @@ router.post('/influencers', async (req, res) => {
             audience_demographics: null,
             thumbnail: cand.thumbnail || null,
             beskrivning: cand.bio || row.beskrivning || null,
-            datakalla: 'ai-discovery-v9',
+            datakalla: cand.platform === 'youtube' ? 'youtube_api'
+                     : cand.platform === 'instagram' ? 'apify_instagram'
+                     : cand.platform === 'tiktok' ? 'apify_tiktok'
+                     : 'ai-discovery-v9',
             enrichment_kalla: 'v9-pipeline',
             verifierad: !!(cand.is_verified || cand.verifierad),
             videoCount: 0,

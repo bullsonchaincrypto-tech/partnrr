@@ -63,6 +63,13 @@ function renderUserPrompt(batch) {
   return lines.join('\n');
 }
 
+/** Strip unpaired surrogates that break JSON serialization (common in IG bios with emojis). */
+function sanitizeUnicode(str) {
+  if (typeof str !== 'string') return str;
+  return str.replace(/[\uD800-\uDBFF](?![\uDC00-\uDFFF])/g, '\uFFFD')
+            .replace(/(?<![\uD800-\uDBFF])[\uDC00-\uDFFF]/g, '\uFFFD');
+}
+
 async function callHaiku(systemPrompt, userPrompt) {
   const apiKey = process.env.ANTHROPIC_API_KEY;
   if (!apiKey) throw new Error('[Haiku] ANTHROPIC_API_KEY saknas');
@@ -77,8 +84,8 @@ async function callHaiku(systemPrompt, userPrompt) {
       model: MODEL,
       max_tokens: 2000,
       temperature: 0,
-      system: systemPrompt,
-      messages: [{ role: 'user', content: userPrompt }],
+      system: sanitizeUnicode(systemPrompt),
+      messages: [{ role: 'user', content: sanitizeUnicode(userPrompt) }],
     }),
   });
   if (!res.ok) {

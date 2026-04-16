@@ -49,6 +49,14 @@ function renderProvisionalPrompt(companyProfile, brief, profiles) {
   return lines.join('\n');
 }
 
+/** Strip unpaired surrogates that break JSON serialization (common in IG bios with emojis). */
+function sanitizeUnicode(str) {
+  if (typeof str !== 'string') return str;
+  // Remove lone surrogates: high surrogate not followed by low, or lone low surrogate
+  return str.replace(/[\uD800-\uDBFF](?![\uDC00-\uDFFF])/g, '\uFFFD')
+            .replace(/(?<![\uD800-\uDBFF])[\uDC00-\uDFFF]/g, '\uFFFD');
+}
+
 async function callModel(model, system, user, maxTokens, temperature) {
   const apiKey = process.env.ANTHROPIC_API_KEY;
   if (!apiKey) throw new Error('[Scoring v9] ANTHROPIC_API_KEY saknas');
@@ -63,8 +71,8 @@ async function callModel(model, system, user, maxTokens, temperature) {
       model,
       max_tokens: maxTokens,
       temperature,
-      system,
-      messages: [{ role: 'user', content: user }],
+      system: sanitizeUnicode(system),
+      messages: [{ role: 'user', content: sanitizeUnicode(user) }],
     }),
   });
   if (!res.ok) {

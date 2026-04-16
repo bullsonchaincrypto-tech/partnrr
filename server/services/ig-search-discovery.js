@@ -121,7 +121,14 @@ async function searchKeyword(keyword, metrics) {
         continue;
       }
 
-      // Behåll alla andra (creator, unknown, personal)
+      // Filtrera bort personal accounts (isBusinessAccount=false)
+      // Riktiga creators har alltid Business eller Creator-konto på Instagram
+      if (accountType === 'personal') {
+        skippedPersonal++;
+        continue;
+      }
+
+      // Behåll creator + unknown (båda har isBusinessAccount=true)
       const cat = (p.businessCategoryName || p.business_category_name || p.category || '');
 
       candidates.push({

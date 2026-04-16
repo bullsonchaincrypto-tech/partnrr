@@ -102,7 +102,8 @@ function parseNameFromTitle(title, handle) {
 // === DISCOVERY ENTRY POINT ===================================
 // ============================================================
 
-const BATCH_SIZE = 5; // Parallella Serper-anrop per batch
+const BATCH_SIZE = 3; // Parallella Serper-anrop per batch (Serper limit: 5 req/s, keep margin)
+const BATCH_DELAY_MS = 1200; // Paus mellan batches för att undvika 429 rate limit
 const PAGES_PER_QUERY = parseInt(process.env.SERPER_PAGES_PER_QUERY) || 3; // Sidor per query (1 credit/sida)
 
 /**
@@ -137,34 +138,45 @@ export async function discoverIGViaSerper(keywords, metrics = {}) {
     }
   }
 
-  // Kör i batches om 5 parallellt
+  // Kör i batches med delay för att undvika 429 rate limit
   for (let i = 0; i < expandedQueries.length; i += BATCH_SIZE) {
+    if (i > 0) await new Promise(r => setTimeout(r, BATCH_DELAY_MS));
     const batch = expandedQueries.slice(i, i + BATCH_SIZE);
     const results = await Promise.all(batch.map(async ({ q, label, page }, batchIdx) => {
       const qIdx = i + batchIdx + 1;
       const pageLabel = PAGES_PER_QUERY > 1 ? ` [p${page}]` : '';
-      try {
-        const data = await serperSearch(q, {
-          gl: 'se',
-          hl: 'sv',
-          num: 20,        // num:100/50/30 blockeras av Serper för site:-dorks
-          tbs: 'qdr:m',  // Senaste månaden
-          page,
-        });
-        const organic = data.organic || [];
-        // Räkna profiler (inte alla results, bara de med giltigt handle)
-        let profileCount = 0;
-        for (const item of organic) {
-          const h = extractHandleFromUrl(item.link);
-          if (h) profileCount++;
+      // Retry-loop för 429 rate limits
+      for (let attempt = 0; attempt < 3; attempt++) {
+        try {
+          const data = await serperSearch(q, {
+            gl: 'se',
+            hl: 'sv',
+            num: 20,        // num:100/50/30 blockeras av Serper för site:-dorks
+            tbs: 'qdr:m',  // Senaste månaden
+            page,
+          });
+          const organic = data.organic || [];
+          let profileCount = 0;
+          for (const item of organic) {
+            const h = extractHandleFromUrl(item.link);
+            if (h) profileCount++;
+          }
+          console.log(`[Discovery][IG-Serper] Q${qIdx}/${expandedQueries.length} ${label}${pageLabel}: ${organic.length} results, ${profileCount} profiler`);
+          return { organic, label };
+        } catch (err) {
+          if (err.message?.includes('429') && attempt < 2) {
+            const wait = (attempt + 1) * 2000; // 2s, 4s
+            console.warn(`[Discovery][IG-Serper] Q${qIdx} 429 rate limit — retry ${attempt + 1}/2 after ${wait}ms`);
+            await new Promise(r => setTimeout(r, wait));
+            continue;
+          }
+          console.warn(`[Discovery][IG-Serper] Q${qIdx}/${expandedQueries.length} ${label}${pageLabel} FAIL: ${err.message}`);
+          failedQueries++;
+          return { organic: [], label };
         }
-        console.log(`[Discovery][IG-Serper] Q${qIdx}/${expandedQueries.length} ${label}${pageLabel}: ${organic.length} results, ${profileCount} profiler`);
-        return { organic, label };
-      } catch (err) {
-        console.warn(`[Discovery][IG-Serper] Q${qIdx}/${expandedQueries.length} ${label}${pageLabel} FAIL: ${err.message}`);
-        failedQueries++;
-        return { organic: [], label };
       }
+      // Alla retries misslyckades
+      return { organic: [], label };
     }));
 
     for (const { organic, label } of results) {

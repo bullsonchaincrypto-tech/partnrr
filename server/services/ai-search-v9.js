@@ -105,7 +105,7 @@ Dessa används i Google-dork queries: "keyword" "Stockholm" site:instagram.com
 3. KRITISKT: Keywords måste vara NISCH-SPECIFIKA, inte generiska!
    Om nischen är "fantasy fotboll" ska keywords handla om FANTASY, inte bara fotboll.
    Om nischen är "smart hem" ska keywords handla om SMART HEM, inte bara teknik.
-   Generiska ord som "fotboll" eller "teknik" ger tusentals irrelevanta träffar
+   Generiska ord som "fotboll" eller "teknik" ensamt ger tusentals irrelevanta träffar
    (fotbollslag, teknikbutiker etc.) och är FÖRBJUDNA som ensamt keyword.
 
    BRA exempel per nisch:
@@ -118,9 +118,7 @@ Dessa används i Google-dork queries: "keyword" "Stockholm" site:instagram.com
    "allsvenskan"   → matchar fotbollsklubbar och sportjournalister, inte fantasy-creators
    "teknik"        → matchar teknikbutiker, inte smart hem-creators
    "elektronik"    → matchar elektronisk MUSIK, inte teknik-content
-   "heminredning"  → matchar inrednings-konton, inte smart hem
    "automation"    → för brett, matchar industriföretag
-   "tränare"       → matchar personliga tränare, inte fantasy-tränare
 
 4. ALLA 5 keywords ska vara nisch-specifika. Inga generiska kategori-ord.
 5. Tänk: "Skulle detta keyword BARA matcha creators i MIN NISCH, eller skulle det

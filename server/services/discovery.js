@@ -11,6 +11,7 @@
 
 import * as provider from './providers/social-provider.js';
 import { runSql, queryOne } from '../db/schema.js';
+import { discoverIGViaSerper } from './ig-serper-discovery.js';
 
 const YT_PUBLISHED_AFTER = (() => {
   const d = new Date();
@@ -178,56 +179,34 @@ function dedupeByHandle(arrays) {
 }
 
 async function discoverIG(queries, metrics) {
-  const igTerms = queries.ig_terms || [];
-  console.log(`[Discovery][IG] Söker ${igTerms.length} reel-termer:`);
-  for (const t of igTerms) console.log(`[Discovery][IG]   • "${t}"`);
+  // ============================================================
+  // NYA STRATEGIN: Serper.dev Google-dork istället för SC reel-search.
+  // SC hade 60%+ fail-rate och returnerade irrelevanta internationella reels.
+  // Serper kostar 1 credit/query (~$0.002) och hittar PROFILER, inte reels.
+  // ============================================================
+  const serperKeywords = queries.serper_keywords || [];
 
-  const reelPromises = igTerms.map(t =>
-    provider.searchReels(t, 30)
-      .then(r => {
-        console.log(`[Discovery][IG] reels "${t}" → ${(r.items || []).length} items`);
-        return r;
-      })
-      .catch(err => {
-        console.warn(`[Discovery][IG] reels "${t}" → ${err.message}`);
-        return { items: [] };
-      })
-  );
-  const reelResults = await Promise.all(reelPromises);
-  const fromReels = dedupeByHandle(reelResults.map(r => r.items || []));
-  console.log(`[Discovery][IG] Reel-fas klar: ${fromReels.length} unika kandidater`);
-
-  let fromHashtags = [];
-  if (fromReels.length < 60 && process.env.USE_HASHTAG_DISCOVERY === 'true') {
-    metrics.hashtag_triggered = true;
-    const hashtags = queries.hashtag_terms || [];
-    console.log(`[Discovery][IG] Triggar hashtag-discovery (reels<60), testar ${hashtags.length} hashtags:`);
-    for (const t of hashtags) console.log(`[Discovery][IG]   • #${t}`);
-    const hashtagPromises = hashtags.map(async tag => {
-      try {
-        const cached = await getCachedHashtag(tag, 'instagram');
-        if (cached) {
-          console.log(`[Discovery][IG] hashtag #${tag} → CACHE-HIT (${(cached.items || []).length} items)`);
-          return cached;
-        }
-        const data = await provider.searchIgHashtag(tag, 20);
-        console.log(`[Discovery][IG] hashtag #${tag} → ${(data.items || []).length} items`);
-        await setCachedHashtag(tag, 'instagram', data);
-        return data;
-      } catch (err) {
-        console.warn(`[Discovery][IG] hashtag "${tag}" → ${err.message}`);
-        return { items: [] };
-      }
-    });
-    const hashtagResults = await Promise.all(hashtagPromises);
-    fromHashtags = dedupeByHandle(hashtagResults.map(r => r.items || []));
-    console.log(`[Discovery][IG] Hashtag-fas klar: ${fromHashtags.length} unika kandidater`);
-  } else if (fromReels.length >= 60) {
-    console.log(`[Discovery][IG] Skippar hashtag-discovery (reels>=60)`);
-  } else {
-    console.log(`[Discovery][IG] Skippar hashtag-discovery (USE_HASHTAG_DISCOVERY=false)`);
+  if (serperKeywords.length > 0) {
+    console.log(`[Discovery][IG] Använder Serper Google-dork (${serperKeywords.length} keywords)`);
+    return discoverIGViaSerper(serperKeywords, metrics);
   }
-  return dedupeByHandle([fromReels, fromHashtags]);
+
+  // Fallback: om Sonnet inte genererade serper_keywords, bygg från ig_terms
+  const igTerms = queries.ig_terms || [];
+  if (igTerms.length > 0) {
+    // Extrahera korta nisch-ord ur ig_terms (ta bort creator-ord)
+    const creatorWords = new Set(['youtuber', 'bloggare', 'influencer', 'tiktokare', 'creator', 'recenserar', 'tipsar', 'berättar', 'visar', 'skapar']);
+    const fallbackKeywords = igTerms.slice(0, 5).map(t =>
+      t.split(/\s+/).filter(w => !creatorWords.has(w.toLowerCase())).join(' ').trim()
+    ).filter(k => k.length >= 2);
+    if (fallbackKeywords.length > 0) {
+      console.log(`[Discovery][IG] Serper fallback: extraherade ${fallbackKeywords.length} keywords från ig_terms`);
+      return discoverIGViaSerper(fallbackKeywords.slice(0, 5), metrics);
+    }
+  }
+
+  console.warn('[Discovery][IG] Inga keywords för Serper IG-discovery — returnerar tomt');
+  return [];
 }
 
 // ============================================================

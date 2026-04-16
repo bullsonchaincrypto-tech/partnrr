@@ -65,7 +65,8 @@ någonstans i captionen. Vi behöver STARKARE anchors.
 Returnera STRIKT JSON:
 {
   "ig_terms": [8 strängar],
-  "hashtag_terms": [6 strängar utan #]
+  "hashtag_terms": [6 strängar utan #],
+  "serper_keywords": [5 strängar]
 }
 
 Regler för ig_terms (8 st):
@@ -93,7 +94,17 @@ Regler för hashtag_terms (6 st):
 1. Svenska nisch-hashtags, utan #-tecken.
 2. Matcha regex: /^[a-zåäö0-9_]{4,30}$/i
 3. Föredra sammansatta som "svensktiktok", "fantasyfotbollsverige".
-4. Mix av generiska svenska (svensktiktok, svenskfotboll) + nisch-specifika.`;
+4. Mix av generiska svenska (svensktiktok, svenskfotboll) + nisch-specifika.
+
+Regler för serper_keywords (5 st):
+Dessa används i Google-dork queries: "keyword" "Stockholm" site:instagram.com
+1. 1-3 ord, SVENSKA, beskriver nischen så att Google hittar relevanta IG-profiler.
+2. Tänk: vad skriver en svensk influencer i sin Instagram-bio?
+   Exempel för nisch "smart hem": ["smart hem", "hemautomation", "teknikbloggare",
+   "smarta prylar", "uppkopplat hem"]
+3. Undvik engelska ord — queryn MÅSTE dra svenska profiler.
+4. Blanda nisch-specifika termer med bredare creator-termer.
+5. Korta och koncisa — de kombineras med stadsnamn i queryn.`;
 
 // ============================================================
 // === HELPERS =================================================
@@ -202,14 +213,20 @@ async function generateIGWithRetry(foretag, brief) {
       .map(t => String(t || '').replace(/^#/, '').toLowerCase())
       .filter(isValidHashtag)
       .slice(0, 6);
+    // Serper keywords: 1-3 svenska ord, inga speciella filter behövs
+    const serperKeywords = (parsed.serper_keywords || [])
+      .map(k => String(k || '').trim())
+      .filter(k => k.length >= 2 && k.length <= 40)
+      .slice(0, 5);
+
     if (validIg.length >= 4) {
-      console.log(`[AI-Search v9] IG returned ${parsed.ig_terms?.length || 0} raw, ${validIg.length} after filter, ${validHashtags.length} hashtags`);
-      return { ig_terms: validIg, hashtag_terms: validHashtags };
+      console.log(`[AI-Search v9] IG returned ${parsed.ig_terms?.length || 0} raw, ${validIg.length} after filter, ${validHashtags.length} hashtags, ${serperKeywords.length} serper-keywords`);
+      return { ig_terms: validIg, hashtag_terms: validHashtags, serper_keywords: serperKeywords };
     }
     userPrompt += `\n\nFöregående försök gav endast ${validIg.length} godkända IG-termer. Försök igen.`;
   }
   console.warn('[AI-Search v9] IG generation failed after retries — returnerar tomt set');
-  return { ig_terms: [], hashtag_terms: [] };
+  return { ig_terms: [], hashtag_terms: [], serper_keywords: [] };
 }
 
 // ============================================================
@@ -234,6 +251,7 @@ export async function generateAllSearchTerms(foretag, brief) {
     hashtag_terms: ig.hashtag_terms,
     long_tail_terms: yt.long_tail_terms,
     negative_terms: yt.negative_terms,
+    serper_keywords: ig.serper_keywords || [],
   };
 }
 

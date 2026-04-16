@@ -31,8 +31,9 @@ function getKey() {
  * @param {string} [opts.hl='sv'] - Interface language (Swedish default)
  * @param {number} [opts.num=10] - Antal resultat
  * @param {string} [opts.location] - Specifik plats t.ex. "Stockholm, Sweden"
+ * @param {string} [opts.tbs] - Tidsfilter t.ex. "qdr:m" (senaste månaden)
  */
-export async function serperSearch(q, { gl = 'se', hl = 'sv', num = 10, location } = {}) {
+export async function serperSearch(q, { gl = 'se', hl = 'sv', num = 10, location, tbs } = {}) {
   const t0 = Date.now();
   const ac = new AbortController();
   const timer = setTimeout(() => ac.abort(), TIMEOUT_MS);
@@ -42,6 +43,7 @@ export async function serperSearch(q, { gl = 'se', hl = 'sv', num = 10, location
   try {
     const body = { q, gl, hl, num };
     if (location) body.location = location;
+    if (tbs) body.tbs = tbs;
     const res = await fetch(URL, {
       method: 'POST',
       headers: {

@@ -281,6 +281,7 @@ async function runPipelineInner(foretag, companyProfile, platforms, userQuery, b
   console.log(`[V9]     IG-termer: [${(queries.ig_terms || []).join(' | ')}]`);
   console.log(`[V9]     Hashtags: [${(queries.hashtag_terms || []).join(' | ')}]`);
   console.log(`[V9]     Long-tail: [${(queries.long_tail_terms || []).join(' | ')}]`);
+  console.log(`[V9]     Serper-IG-keywords: [${(queries.serper_keywords || []).join(' | ')}]`);
 
   // === Fas 2: Discovery ===
   console.log(`[V9] >>> Fas 2: Parallel Discovery`);

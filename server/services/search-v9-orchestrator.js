@@ -376,9 +376,24 @@ async function runPipelineInner(foretag, companyProfile, platforms, userQuery, b
 
   // === Fas 5: Brand Filter (deterministisk, körs på enriched data) ===
   console.log(`[V9] >>> Fas 5: Brand Filter (deterministisk, på enriched data)`);
-  const { kept: brandKept, brands } = applyBrandFilter(enriched);
+  const { kept: brandKept, ambiguous, brands } = applyBrandFilter(enriched);
   metrics.after_brand_filter = brandKept.length;
-  console.log(`[V9] <<< Fas 5 klar. ${brandKept.length} kept, ${brands.length} rejected as brand`);
+  console.log(`[V9] <<< Fas 5 klar. ${brandKept.length} kept (${ambiguous.length} ambiguous), ${brands.length} rejected as brand`);
+  // Logga brand_score-distribution för debugging
+  const scoreDist = {};
+  for (const c of enriched) {
+    const s = c.brand_score ?? 0;
+    scoreDist[s] = (scoreDist[s] || 0) + 1;
+  }
+  console.log(`[V9]   Brand score distribution: ${Object.entries(scoreDist).sort((a,b) => Number(a[0]) - Number(b[0])).map(([s,n]) => `score=${s}:${n}`).join(', ')}`);
+  // Logga rejected brands med signals
+  for (const b of brands) {
+    console.log(`[V9]   BRAND-REJECT @${b.handle} score=${b.brand_score} signals=${JSON.stringify(b.brand_signals)} bio="${(b.bio || '').slice(0, 80)}"`);
+  }
+  // Logga ambiguous (score=2) för insikt
+  for (const a of ambiguous.slice(0, 5)) {
+    console.log(`[V9]   AMBIGUOUS @${a.handle} score=${a.brand_score} signals=${JSON.stringify(a.brand_signals)}`);
+  }
 
   // === Fas 6: Haiku Classifier (körs på enriched + brand-filtered data) ===
   console.log(`[V9] >>> Fas 6: Haiku Classifier (på enriched data)`);

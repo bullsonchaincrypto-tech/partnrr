@@ -8,8 +8,9 @@
 //   5 AI-genererade keywords × 5 städer = 25 queries
 //   5 keywords × "Sverige"              =  5 queries
 //   5 keywords × "Sweden"               =  5 queries
-//   Totalt: 35 queries à 1 Serper-credit × num:100 = 3500 resultat
+//   Totalt: 35 queries à 1 Serper-credit × num:10 = ~350 resultat
 //
+// OBS: num:100 blockeras av Serper för site:-dork queries (400 "Query not allowed").
 // Budget: 35 credits per sökning.
 // Output: RawCandidate[] med handle, namn (från title), bio (snippet).
 // Profil-berikining sker i Fas 6 via Apify.
@@ -134,7 +135,7 @@ export async function discoverIGViaSerper(keywords, metrics = {}) {
         const data = await serperSearch(q, {
           gl: 'se',
           hl: 'sv',
-          num: 100,       // Max resultat — 1 credit oavsett num
+          num: 10,        // Serper blockerar num:100 med site:-dorks — håll på 10
           tbs: 'qdr:m',  // Senaste månaden
         });
         const organic = data.organic || [];

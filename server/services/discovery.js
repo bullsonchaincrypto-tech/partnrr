@@ -20,7 +20,7 @@ const IG_DISCOVERY_MODE = (process.env.IG_DISCOVERY_MODE || 'search').toLowerCas
 
 const YT_PUBLISHED_AFTER = (() => {
   const d = new Date();
-  d.setMonth(d.getMonth() - 18);
+  d.setMonth(d.getMonth() - 2);
   return d.toISOString();
 })();
 
@@ -106,7 +106,7 @@ async function batchChannelsList(channelIds) {
     const batch = channelIds.slice(i, i + 50);
     const url = new URL('https://www.googleapis.com/youtube/v3/channels');
     url.searchParams.set('id', batch.join(','));
-    url.searchParams.set('part', 'snippet,statistics,brandingSettings');
+    url.searchParams.set('part', 'snippet,statistics,brandingSettings,topicDetails');
     url.searchParams.set('key', process.env.YOUTUBE_API_KEY);
     const ac = new AbortController();
     const timer = setTimeout(() => ac.abort(), 15000);
@@ -132,6 +132,13 @@ function normalizeYTChannel(ch, query) {
   const stats = ch.statistics || {};
   const country = s.country || ch.brandingSettings?.channel?.country || null;
   const lang = s.defaultLanguage || ch.brandingSettings?.channel?.defaultLanguage || null;
+  // topicDetails — Freebase topic categories from YouTube
+  const topics = ch.topicDetails?.topicCategories || [];
+  const topicLabels = topics.map(url => {
+    // "https://en.wikipedia.org/wiki/Technology" → "Technology"
+    const parts = url.split('/');
+    return parts[parts.length - 1].replace(/_/g, ' ');
+  });
   return {
     platform: 'youtube',
     handle: s.customUrl || s.title || ch.id,
@@ -144,13 +151,14 @@ function normalizeYTChannel(ch, query) {
     caption_sample: null,
     engagement_signal: stats.viewCount ? Number(stats.viewCount) : 0,
     is_business_account: null,
-    business_category: null,
+    business_category: topicLabels.join(', ') || null,
     is_verified: false,
     discovery_source: 'main',
     discovery_query: query,
     raw: ch,
     comment_depth: 0,
     youtube_channel_id: ch.id,
+    topic_categories: topicLabels,
   };
 }
 

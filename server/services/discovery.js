@@ -199,7 +199,31 @@ async function discoverIG(queries, metrics) {
     const igTerms = queries.ig_terms || [];
     if (serperKeywords.length > 0 || hashtags.length > 0 || igTerms.length > 0) {
       console.log(`[Discovery][IG] MODE=search — Apify Instagram Search (${serperKeywords.length} keywords + ${hashtags.length} hashtags + ${igTerms.length} ig_terms)`);
-      return discoverIGViaSearch(serperKeywords, hashtags, igTerms, metrics);
+      const searchResults = await discoverIGViaSearch(serperKeywords, hashtags, igTerms, metrics);
+
+      // Om search gav för få resultat: komplettera med hashtag-discovery
+      const MIN_SEARCH_RESULTS = 15;
+      if (searchResults.length < MIN_SEARCH_RESULTS && hashtags.length > 0) {
+        console.log(`[Discovery][IG] Search gav bara ${searchResults.length} profiler (< ${MIN_SEARCH_RESULTS}) — kompletterar med hashtag-discovery`);
+        try {
+          const hashtagResults = await discoverIGViaHashtags(hashtags, metrics);
+          // Merge: dedup baserat på handle
+          const existing = new Set(searchResults.map(c => c.handle));
+          let added = 0;
+          for (const c of hashtagResults) {
+            if (!existing.has(c.handle)) {
+              searchResults.push(c);
+              existing.add(c.handle);
+              added++;
+            }
+          }
+          console.log(`[Discovery][IG] Hashtag-komplettering: +${added} nya profiler (totalt ${searchResults.length})`);
+        } catch (err) {
+          console.error(`[Discovery][IG] Hashtag-komplettering misslyckades: ${err.message}`);
+        }
+      }
+
+      return searchResults;
     }
     console.warn('[Discovery][IG] Inga keywords för search — fallback till hashtag');
     // Fall through

@@ -33,6 +33,11 @@ const COMMERCIAL_CATEGORIES = new Set([
   // Tillagda från Apify-loggar 2026-04-16
   'pet groomer', 'beauty, cosmetic & personal care', 'lifestyle services',
   'book', 'book series',
+  'electrician', 'martial arts school', 'pet supplies', 'agriculture',
+  'interior design studio', 'gym/physical fitness center', 'sports league',
+  'school', 'nonprofit organization', 'government organization',
+  'media/news company', 'tv channel', 'radio station', 'magazine',
+  'church/religious organization', 'political organization',
 ]);
 
 // Creator-kategorier = bra signal
@@ -83,16 +88,30 @@ function classifyAccountType(profile) {
 }
 
 /**
+ * Sanitize keyword for Apify Instagram Search input.
+ * Apify rejects: !?.,:;\-+=*&%$#@/\~^|<>()[]{}\"'`
+ */
+function sanitizeKeyword(kw) {
+  return kw.replace(/[!?.,:;\-+=*&%$#@/\\~^|<>()\[\]{}"'`]/g, ' ').replace(/\s+/g, ' ').trim();
+}
+
+/**
  * Sök profiler med ett keyword via Apify Instagram Search.
  */
 async function searchKeyword(keyword, metrics) {
-  console.log(`[Discovery][IG-Search] Söker "${keyword}" (max ${RESULTS_PER_KEYWORD} profiler)...`);
+  const sanitized = sanitizeKeyword(keyword);
+  if (!sanitized || sanitized.length < 2) {
+    console.log(`[Discovery][IG-Search] "${keyword}" → sanitized bort, skippar`);
+    return [];
+  }
+
+  console.log(`[Discovery][IG-Search] Söker "${sanitized}" (max ${RESULTS_PER_KEYWORD} profiler)...`);
 
   try {
     const items = await runApifyActor(
       SEARCH_ACTOR,
       {
-        search: keyword,
+        search: sanitized,
         searchType: 'user',
         resultsLimit: RESULTS_PER_KEYWORD,
       },
@@ -197,6 +216,9 @@ const FILLER = new Set([
   'recensioner', 'produkt', 'produkter', 'köp', 'online', 'billig',
   'billiga', 'gratis', 'blogg', 'vlogg', 'kanal', 'konto',
   'inspiration', 'idéer', 'svenska', 'svensk', 'sverige',
+  // Prepositioner/fyllnadsord
+  'på', 'för', 'med', 'och', 'till', 'från', 'hos', 'som', 'att',
+  'ett', 'en', 'den', 'det', 'av', 'vid', 'inom', 'mot', 'utan',
   // Creator-ord (bra för video-sök men inte user-sök)
   'influencer', 'youtuber', 'tiktokare', 'bloggare', 'creator',
   'recenserar', 'tipsar', 'berättar', 'visar', 'skapar',
@@ -261,7 +283,8 @@ function simplifyHashtags(hashtags) {
   for (let h of hashtags) {
     h = h.replace(/^#/, '').toLowerCase();
     // Ta bort vanliga suffix som inte hjälper i user search
-    h = h.replace(/sverige$/, '').replace(/swedish$/, '').replace(/svenska$/, '');
+    // "smarthemverige" → "smarthem", "groomingsverige" → "grooming"
+    h = h.replace(/s?verige$/, '').replace(/swedish$/, '').replace(/svenska?$/, '');
     if (h.length >= 3 && h.length <= 25) {
       simplified.add(h);
     }

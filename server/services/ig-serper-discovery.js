@@ -8,11 +8,12 @@
 //   5 AI-genererade keywords × 5 städer = 25 queries
 //   5 keywords × "Sverige"              =  5 queries
 //   5 keywords × "Sweden"               =  5 queries
-//   Totalt: 35 queries × 3 pages = 105 credits, num:20 → ~2100 resultat
+//   Totalt: 35 queries × 1 page = 35 credits, num:20 → ~700 resultat
 //
 // OBS: num:100 blockeras av Serper för site:-dork queries (400 "Query not allowed").
 //      Pagination (page=1,2,3) funkar — varje page kostar 1 credit.
-// Budget: ~105 credits per sökning (konfigurerbar via SERPER_PAGES_PER_QUERY env).
+//      Men page 2-3 ger 0 resultat för nästan alla site:-dorks → default 1 page.
+// Budget: ~35 credits per sökning (konfigurerbar via SERPER_PAGES_PER_QUERY env).
 // Output: RawCandidate[] med handle, namn (från title), bio (snippet).
 // Profil-berikining sker i Fas 6 via Apify.
 
@@ -104,7 +105,7 @@ function parseNameFromTitle(title, handle) {
 
 const BATCH_SIZE = 3; // Parallella Serper-anrop per batch (Serper limit: 5 req/s, keep margin)
 const BATCH_DELAY_MS = 1200; // Paus mellan batches för att undvika 429 rate limit
-const PAGES_PER_QUERY = parseInt(process.env.SERPER_PAGES_PER_QUERY) || 3; // Sidor per query (1 credit/sida)
+const PAGES_PER_QUERY = parseInt(process.env.SERPER_PAGES_PER_QUERY) || 1; // Sidor per query (1 credit/sida) — page 2-3 ger 0 för site:-dorks
 
 /**
  * @param {string[]} keywords - 5 AI-genererade nisch-keywords

@@ -134,40 +134,48 @@ export async function findEmailsForFinal(finalCandidates) {
   const top25 = finalCandidates; // Ingen cap — sök email för alla
   const stats = { cache: 0, yt: 0, snippet: 0, page: 0, failed: 0 };
 
-  // Chunk 5 parallellt
+  // Chunk 5 parallellt — varje kandidat wrappas i try/catch så att
+  // ett nätverksfel inte kraschar hela pipelinen.
   for (let i = 0; i < top25.length; i += 5) {
     const chunk = top25.slice(i, i + 5);
     await Promise.all(chunk.map(async c => {
-      // Step 1: Cache
-      const cached = await getCachedEmail(c.handle);
-      if (cached) {
-        c.email = cached;
-        c.email_source = 'cache';
-        stats.cache++;
-        return;
-      }
-
-      // Step 2: YouTube description
-      if (c.platform === 'youtube' && c.bio) {
-        const email = extractEmail(c.bio);
-        if (email && await mxValidate(email)) {
-          c.email = email;
-          c.email_source = 'yt-description';
-          await setCachedEmail(c.handle, email, 'v9-yt-description');
-          stats.yt++;
+      try {
+        // Step 1: Cache
+        const cached = await getCachedEmail(c.handle);
+        if (cached) {
+          c.email = cached;
+          c.email_source = 'cache';
+          stats.cache++;
           return;
         }
-      }
 
-      // Step 3+4: Serper
-      const result = await findEmailViaSerper(c);
-      if (result) {
-        c.email = result.email;
-        c.email_source = result.source;
-        await setCachedEmail(c.handle, result.email, `v9-${result.source}`);
-        if (result.source === 'serp-snippet') stats.snippet++;
-        else stats.page++;
-      } else {
+        // Step 2: YouTube description
+        if (c.platform === 'youtube' && c.bio) {
+          const email = extractEmail(c.bio);
+          if (email && await mxValidate(email)) {
+            c.email = email;
+            c.email_source = 'yt-description';
+            await setCachedEmail(c.handle, email, 'v9-yt-description');
+            stats.yt++;
+            return;
+          }
+        }
+
+        // Step 3+4: Serper
+        const result = await findEmailViaSerper(c);
+        if (result) {
+          c.email = result.email;
+          c.email_source = result.source;
+          await setCachedEmail(c.handle, result.email, `v9-${result.source}`);
+          if (result.source === 'serp-snippet') stats.snippet++;
+          else stats.page++;
+        } else {
+          c.email = null;
+          c.kontakt_info = 'Se profil för kontakt';
+          stats.failed++;
+        }
+      } catch (err) {
+        console.warn(`[EmailFinder v9] @${c.handle} failed: ${err.message}`);
         c.email = null;
         c.kontakt_info = 'Se profil för kontakt';
         stats.failed++;

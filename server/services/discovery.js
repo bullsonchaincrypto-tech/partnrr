@@ -12,6 +12,10 @@
 import * as provider from './providers/social-provider.js';
 import { runSql, queryOne } from '../db/schema.js';
 import { discoverIGViaSerper } from './ig-serper-discovery.js';
+import { discoverIGViaHashtags } from './ig-hashtag-discovery.js';
+
+// Toggle: "hashtag" (default) | "serper"
+const IG_DISCOVERY_MODE = (process.env.IG_DISCOVERY_MODE || 'hashtag').toLowerCase();
 
 const YT_PUBLISHED_AFTER = (() => {
   const d = new Date();
@@ -180,21 +184,39 @@ function dedupeByHandle(arrays) {
 
 async function discoverIG(queries, metrics) {
   // ============================================================
-  // NYA STRATEGIN: Serper.dev Google-dork istället för SC reel-search.
-  // SC hade 60%+ fail-rate och returnerade irrelevanta internationella reels.
-  // Serper kostar 1 credit/query (~$0.002) och hittar PROFILER, inte reels.
+  // Toggle: IG_DISCOVERY_MODE = "hashtag" (default) | "serper"
+  //   hashtag — Apify hashtag-scraper → hittar creators som postar
+  //   serper  — Google-dork site:instagram.com → hittar profiler via SEO
+  // Byt med env IG_DISCOVERY_MODE=serper för att gå tillbaka.
   // ============================================================
-  const serperKeywords = queries.serper_keywords || [];
 
+  if (IG_DISCOVERY_MODE === 'hashtag') {
+    const hashtags = queries.hashtags || [];
+    if (hashtags.length > 0) {
+      console.log(`[Discovery][IG] MODE=hashtag — Apify Hashtag Discovery (${hashtags.length} hashtags)`);
+      return discoverIGViaHashtags(hashtags, metrics);
+    }
+    // Fallback: bygg hashtags från serper_keywords (ta bort mellanslag)
+    const serperKeywords = queries.serper_keywords || [];
+    if (serperKeywords.length > 0) {
+      const fallbackTags = serperKeywords.map(kw => kw.replace(/\s+/g, '').toLowerCase());
+      console.log(`[Discovery][IG] Hashtag fallback från serper_keywords: ${fallbackTags.join(', ')}`);
+      return discoverIGViaHashtags(fallbackTags, metrics);
+    }
+    console.warn('[Discovery][IG] Inga hashtags tillgängliga — fallback till Serper');
+    // Fall through till Serper nedan
+  }
+
+  // === SERPER MODE (eller hashtag-fallback) ===
+  const serperKeywords = queries.serper_keywords || [];
   if (serperKeywords.length > 0) {
-    console.log(`[Discovery][IG] Använder Serper Google-dork (${serperKeywords.length} keywords)`);
+    console.log(`[Discovery][IG] MODE=serper — Google-dork (${serperKeywords.length} keywords)`);
     return discoverIGViaSerper(serperKeywords, metrics);
   }
 
-  // Fallback: om Sonnet inte genererade serper_keywords, bygg från ig_terms
+  // Fallback: bygg keywords från ig_terms
   const igTerms = queries.ig_terms || [];
   if (igTerms.length > 0) {
-    // Extrahera korta nisch-ord ur ig_terms (ta bort creator-ord)
     const creatorWords = new Set(['youtuber', 'bloggare', 'influencer', 'tiktokare', 'creator', 'recenserar', 'tipsar', 'berättar', 'visar', 'skapar']);
     const fallbackKeywords = igTerms.slice(0, 5).map(t =>
       t.split(/\s+/).filter(w => !creatorWords.has(w.toLowerCase())).join(' ').trim()
@@ -205,7 +227,7 @@ async function discoverIG(queries, metrics) {
     }
   }
 
-  console.warn('[Discovery][IG] Inga keywords för Serper IG-discovery — returnerar tomt');
+  console.warn('[Discovery][IG] Inga keywords för IG-discovery — returnerar tomt');
   return [];
 }
 

@@ -126,10 +126,37 @@ async function start() {
     console.log('[Followup] Kunde inte starta scheduler:', e.message);
   }
 
-  app.listen(PORT, () => {
+  server = app.listen(PORT, () => {
     console.log(`RankLeague server kors pa http://localhost:${PORT}`);
   });
 }
+
+// Graceful shutdown — låt pågående requests köra klart vid deploy
+let server;
+let isShuttingDown = false;
+
+function gracefulShutdown(signal) {
+  if (isShuttingDown) return;
+  isShuttingDown = true;
+  console.log(`[Server] ${signal} mottagen — väntar på pågående requests (max 60s)...`);
+
+  // Sluta ta emot nya connections
+  if (server) {
+    server.close(() => {
+      console.log('[Server] Alla requests klara — stänger ner.');
+      process.exit(0);
+    });
+  }
+
+  // Fallback: tvinga ner efter 60s
+  setTimeout(() => {
+    console.log('[Server] Timeout 60s — tvingar ner.');
+    process.exit(1);
+  }, 60_000).unref();
+}
+
+process.on('SIGTERM', () => gracefulShutdown('SIGTERM'));
+process.on('SIGINT', () => gracefulShutdown('SIGINT'));
 
 // Fånga oförutsedda fel så att Railway-loggar visar orsaken
 process.on('unhandledRejection', (reason, promise) => {

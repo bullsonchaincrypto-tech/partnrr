@@ -20,9 +20,13 @@ const MODEL = 'claude-sonnet-4-6';
 // === SYSTEM PROMPTS ==========================================
 // ============================================================
 
-const YT_SYSTEM = `Du genererar svenska söktermer för YouTube-video-search. Målet är att hitta
-SVENSKA KREATÖRER (människor eller familjer, inte företag) som skapar content
-i nischen <PRIMARY_NICHE>.
+const YT_SYSTEM = `Du genererar söktermer för YouTube Data API (search.list).
+API:t har redan regionCode=SE och relevanceLanguage=sv — du behöver INTE
+lägga till "svenska", "svensk" eller "sverige" i termerna. Fokusera helt
+på att beskriva nischen med precisa, korta termer.
+
+Målet: hitta SVENSKA KREATÖRER (människor/familjer, inte företag) i nischen
+<PRIMARY_NICHE>.
 
 Returnera STRIKT JSON (ingen markdown):
 {
@@ -32,25 +36,26 @@ Returnera STRIKT JSON (ingen markdown):
 }
 
 Regler för terms (8 st):
-1. 2-4 ord per term.
-2. Minst ett av följande i varje term:
-   (a) åäö-tecken
-   (b) "sverige"/"svensk"/"svenska"
-   (c) garanterat-svenskt ord (recension, uppkopplade, smarta, prylar,
-       hemautomation, högtalare, robotdammsugare, etc.)
-3. FÖRBJUDNA "magnet"-ord (drar till internationellt content):
-   tech, review, unboxing, gadget, home, alexa, apple, samsung, gaming,
+1. 2-3 ord per term. Kortare = bredare träffyta. YouTube implicit-AND:ar orden.
+2. Skriv termerna på SVENSKA — det räcker som språksignal tillsammans med API-params.
+   Undantag: nischspecifika engelska facktermer som saknar bra svensk motsvarighet
+   (t.ex. "home assistant", "zigbee") är OK att blanda in.
+3. FÖRBJUDNA engelska "magnet"-ord (drar in internationellt content):
+   tech, review, unboxing, gadget, alexa, apple, samsung, gaming,
    vlog, tutorial, how to, vs, best, top 10, amazon, aliexpress
 4. FÖRBJUDNA "brand"-ord (drar till företagskonton):
-   officiell, store, shop, butik, återförsäljare, brand, AB, sweden official
-5. Maximera variation: varje term ska fånga en UNIK typ av kreatör
-   (recensent, tipsare, byggare, testare, jämförare, berättare, guider,
-   nybörjar-orienterad).
-6. Fokus på RECENSIONER / TESTER / TIPS / JÄMFÖRELSER — ej marknadsförings-språk.
+   officiell, store, shop, butik, återförsäljare, brand, AB
+5. Maximera variation: varje term ska fånga en UNIK typ av kreatör:
+   recensenter, tipsare, byggare, testare, jämförare, berättare,
+   nybörjar-guider, "jag testar"-format.
+6. Inkludera minst 2 termer med personliga verb (jag-form):
+   "jag testar", "jag installerar", "min upplevelse", "mitt hem" etc.
+   Dessa hittar PERSONER snarare än företag.
 
 Regler för long_tail_terms (3 st):
-- Biasade mot nano/micro. Inkludera ord som "liten", "nischad", "mikro-",
-  "okänd", "underrated", "ny", "bäst dold". Fortfarande svensk-enforcement.
+- Biasade mot nano/micro-kreatörer. Inkludera nischade kombinationer
+  som hittar mindre kanaler, t.ex. specifika underkategorier eller
+  användningsscenarier inom <PRIMARY_NICHE>.
 
 negative_terms (3-5): ord/fraser som starkt indikerar brand snarare än creator.`;
 

@@ -105,17 +105,17 @@ export const COMPANY_INDICATORS_REGEX = [/\d{6}-\d{4}/];
 
 /**
  * Validera YouTube-sökterm enligt Fas 1 regler.
+ * Kräver INTE längre svenska markörer — regionCode=SE + relevanceLanguage=sv
+ * i API-anropet hanterar det. Vi blockerar bara engelska magnet-ord och brand-ord.
  * @returns {boolean} true om termen är godkänd
  */
 export function isValidYtTerm(term) {
   if (!term || typeof term !== 'string') return false;
-  const lc = term.toLowerCase();
+  const lc = term.toLowerCase().trim();
+  if (lc.length < 3) return false;
   for (const m of ENGLISH_MAGNETS) if (lc.includes(m)) return false;
   for (const m of BRAND_MAGNETS) if (lc.includes(m)) return false;
-  if (/[åäöÅÄÖ]/.test(term)) return true;
-  if (/\b(sverige|svensk|svenska)\b/i.test(term)) return true;
-  for (const w of GUARANTEED_SWEDISH_WORDS) if (lc.includes(w)) return true;
-  return false;
+  return true;
 }
 
 /**

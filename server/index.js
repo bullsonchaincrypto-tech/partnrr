@@ -114,6 +114,15 @@ app.use((err, req, res, _next) => {
 
 async function start() {
   await initDb();
+
+  // Rensa stale search locks — om containern dödades av en deploy finns
+  // gamla lås kvar som annars blockerar nya sökningar.
+  try {
+    const { runSql } = await import('./db/schema.js');
+    const deleted = await runSql('DELETE FROM search_locks RETURNING foretag_id');
+    if (deleted?.length) console.log(`[Startup] Rensade ${deleted.length} stale search lock(s)`);
+  } catch {}
+
   seedEmailCache();
 
   // Starta auto-uppföljning om den är aktiverad

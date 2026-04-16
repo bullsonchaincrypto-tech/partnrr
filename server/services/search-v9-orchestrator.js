@@ -29,7 +29,7 @@ import { findEmailsForFinal } from './email-finder-v9.js';
 import { notifyAlert } from './alerts.js';
 
 const GLOBAL_TIMEOUT_MS = 420_000; // 7 min — alla profiler berikas nu (ingen TOP_N cap)
-const LOCK_STALE_SEC = 300;
+const LOCK_STALE_SEC = 60; // Kort — container kan dödas av deploy, lås måste rensas snabbt
 
 /** Räkna kandidater per plattform för diagnos-logging. */
 function platformCounts(list) {

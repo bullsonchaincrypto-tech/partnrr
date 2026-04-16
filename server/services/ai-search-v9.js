@@ -98,13 +98,16 @@ Regler för hashtag_terms (6 st):
 
 Regler för serper_keywords (5 st):
 Dessa används i Google-dork queries: "keyword" "Stockholm" site:instagram.com
-1. 1-3 ord, SVENSKA, beskriver nischen så att Google hittar relevanta IG-profiler.
-2. Tänk: vad skriver en svensk influencer i sin Instagram-bio?
-   Exempel för nisch "smart hem": ["smart hem", "hemautomation", "teknikbloggare",
-   "smarta prylar", "uppkopplat hem"]
-3. Undvik engelska ord — queryn MÅSTE dra svenska profiler.
-4. Blanda nisch-specifika termer med bredare creator-termer.
-5. Korta och koncisa — de kombineras med stadsnamn i queryn.`;
+1. HELST ETT ENDA ORD per keyword. Max 2 ord om det verkligen behövs.
+   Singelord ger bredare Google-träffar och fångar fler profiler.
+2. Tänk: vilka ORD finns i en svensk influencers Instagram-bio eller namn?
+   Exempel för nisch "smart hem": ["teknik", "smarthome", "gadgets", "heminredning", "automation"]
+   Exempel för nisch "fantasy fotboll": ["fotboll", "fantasy", "sport", "betting", "allsvenskan"]
+   Exempel för nisch "hudvård": ["hudvård", "skincare", "skönhet", "beauty", "hälsa"]
+3. Blanda nisch-specifika singelord med bredare kategori-ord.
+4. Minst 2 av 5 ska vara breda/generiska ord relaterade till nischen.
+5. Undvik fler-ordskombinationer som "smart hem" eller "uppkopplat hem" —
+   använd istället singelord som "smarthome" eller "teknik".`;
 
 // ============================================================
 // === HELPERS =================================================

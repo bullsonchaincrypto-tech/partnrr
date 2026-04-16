@@ -28,11 +28,13 @@ export function classifyBrand(c) {
   const handle = String(c?.handle || '');
   const name = String(c?.name || '');
 
-  // B1: isBusinessAccount (IG)
-  if (c.is_business_account === true) { score++; sig.B1 = true; }
-
-  // B2: Kommersiell business-kategori
-  if (c.business_category && COMMERCIAL_CATEGORIES.has(c.business_category)) {
+  // B1+B2: Kommersiell IG-kategori (kräver business-konto + kommersiell kategori)
+  // OBS: is_business_account ENSAMT räknas INTE — de flesta creators/influencers
+  // har Business- eller Creator-konto på Instagram. Bara kommersiella kategorier
+  // som "Product/service", "Shopping & retail" etc. är brand-signaler.
+  if (c.is_business_account === true && c.business_category && COMMERCIAL_CATEGORIES.has(c.business_category)) {
+    score += 2; sig.B1 = true; sig.B2 = c.business_category;
+  } else if (c.business_category && COMMERCIAL_CATEGORIES.has(c.business_category)) {
     score++; sig.B2 = c.business_category;
   }
 

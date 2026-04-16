@@ -143,7 +143,7 @@ Scora varje profil på FYRA dimensioner (var och en 0-100):
    hårt profiler som är uppenbara toppsök-träffar.
 
    Belöna:
-   - Mid-tier creators (5K-100K followers) med hög engagement relativt storlek
+   - Mid-tier creators (5K-100K followers)
    - Nischade specialister hellre än breda generalister
    - multi_platform = true → +5 bonus
    - discovery_source = "comment" → +5 (community-engagerad)
@@ -178,7 +178,7 @@ Hårda capar på match_score:
 
 Returnera STRIKT JSON-array:
 [{"index": N, "match_score": 0-100, "nischfit": N, "audience_fit": N,
-  "obscurity": N, "authenticity": N, "motivation": "max 90 tecken"}]`;
+  "obscurity": N, "authenticity": N, "motivation": "max 90 tecken, BARA fakta från datan ovan — hitta INTE PÅ siffror"}]`;
 
 function renderDeepPrompt(profiles) {
   const lines = ['Profiler att djup-scora:'];
@@ -190,7 +190,6 @@ function renderDeepPrompt(profiles) {
       `  Sample caption/titel: ${truncate(c.caption_sample, 200) || '—'}`,
       `  Verified: ${!!c.is_verified}, Business: ${!!c.is_business_account} (${c.business_category || '—'})`,
       `  External: ${c.external_url || '—'}`,
-      `  Engagement-signal: ${c.engagement_signal || 0}`,
       `  Multi-platform: ${!!c.is_multi_platform} (${c.platform_count || 1})`,
       `  Discovery source: ${c.discovery_source || 'main'}`,
       `  Swedish confidence: ${c.swedish_confidence || 'unknown'}`,

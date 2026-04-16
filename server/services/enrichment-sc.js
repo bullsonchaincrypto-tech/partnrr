@@ -87,7 +87,8 @@ export async function enrichProfiles(candidates) {
   const ttCandidates = top.filter(c => c.platform === 'tiktok' && !c._already_enriched);
   const ytCandidates = top.filter(c => c.platform === 'youtube' || c._already_enriched);
 
-  console.log(`[Enrichment] To enrich: IG=${igCandidates.length}, TT=${ttCandidates.length}, YT/skip=${ytCandidates.length}`);
+  const alreadyEnriched = top.filter(c => c._already_enriched).length;
+  console.log(`[Enrichment] To enrich: IG=${igCandidates.length}, TT=${ttCandidates.length}, already enriched (skip)=${alreadyEnriched}`);
 
   // Kör IG och TT parallellt via Apify
   const [igResults, ttResults] = await Promise.all([

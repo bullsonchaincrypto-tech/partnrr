@@ -13,9 +13,10 @@ import * as provider from './providers/social-provider.js';
 import { runSql, queryOne } from '../db/schema.js';
 import { discoverIGViaSerper } from './ig-serper-discovery.js';
 import { discoverIGViaHashtags } from './ig-hashtag-discovery.js';
+import { discoverIGViaSearch } from './ig-search-discovery.js';
 
-// Toggle: "hashtag" (default) | "serper"
-const IG_DISCOVERY_MODE = (process.env.IG_DISCOVERY_MODE || 'hashtag').toLowerCase();
+// Toggle: "search" (default) | "hashtag" | "serper"
+const IG_DISCOVERY_MODE = (process.env.IG_DISCOVERY_MODE || 'search').toLowerCase();
 
 const YT_PUBLISHED_AFTER = (() => {
   const d = new Date();
@@ -184,37 +185,48 @@ function dedupeByHandle(arrays) {
 
 async function discoverIG(queries, metrics) {
   // ============================================================
-  // Toggle: IG_DISCOVERY_MODE = "hashtag" (default) | "serper"
+  // Toggle: IG_DISCOVERY_MODE = "search" (default) | "hashtag" | "serper"
+  //   search  — Apify instagram-search-scraper → full profildata direkt
   //   hashtag — Apify hashtag-scraper → hittar creators som postar
   //   serper  — Google-dork site:instagram.com → hittar profiler via SEO
-  // Byt med env IG_DISCOVERY_MODE=serper för att gå tillbaka.
+  // Byt med env IG_DISCOVERY_MODE=serper|hashtag för att gå tillbaka.
   // ============================================================
 
-  if (IG_DISCOVERY_MODE === 'hashtag') {
+  // === SEARCH MODE (default) — bästa kvalitet, full profildata direkt ===
+  if (IG_DISCOVERY_MODE === 'search') {
+    const serperKeywords = queries.serper_keywords || [];
+    const hashtags = queries.hashtags || [];
+    if (serperKeywords.length > 0 || hashtags.length > 0) {
+      console.log(`[Discovery][IG] MODE=search — Apify Instagram Search (${serperKeywords.length} keywords + ${hashtags.length} hashtags)`);
+      return discoverIGViaSearch(serperKeywords, hashtags, metrics);
+    }
+    console.warn('[Discovery][IG] Inga keywords för search — fallback till hashtag');
+    // Fall through
+  }
+
+  // === HASHTAG MODE ===
+  if (IG_DISCOVERY_MODE === 'hashtag' || IG_DISCOVERY_MODE === 'search') {
     const hashtags = queries.hashtags || [];
     if (hashtags.length > 0) {
       console.log(`[Discovery][IG] MODE=hashtag — Apify Hashtag Discovery (${hashtags.length} hashtags)`);
       return discoverIGViaHashtags(hashtags, metrics);
     }
-    // Fallback: bygg hashtags från serper_keywords (ta bort mellanslag)
     const serperKeywords = queries.serper_keywords || [];
     if (serperKeywords.length > 0) {
       const fallbackTags = serperKeywords.map(kw => kw.replace(/\s+/g, '').toLowerCase());
       console.log(`[Discovery][IG] Hashtag fallback från serper_keywords: ${fallbackTags.join(', ')}`);
       return discoverIGViaHashtags(fallbackTags, metrics);
     }
-    console.warn('[Discovery][IG] Inga hashtags tillgängliga — fallback till Serper');
-    // Fall through till Serper nedan
+    console.warn('[Discovery][IG] Inga hashtags — fallback till Serper');
   }
 
-  // === SERPER MODE (eller hashtag-fallback) ===
+  // === SERPER MODE (eller sista fallback) ===
   const serperKeywords = queries.serper_keywords || [];
   if (serperKeywords.length > 0) {
     console.log(`[Discovery][IG] MODE=serper — Google-dork (${serperKeywords.length} keywords)`);
     return discoverIGViaSerper(serperKeywords, metrics);
   }
 
-  // Fallback: bygg keywords från ig_terms
   const igTerms = queries.ig_terms || [];
   if (igTerms.length > 0) {
     const creatorWords = new Set(['youtuber', 'bloggare', 'influencer', 'tiktokare', 'creator', 'recenserar', 'tipsar', 'berättar', 'visar', 'skapar']);

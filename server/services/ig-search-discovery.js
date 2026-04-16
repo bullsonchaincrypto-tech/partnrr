@@ -22,7 +22,7 @@ const TIMEOUT_SECS = 120;
 
 // Kommersiella kategorier = troligen brand, inte creator
 const COMMERCIAL_CATEGORIES = new Set([
-  // Exakt-matchning (case-insensitive jämförs nedan)
+  // Exakt-matchning (case-insensitive, "none,"-prefix hanteras i parseCategories)
   'shopping & retail', 'retail company', 'product/service',
   'brand', 'company', 'e-commerce website', 'business service',
   'local business', 'restaurant', 'bar', 'hotel', 'grocery store',
@@ -30,6 +30,9 @@ const COMMERCIAL_CATEGORIES = new Set([
   'real estate', 'insurance company', 'bank', 'financial service',
   'clothing store', 'jewelry/watches', 'home decor', 'furniture store',
   'pet store', 'veterinarian', 'pet service',
+  // Tillagda från Apify-loggar 2026-04-16
+  'pet groomer', 'beauty, cosmetic & personal care', 'lifestyle services',
+  'book', 'book series',
 ]);
 
 // Creator-kategorier = bra signal
@@ -42,25 +45,41 @@ const CREATOR_CATEGORIES = new Set([
 ]);
 
 /**
+ * Parsa Apify-kategori — hanterar "none,product/service"-format.
+ * Returnerar array av rena kategorier (utan "none").
+ */
+function parseCategories(profile) {
+  const raw = (profile.businessCategoryName || profile.business_category_name || profile.category || '').toLowerCase().trim();
+  if (!raw) return [];
+  // Apify returnerar ibland "none,pet service" eller "none,product/service"
+  return raw.split(',').map(c => c.trim()).filter(c => c && c !== 'none');
+}
+
+/**
  * Klassificera profil baserat på isBusinessAccount + category.
- * @returns {'creator'|'business'|'personal'|'unknown'}
+ * @returns {'creator'|'business'|'personal'|'unknown'|'unknown-nocat'}
  */
 function classifyAccountType(profile) {
   const isBiz = profile.isBusinessAccount || profile.is_business_account;
-  const cat = (profile.businessCategoryName || profile.business_category_name || profile.category || '').toLowerCase().trim();
+  const cats = parseCategories(profile);
 
-  if (!isBiz && !cat) return 'personal';
   if (!isBiz) return 'personal';
 
-  // Business/Creator-konto — kolla kategori
-  if (COMMERCIAL_CATEGORIES.has(cat)) return 'business';
-  if (CREATOR_CATEGORIES.has(cat)) return 'creator';
+  // Business/Creator-konto — kolla ALLA kategorier (kan ha flera)
+  for (const cat of cats) {
+    if (COMMERCIAL_CATEGORIES.has(cat)) return 'business';
+  }
+  for (const cat of cats) {
+    if (CREATOR_CATEGORIES.has(cat)) return 'creator';
+  }
 
   // Okänd kategori men har business-konto
-  if (cat) {
-    console.log(`[Discovery][IG-Search] UNKNOWN category: "${cat}" (handle=${profile.username || profile.handle || '?'})`);
+  if (cats.length > 0) {
+    const handle = profile.username || profile.handle || '?';
+    console.log(`[Discovery][IG-Search] UNKNOWN category: "${cats.join(', ')}" (handle=${handle})`);
+    return 'unknown';
   }
-  return cat ? 'unknown' : 'unknown-nocat';
+  return 'unknown-nocat';
 }
 
 /**

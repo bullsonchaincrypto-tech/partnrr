@@ -128,9 +128,9 @@ export async function enrichSingleProfile(handle, platform) {
 export async function enrichInstagramProfiles(usernames) {
   if (!usernames.length) return [];
 
-  console.log(`[Enrichment] Hämtar ${usernames.length} Instagram-profiler via Apify (i batches om 5)...`);
+  console.log(`[Enrichment] Hämtar ${usernames.length} Instagram-profiler via Apify (i batches om 10)...`);
 
-  const BATCH_SIZE = 5;
+  const BATCH_SIZE = 10;
   const TIMEOUT_SECS = 120;
   const allResults = [];
 

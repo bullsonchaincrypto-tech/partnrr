@@ -28,7 +28,7 @@ import { validateObscurity } from './obscurity-validator.js';
 import { findEmailsForFinal } from './email-finder-v9.js';
 import { notifyAlert } from './alerts.js';
 
-const GLOBAL_TIMEOUT_MS = 300_000;
+const GLOBAL_TIMEOUT_MS = 420_000; // 7 min — alla profiler berikas nu (ingen TOP_N cap)
 const LOCK_STALE_SEC = 300;
 
 /** Räkna kandidater per plattform för diagnos-logging. */
@@ -266,7 +266,7 @@ export async function runV9Pipeline({
   try {
     // Global timeout guard
     const timeoutPromise = new Promise((_, reject) =>
-      setTimeout(() => reject(new Error('V9 pipeline timeout (300s)')), GLOBAL_TIMEOUT_MS)
+      setTimeout(() => reject(new Error('V9 pipeline timeout (420s)')), GLOBAL_TIMEOUT_MS)
     );
     return await Promise.race([
       runPipelineInner(foretag, companyProfile, platforms, userQuery, bust_cache, metrics, t0),

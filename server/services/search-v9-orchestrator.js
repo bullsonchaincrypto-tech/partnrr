@@ -365,27 +365,17 @@ async function runPipelineInner(foretag, companyProfile, platforms, userQuery, b
     console.log(`[V9]   IG-reject @${c.handle}: confidence=${c.swedish_confidence}, bio="${(c.bio || '').slice(0, 60)}" caption="${(c.caption_sample || '').slice(0, 60)}"`);
   }
 
-  // === Fas 4: Brand Filter ===
+  // === Fas 4: Brand Filter (deterministisk, gratis) ===
   const { kept: brandKept, brands } = applyBrandFilter(swedishPassed);
   metrics.after_brand_filter = brandKept.length;
   console.log(`[V9] Brand Filter: ${brandKept.length} kept, ${brands.length} rejected as brand`);
 
-  // === Fas 4.5 (NYHET): Pre-enrichment för IG/TT (tunn reel-data) ===
-  // IG/TT discovery ger bara reel-metadata (tom bio, null followers). Haiku
-  // behöver profil-data för att fatta bra beslut. YT har redan full data
-  // från channels.list i Fas 2. Vi berikar bara IG/TT här.
-  // OBS: Vi markerar dessa som "already enriched" så Fas 6 INTE dubbelanropar
-  // och dränerar SC-credits.
-  console.log(`[V9] >>> Fas 4.5: Pre-enrichment för IG/TT (hämtar full profil innan Haiku)`);
-  const preEnriched = await enrichProfiles(brandKept);
-  // Flagga som berikad — Fas 6 skippar dem då
-  for (const c of preEnriched) c._already_enriched = true;
-  const preE_Plat = platformCounts(preEnriched);
-  console.log(`[V9] <<< Fas 4.5 klar. ${preEnriched.length} kandidater med berikad data (yt=${preE_Plat.youtube} ig=${preE_Plat.instagram} tt=${preE_Plat.tiktok})`);
-
-  // === Fas 5: Haiku Classifier (körs på berikad data) ===
-  console.log(`[V9] >>> Fas 5: Haiku Classifier`);
-  const { confirmed, reserve } = await classifyWithHaiku(preEnriched);
+  // === Fas 5: Haiku Classifier (körs FÖRE enrichment för att spara Apify-credits) ===
+  // Haiku klassificerar creator/brand/uncertain baserat på tunn data (handle, bio, caption).
+  // Brands droppas här INNAN vi spenderar Apify-credits på enrichment.
+  // Post-enrichment brand-filter i Fas 6 fångar resterande brands med bättre data.
+  console.log(`[V9] >>> Fas 5: Haiku Classifier (pre-enrichment, tunn data)`);
+  const { confirmed, reserve } = await classifyWithHaiku(brandKept);
   metrics.after_haiku = confirmed.length;
   const confPlat = platformCounts(confirmed);
   console.log(`[V9] <<< Fas 5 klar. confirmed=${confirmed.length} reserve=${reserve.length} (yt=${confPlat.youtube} ig=${confPlat.instagram} tt=${confPlat.tiktok})`);
@@ -397,8 +387,10 @@ async function runPipelineInner(foretag, companyProfile, platforms, userQuery, b
   const allForEnrichment = [...confirmed, ...lookalikes];
   console.log(`[V9] <<< Fas 5.5 klar. +${lookalikes.length} lookalikes, totalt till enrichment: ${allForEnrichment.length}`);
 
-  // === Fas 6: Enrichment ===
-  console.log(`[V9] >>> Fas 6: Profile Enrichment`);
+  // === Fas 6: Enrichment (Apify — bara confirmed creators + lookalikes) ===
+  // Enrichar BARA profiler som Haiku bekräftat som creators.
+  // Sparar ~50% Apify-credits jämfört med att enricha alla.
+  console.log(`[V9] >>> Fas 6: Profile Enrichment (${allForEnrichment.length} profiler)`);
   const enriched = await enrichProfiles(allForEnrichment);
   console.log(`[V9] <<< Fas 6 klar. ${enriched.length} enriched (inkl skipped)`);
 

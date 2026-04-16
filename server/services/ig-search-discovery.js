@@ -163,37 +163,79 @@ async function searchKeyword(keyword, metrics) {
   }
 }
 
+// Filler-ord som inte hjälper i IG user search
+const FILLER = new Set([
+  'tips', 'hemma', 'bäst', 'bästa', 'bra', 'guide', 'recension',
+  'recensioner', 'produkt', 'produkter', 'köp', 'online', 'billig',
+  'billiga', 'gratis', 'blogg', 'vlogg', 'kanal', 'konto',
+  'inspiration', 'idéer', 'svenska', 'svensk', 'sverige',
+  // Creator-ord (bra för video-sök men inte user-sök)
+  'influencer', 'youtuber', 'tiktokare', 'bloggare', 'creator',
+  'recenserar', 'tipsar', 'berättar', 'visar', 'skapar',
+]);
+
 /**
- * Gör serper_keywords (optimerade för Google-dork) IG-sök-vänliga.
- * Instagram user search matchar på username + name + bio — korta, enkla termer fungerar bäst.
+ * Gör serper_keywords IG-sök-vänliga.
+ * IG user search matchar username + name + bio — korta termer fungerar bäst.
+ * VIKTIGT: Genererar INTE ihopskrivna varianter — de returnerar Apify-errors.
  *
  * "pälsvård hemma" → ["pälsvård"]
  * "hundgrooming tips" → ["hundgrooming"]
- * "katt grooming" → ["katt grooming", "kattgrooming"]
+ * "katt grooming" → ["katt grooming"]
  * "djurvård produkter" → ["djurvård"]
  */
-function simplifyForIGSearch(keywords) {
-  // Filler-ord som inte hjälper i IG-sök
-  const FILLER = new Set([
-    'tips', 'hemma', 'bäst', 'bästa', 'bra', 'guide', 'recension',
-    'recensioner', 'produkt', 'produkter', 'köp', 'online', 'billig',
-    'billiga', 'gratis', 'blogg', 'vlogg', 'kanal', 'konto',
-    'inspiration', 'idéer', 'svenska', 'svensk', 'sverige',
-  ]);
-
+function simplifyKeywords(keywords) {
   const simplified = new Set();
   for (const kw of keywords) {
     const words = kw.trim().split(/\s+/).filter(w => !FILLER.has(w.toLowerCase()));
     if (words.length === 0) {
-      // Hela keywordet var filler — behåll ursprungligt första ord
+      // Hela keywordet var filler — behåll första icke-filler-liknande ord
       const first = kw.trim().split(/\s+/)[0];
       if (first) simplified.add(first.toLowerCase());
-    } else if (words.length === 1) {
+    } else if (words.length <= 2) {
+      // 1-2 ord kvar → behåll som fras (INTE ihopskrivet)
+      simplified.add(words.join(' ').toLowerCase());
+    } else {
+      // 3+ ord → ta första 2 ord
+      simplified.add(words.slice(0, 2).join(' ').toLowerCase());
+    }
+  }
+  return [...simplified];
+}
+
+/**
+ * Gör ig_terms (optimerade för video-sök) IG user-search-vänliga.
+ * ig_terms har format "pälsvård katt influencer Sverige" — vi extraherar nisch-kärnan.
+ */
+function simplifyIGTerms(igTerms) {
+  const simplified = new Set();
+  for (const term of igTerms) {
+    const words = term.trim().split(/\s+/).filter(w => !FILLER.has(w.toLowerCase()));
+    if (words.length === 0) continue;
+    if (words.length === 1) {
       simplified.add(words[0].toLowerCase());
     } else {
-      // Flera kvar: behåll som fras OCH som ihopskrivet
-      simplified.add(words.join(' ').toLowerCase());
-      simplified.add(words.join('').toLowerCase());
+      // Ta max 2 kärnord
+      simplified.add(words.slice(0, 2).join(' ').toLowerCase());
+    }
+  }
+  return [...simplified];
+}
+
+/**
+ * Simplifierar hashtag_terms för IG user search.
+ * Hashtags som "pälsvårdsverige" → "pälsvård" (ta bort "sverige"-suffix)
+ * "hundgrooming" → "hundgrooming" (behåll)
+ * "svenskapälsälskare" → skippas (för specifikt)
+ */
+function simplifyHashtags(hashtags) {
+  const simplified = new Set();
+  for (let h of hashtags) {
+    h = h.replace(/^#/, '').toLowerCase();
+    // Ta bort vanliga suffix som inte hjälper i user search
+    h = h.replace(/sverige$/, '').replace(/swedish$/, '').replace(/svenska$/, '');
+    if (h.length >= 3 && h.length <= 25) {
+      simplified.add(h);
     }
   }
   return [...simplified];
@@ -203,21 +245,24 @@ function simplifyForIGSearch(keywords) {
  * Kör search-discovery för alla keywords.
  * @param {string[]} keywords - AI-genererade nisch-keywords (serper_keywords)
  * @param {string[]} hashtags - AI-genererade hashtags (hashtag_terms)
+ * @param {string[]} igTerms - AI-genererade IG video-termer (ig_terms)
  * @param {object} metrics
  * @returns {RawCandidate[]}
  */
-export async function discoverIGViaSearch(keywords, hashtags, metrics) {
-  // Förbered IG-sök-vänliga keywords
-  const fromSerper = simplifyForIGSearch(keywords || []);
-  const fromHashtags = (hashtags || []).map(h => h.replace(/^#/, '').toLowerCase());
+export async function discoverIGViaSearch(keywords, hashtags, igTerms, metrics) {
+  // Förbered IG-sök-vänliga keywords från alla tre källor
+  const fromSerper = simplifyKeywords(keywords || []);
+  const fromHashtags = simplifyHashtags(hashtags || []);
+  const fromIGTerms = simplifyIGTerms(igTerms || []);
 
-  // Kombinera, dedup, max 10 sökningar
+  // Kombinera, dedup, max 12 sökningar
   const allKeywords = [
-    ...new Set([...fromSerper, ...fromHashtags])
-  ].slice(0, 10);
+    ...new Set([...fromSerper, ...fromHashtags, ...fromIGTerms])
+  ].slice(0, 12);
 
-  console.log(`[Discovery][IG-Search] Simplified keywords: ${fromSerper.join(', ')}`);
-  console.log(`[Discovery][IG-Search] Hashtag keywords: ${fromHashtags.join(', ')}`);
+  console.log(`[Discovery][IG-Search] From serper (${fromSerper.length}): ${fromSerper.join(', ')}`);
+  console.log(`[Discovery][IG-Search] From hashtags (${fromHashtags.length}): ${fromHashtags.join(', ')}`);
+  console.log(`[Discovery][IG-Search] From ig_terms (${fromIGTerms.length}): ${fromIGTerms.join(', ')}`);
 
   if (allKeywords.length === 0) {
     console.warn('[Discovery][IG-Search] Inga keywords — returnerar tomt');

@@ -196,9 +196,10 @@ async function discoverIG(queries, metrics) {
   if (IG_DISCOVERY_MODE === 'search') {
     const serperKeywords = queries.serper_keywords || [];
     const hashtags = queries.hashtag_terms || queries.hashtags || [];
-    if (serperKeywords.length > 0 || hashtags.length > 0) {
-      console.log(`[Discovery][IG] MODE=search — Apify Instagram Search (${serperKeywords.length} keywords + ${hashtags.length} hashtags)`);
-      return discoverIGViaSearch(serperKeywords, hashtags, metrics);
+    const igTerms = queries.ig_terms || [];
+    if (serperKeywords.length > 0 || hashtags.length > 0 || igTerms.length > 0) {
+      console.log(`[Discovery][IG] MODE=search — Apify Instagram Search (${serperKeywords.length} keywords + ${hashtags.length} hashtags + ${igTerms.length} ig_terms)`);
+      return discoverIGViaSearch(serperKeywords, hashtags, igTerms, metrics);
     }
     console.warn('[Discovery][IG] Inga keywords för search — fallback till hashtag');
     // Fall through

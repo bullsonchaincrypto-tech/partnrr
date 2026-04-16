@@ -126,7 +126,7 @@ async function searchKeyword(keyword, metrics) {
     if (metrics) {
       metrics.search_total_returned = (metrics.search_total_returned || 0) + items.length;
       metrics.search_skipped_private = (metrics.search_skipped_private || 0) + skippedPrivate;
-      metrics.search_skipped_commercial = (metrics.search_skipped_commercial || 0) + skippedCommercial;
+      metrics.search_skipped_personal = (metrics.search_skipped_personal || 0) + skippedPersonal;
     }
 
     return candidates;

@@ -873,6 +873,16 @@ export default function Step2HittaInfluencers({ foretag, outreachType, influence
                                   inf.enrichment_kalla
                                 }</p>
                               )}
+                              {/* YouTube API ToS — attribution */}
+                              {(inf.datakalla === 'youtube_api' || inf.plattform?.toLowerCase().includes('youtube')) && (
+                                <p className="text-gray-500 text-[10px] mt-1 flex items-center gap-1">
+                                  <svg viewBox="0 0 28 20" className="w-4 h-3 flex-shrink-0">
+                                    <rect width="28" height="20" rx="4" fill="#FF0000"/>
+                                    <polygon points="11,5 11,15 20,10" fill="white"/>
+                                  </svg>
+                                  Channel data provided by <a href="https://www.youtube.com/" target="_blank" rel="noopener noreferrer" className="underline hover:text-gray-400">YouTube</a>
+                                </p>
+                              )}
                             </>
                           )}
                         </div>
@@ -883,6 +893,24 @@ export default function Step2HittaInfluencers({ foretag, outreachType, influence
               </div>
             ))}
           </div>
+
+          {/* YouTube API ToS — global attribution footer */}
+          {influencers.some(inf => inf.datakalla === 'youtube_api' || inf.plattform?.toLowerCase().includes('youtube')) && (
+            <div className="mt-2 px-1 flex items-center gap-1.5 text-gray-500 text-[10px]">
+              <svg viewBox="0 0 28 20" className="w-4 h-3 flex-shrink-0">
+                <rect width="28" height="20" rx="4" fill="#FF0000"/>
+                <polygon points="11,5 11,15 20,10" fill="white"/>
+              </svg>
+              <span>
+                YouTube channel data provided by{' '}
+                <a href="https://www.youtube.com/" target="_blank" rel="noopener noreferrer" className="underline hover:text-gray-400">YouTube</a>
+                {' · '}
+                <a href="https://www.youtube.com/t/terms" target="_blank" rel="noopener noreferrer" className="underline hover:text-gray-400">Terms of Service</a>
+                {' · '}
+                <a href="https://policies.google.com/privacy" target="_blank" rel="noopener noreferrer" className="underline hover:text-gray-400">Google Privacy Policy</a>
+              </span>
+            </div>
+          )}
 
           {/* Sök fler-knapp för sponsors */}
           {isSponsor && influencers.length > 0 && (

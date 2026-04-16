@@ -366,9 +366,10 @@ async function runPipelineInner(foretag, companyProfile, platforms, userQuery, b
   }
 
   // === Fas 4: Brand Filter (deterministisk, gratis) ===
+  console.log(`[V9] >>> Fas 4: Brand Filter (deterministisk)`);
   const { kept: brandKept, brands } = applyBrandFilter(swedishPassed);
   metrics.after_brand_filter = brandKept.length;
-  console.log(`[V9] Brand Filter: ${brandKept.length} kept, ${brands.length} rejected as brand`);
+  console.log(`[V9] <<< Fas 4 klar. ${brandKept.length} kept, ${brands.length} rejected as brand`);
 
   // === Fas 5: Haiku Classifier (körs FÖRE enrichment för att spara Apify-credits) ===
   // Haiku klassificerar creator/brand/uncertain baserat på tunn data (handle, bio, caption).

@@ -99,12 +99,11 @@ Regler för hashtag_terms (6 st):
 
 Regler för serper_keywords (5 st):
 Dessa används i Google-dork queries: "keyword" "Stockholm" site:instagram.com
-1. 1-3 ord per keyword. SKRIV ISÄR ord — använd INTE sammansättningar!
-   Google matchar "fantasy fotboll" mycket bättre än "fantasyfotboll".
-   Sammansatta ord som inte är etablerade svenska ord ger ofta 0 träffar.
+1. 1-3 ord per keyword. Använd ETABLERADE svenska sammansättningar (t.ex. "pälsvård", "hundträning", "fotbollstips") men SKRIV ISÄR påhittade/ovanliga kombinationer.
+   Tumregel: om ordet finns i vardagligt svenskt bruk → skriv ihop. Annars → skriv isär.
 
-   FÖRBJUDET: "fantasyfotboll", "fantasyliga", "smarthem", "hemautomation"
-   RÄTT:      "fantasy fotboll", "fantasy liga", "smart hem", "hem automation"
+   BRA:       "pälsvård", "hundträning", "fotbollstips", "fantasy fotboll", "smart hem"
+   FÖRBJUDET: "fantasyfotboll", "fantasyliga", "smarthem", "hemautomation" (ej etablerade ord)
 
 2. BARA SVENSKA ORD (engelska OK om de används i Sverige, t.ex. "fantasy", "smart").
 3. KRITISKT: Keywords måste vara NISCH-SPECIFIKA, inte generiska!

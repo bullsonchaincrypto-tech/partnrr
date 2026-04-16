@@ -58,11 +58,19 @@ export function classifySwedish(c) {
   // S7: franc detekterar svenska från bio + caption (SOFT)
   // Kräver minst 30 tecken för att vara meningsfull
   const francInput = `${bio} ${caption}`.trim();
+  let francDetected = null;
   if (francInput.length >= 30) {
     try {
-      const detected = franc(francInput, { minLength: 20 });
-      if (detected === 'swe') sig.S7 = true;
+      francDetected = franc(francInput, { minLength: 20 });
+      if (francDetected === 'swe') sig.S7 = true;
     } catch {}
+  }
+
+  // ANTI-S7: franc detekterar ett ANNAT språk → blockera soft-only pass
+  // Tyska, engelska etc. i bion ska inte kunna passera bara på namn/hashtag.
+  const NON_SWEDISH_LANGS = new Set(['deu', 'eng', 'fra', 'spa', 'ita', 'por', 'nld', 'pol', 'fin', 'rus', 'tur', 'ara', 'jpn', 'zho', 'kor']);
+  if (francDetected && NON_SWEDISH_LANGS.has(francDetected)) {
+    sig.ANTI_S7 = francDetected;
   }
 
   // S8: Discovery via svensk hashtag (om vi sparat hashtaggen i discovery_query)
@@ -92,6 +100,12 @@ export function classifySwedish(c) {
   const soft = sig.S5 || sig.S6 || sig.S7 || sig.S8;
 
   if (hard) return { pass: true, confidence: 'hard', signals: sig };
+
+  // Om franc detekterar icke-svenska i bion → soft-signaler (namn, hashtag) räcker INTE
+  if (sig.ANTI_S7 && !sig.S7) {
+    return { pass: false, confidence: 'lang-reject', signals: sig };
+  }
+
   if (soft) return { pass: true, confidence: 'soft', signals: sig };
 
   // Pending = otillräcklig data. Tidigare släppte vi igenom dessa, men det

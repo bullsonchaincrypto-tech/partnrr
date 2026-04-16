@@ -152,7 +152,8 @@ export async function discoverIGViaSerper(keywords, metrics = {}) {
             gl: 'se',
             hl: 'sv',
             num: 20,        // num:100/50/30 blockeras av Serper för site:-dorks
-            tbs: 'qdr:m',  // Senaste månaden
+            // OBS: ingen tbs — 'qdr:m' filtrerade bort IG-profiler som inte
+            // re-indexerats senaste månaden, gav 0 träffar på nischade keywords
             page,
           });
           const organic = data.organic || [];

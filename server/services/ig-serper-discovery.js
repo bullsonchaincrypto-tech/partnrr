@@ -5,20 +5,20 @@
 // Använder site:instagram.com Google-dorks via Serper.dev.
 //
 // Strategi:
-//   5 AI-genererade keywords × 3 städer = 15 queries
+//   5 AI-genererade keywords × 5 städer = 25 queries
 //   5 keywords × "Sverige"              =  5 queries
-//   Totalt: 20 queries à 1 Serper-credit × num:100 = 2000 resultat
+//   5 keywords × "Sweden"               =  5 queries
+//   Totalt: 35 queries à 1 Serper-credit × num:100 = 3500 resultat
 //
-// Budget: max 20 credits per sökning.
+// Budget: 35 credits per sökning.
 // Output: RawCandidate[] med handle, namn (från title), bio (snippet).
 // Profil-berikining sker i Fas 6 via Apify.
 
 import { serperSearch } from './serper.js';
 
-const CITIES = ['Stockholm', 'Göteborg', 'Malmö'];
-const GEO_VARIANTS = ['Sverige'];
+const CITIES = ['Stockholm', 'Göteborg', 'Malmö', 'Uppsala', 'Linköping'];
+const GEO_VARIANTS = ['Sverige', 'Sweden'];
 const DORK_EXCLUDES = '-inurl:/p/ -inurl:/reel -inurl:/channel -inurl:/explore';
-const MAX_QUERIES = 20; // Hård budget-cap
 
 // Paths som INTE är profil-URLs
 const NON_PROFILE_SLUGS = new Set([
@@ -50,11 +50,6 @@ export function buildDorkQueries(keywords) {
         label: `"${kw}" × ${geo}`,
       });
     }
-  }
-  // Hård budget-cap
-  if (queries.length > MAX_QUERIES) {
-    console.warn(`[IG-Serper] ${queries.length} queries genererade, cappar till ${MAX_QUERIES}`);
-    return queries.slice(0, MAX_QUERIES);
   }
   return queries;
 }
@@ -119,7 +114,7 @@ export async function discoverIGViaSerper(keywords, metrics = {}) {
   }
 
   const queries = buildDorkQueries(keywords);
-  console.log(`[Discovery][IG-Serper] ${queries.length} queries (${keywords.length} keywords × ${CITIES.length + GEO_VARIANTS.length} geo-varianter, num:100, budget max ${MAX_QUERIES} credits)`);
+  console.log(`[Discovery][IG-Serper] ${queries.length} queries (${keywords.length} keywords × ${CITIES.length + GEO_VARIANTS.length} geo-varianter, num:100, ${queries.length} credits)`);
   for (const kw of keywords) console.log(`[Discovery][IG-Serper]   keyword: "${kw}"`);
 
   const handleMap = new Map();       // handle → candidate

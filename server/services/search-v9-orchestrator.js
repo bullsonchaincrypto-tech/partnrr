@@ -41,6 +41,22 @@ function platformCounts(list) {
   return out;
 }
 
+/** Logga per-source-query breakdown för IG (Serper). */
+function logSourceQueryBreakdown(tag, list) {
+  const igCands = list.filter(c => c.platform === 'instagram' && c.discovery_query);
+  if (igCands.length === 0) return;
+  const byQuery = {};
+  for (const c of igCands) {
+    const q = c.discovery_query;
+    if (!byQuery[q]) byQuery[q] = [];
+    byQuery[q].push(c.handle);
+  }
+  console.log(`[V9] ─── IG source-query breakdown (${tag}) ───`);
+  for (const [query, handles] of Object.entries(byQuery).sort((a, b) => b[1].length - a[1].length)) {
+    console.log(`[V9]   ${query}: ${handles.length} st [${handles.slice(0, 5).map(h => '@' + h).join(', ')}${handles.length > 5 ? '...' : ''}]`);
+  }
+}
+
 // ============================================================
 // === FAS 8: DYNAMIC CUT + RESERVE REFILL =====================
 // ============================================================
@@ -288,6 +304,7 @@ async function runPipelineInner(foretag, companyProfile, platforms, userQuery, b
   let candidates = await discoverCandidates(brief, queries, foretag, platforms, metrics);
   const discPlat = platformCounts(candidates);
   console.log(`[V9] <<< Fas 2 klar. ${candidates.length} kandidater (yt=${discPlat.youtube} ig=${discPlat.instagram} tt=${discPlat.tiktok})`);
+  logSourceQueryBreakdown('efter Discovery', candidates);
 
   // === Fas 2.5: Cross-platform merge ===
   console.log(`[V9] >>> Fas 2.5: Cross-platform merge`);
@@ -334,6 +351,7 @@ async function runPipelineInner(foretag, companyProfile, platforms, userQuery, b
   console.log(`[V9] Swedish Gate: ${swedishPassed.length} passed, ${swedishRejected.length} rejected`);
   console.log(`[V9]   Passed: yt=${sgPassByPlat.youtube} ig=${sgPassByPlat.instagram} tt=${sgPassByPlat.tiktok}`);
   console.log(`[V9]   Rejected: yt=${sgRejByPlat.youtube} ig=${sgRejByPlat.instagram} tt=${sgRejByPlat.tiktok}`);
+  logSourceQueryBreakdown('efter Swedish Gate', swedishPassed);
   // Sampla några rejected IG-kandidater för diagnos
   const rejectedIg = swedishRejected.filter(c => c.platform === 'instagram').slice(0, 3);
   for (const c of rejectedIg) {
@@ -364,6 +382,7 @@ async function runPipelineInner(foretag, companyProfile, platforms, userQuery, b
   metrics.after_haiku = confirmed.length;
   const confPlat = platformCounts(confirmed);
   console.log(`[V9] <<< Fas 5 klar. confirmed=${confirmed.length} reserve=${reserve.length} (yt=${confPlat.youtube} ig=${confPlat.instagram} tt=${confPlat.tiktok})`);
+  logSourceQueryBreakdown('efter Haiku', confirmed);
 
   // === Fas 5.5: Lookalike Expansion ===
   console.log(`[V9] >>> Fas 5.5: Lookalike Expansion (${process.env.USE_LOOKALIKE_EXPANSION === 'true' ? 'AKTIV' : 'SKIPPAD'})`);
@@ -395,6 +414,7 @@ async function runPipelineInner(foretag, companyProfile, platforms, userQuery, b
   metrics.reserve_used = reserveUsed;
   const finalPlat = platformCounts(final);
   console.log(`[V9] <<< Fas 8 klar. Final: ${final.length} (yt=${finalPlat.youtube} ig=${finalPlat.instagram} tt=${finalPlat.tiktok}), reserve used: ${reserveUsed}`);
+  logSourceQueryBreakdown('FINAL', final);
 
   // === Fas 9: Email Finder ===
   console.log(`[V9] >>> Fas 9: Email Finder (Serper waterfall)`);

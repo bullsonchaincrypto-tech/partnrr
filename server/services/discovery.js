@@ -18,19 +18,13 @@ import { discoverIGViaSearch } from './ig-search-discovery.js';
 // Toggle: "search" (default) | "hashtag" | "serper"
 const IG_DISCOVERY_MODE = (process.env.IG_DISCOVERY_MODE || 'search').toLowerCase();
 
-const YT_PUBLISHED_AFTER = (() => {
-  const d = new Date();
-  d.setMonth(d.getMonth() - 2);
-  return d.toISOString();
-})();
-
 const EARLY_EXIT_AT = 300;
 
 // ============================================================
 // === 2.1 + 2.2 + 2.3 YouTube search-pass =====================
 // ============================================================
 
-async function searchYTPass(term, order, publishedAfter) {
+async function searchYTPass(term, order) {
   const url = new URL('https://www.googleapis.com/youtube/v3/search');
   url.searchParams.set('part', 'snippet');
   url.searchParams.set('type', 'video');
@@ -39,7 +33,6 @@ async function searchYTPass(term, order, publishedAfter) {
   url.searchParams.set('relevanceLanguage', 'sv');
   url.searchParams.set('maxResults', '50');
   url.searchParams.set('order', order);
-  url.searchParams.set('publishedAfter', publishedAfter);
   url.searchParams.set('key', process.env.YOUTUBE_API_KEY);
   const ac = new AbortController();
   const timer = setTimeout(() => ac.abort(), 15000);
@@ -69,7 +62,7 @@ async function gatherYTChannelIds(queries) {
   const channelIdSet = new Set();
   const perQueryResults = [];
   const promises = allTerms.map(({ term, order }) =>
-    searchYTPass(term, order, YT_PUBLISHED_AFTER)
+    searchYTPass(term, order)
       .then(data => {
         const items = data.items || [];
         let newChannels = 0;

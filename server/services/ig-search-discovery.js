@@ -56,9 +56,11 @@ function classifyAccountType(profile) {
   if (COMMERCIAL_CATEGORIES.has(cat)) return 'business';
   if (CREATOR_CATEGORIES.has(cat)) return 'creator';
 
-  // Okänd kategori men har business-konto → troligen creator
-  // (de flesta seriösa creators har Business/Creator-konto)
-  return 'unknown';
+  // Okänd kategori men har business-konto
+  if (cat) {
+    console.log(`[Discovery][IG-Search] UNKNOWN category: "${cat}" (handle=${profile.username || profile.handle || '?'})`);
+  }
+  return cat ? 'unknown' : 'unknown-nocat';
 }
 
 /**
@@ -311,10 +313,9 @@ export async function discoverIGViaSearch(keywords, hashtags, igTerms, metrics) 
     }
   }
 
-  // Sortera: creators först, sen multi-keyword, sen followers
+  // Sortera: creators först, sen unknown-med-kategori, sen nocat, sen followers
   const sorted = Array.from(allCandidates.values()).sort((a, b) => {
-    // 1. Creators > unknown > personal
-    const typeOrder = { creator: 0, unknown: 1, personal: 2 };
+    const typeOrder = { creator: 0, unknown: 1, 'unknown-nocat': 2 };
     const aType = typeOrder[a.account_type] ?? 1;
     const bType = typeOrder[b.account_type] ?? 1;
     if (aType !== bType) return aType - bType;
@@ -329,7 +330,7 @@ export async function discoverIGViaSearch(keywords, hashtags, igTerms, metrics) 
   });
 
   // Logga statistik
-  const typeDist = { creator: 0, unknown: 0, personal: 0 };
+  const typeDist = { creator: 0, unknown: 0, 'unknown-nocat': 0 };
   for (const c of sorted) typeDist[c.account_type] = (typeDist[c.account_type] || 0) + 1;
   console.log(`[Discovery][IG-Search] Totalt: ${sorted.length} unika profiler`);
   console.log(`[Discovery][IG-Search] Kontotyp: creator=${typeDist.creator}, unknown=${typeDist.unknown}, personal=${typeDist.personal}`);

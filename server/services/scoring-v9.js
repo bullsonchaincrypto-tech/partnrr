@@ -267,7 +267,10 @@ async function sonnetDeep(top50, brief, companyProfile) {
     scored++;
     const beforeCap = top50[i].match_score;
     top50[i].match_score = applyFollowerCap(top50[i]);
-    if (top50[i].match_score < beforeCap) capped++;
+    if (top50[i].match_score < beforeCap) {
+      capped++;
+      console.log(`[Scoring v9] Cap @${top50[i].handle}: ${beforeCap}→${top50[i].match_score} (followers=${top50[i].followers}, total_reach=${top50[i].total_reach})`);
+    }
   }
   console.log(`[Scoring v9] Fas 7b parsed ${scored}/${top50.length} complete objects (truncation: ${parsed.length < top50.length ? 'yes' : 'no'})`);
   console.log(`[Scoring v9] Follower caps applied: ${capped}`);

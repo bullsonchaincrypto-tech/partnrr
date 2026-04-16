@@ -46,7 +46,7 @@ function mergeApifyIgProfile(original, apifyData) {
     ...original,
     name: apifyData.full_name || apifyData.fullName || original.name,
     bio: bio.slice(0, 1000),
-    followers: apifyData.followers || apifyData.followersCount || original.followers,
+    followers: apifyData.followers ?? apifyData.followersCount ?? original.followers,
     external_url: apifyData.website || apifyData.externalUrl || original.external_url,
     is_business_account: apifyData.is_business || apifyData.isBusinessAccount || false,
     business_category: apifyData.category || apifyData.businessCategoryName || original.business_category,
@@ -128,7 +128,15 @@ export async function enrichProfiles(candidates) {
 
     if (c.platform === 'instagram' && igMap.has(handle)) {
       enrichedCount++;
-      return mergeApifyIgProfile(c, igMap.get(handle));
+      const apifyData = igMap.get(handle);
+      const merged = mergeApifyIgProfile(c, apifyData);
+      if (!merged.followers && apifyData.followers) {
+        console.warn(`[Enrichment] MERGE BUG: @${handle} — apify.followers=${apifyData.followers} but merged.followers=${merged.followers}`);
+      }
+      if (merged.followers !== apifyData.followers && apifyData.followers > 0) {
+        console.log(`[Enrichment] Followers mismatch @${handle}: apify=${apifyData.followers}, merged=${merged.followers}, original=${c.followers}`);
+      }
+      return merged;
     }
     if (c.platform === 'tiktok' && ttMap.has(handle)) {
       enrichedCount++;

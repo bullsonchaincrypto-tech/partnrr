@@ -172,7 +172,7 @@ function normalizeInstagram(raw) {
     platform: 'instagram',
     full_name: raw.fullName || raw.full_name || '',
     bio: raw.biography || raw.bio || '',
-    followers: raw.followersCount || raw.followers || raw.follower_count || 0,
+    followers: raw.followersCount ?? raw.followers ?? raw.follower_count ?? 0,
     following: raw.followsCount || raw.following || 0,
     posts_count: raw.postsCount || raw.mediaCount || raw.posts_count || 0,
     is_verified: raw.verified || raw.isVerified || raw.is_verified || false,

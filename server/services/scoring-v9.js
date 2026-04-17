@@ -123,7 +123,7 @@ Bransch: ${companyProfile?.bransch || ''}
 Beskrivning: ${companyProfile?.beskrivning || ''}
 Nisch: ${brief.primary_niche}
 Sekundära nischer: ${(brief.secondary_niches || []).join(', ')}
-Målgrupp: ${brief.target_audience}
+Målgrupp: ${brief.target_audience}${brief.location ? `\nPLATS-KRAV: ${brief.location} — influencers från/i denna stad/region ska prioriteras.` : ''}
 
 GE VARJE INFLUENCER match_score (0-100) och motivation (max 90 tecken).
 
@@ -145,7 +145,13 @@ STEG 2 — FÖLJAR-JUSTERING (lägg till/dra av från bas):
   3000–10000:       ±0
   10000–50000:      +3
   50000+:           +5
-
+${brief.location ? `
+STEG 3 — PLATS-BONUS (om PLATS-KRAV finns):
+  Om influencerns bio, kanalnamn eller content nämner "${brief.location}"
+  eller närliggande region → +5 bonus.
+  Om influencern tydligt INTE är i rätt region → −5.
+  Om oklart/ej nämnt → ±0 (straffa INTE om plats inte framgår).
+` : ''}
 REGLER:
 - En 466k mega-influencer i EXAKT rätt nisch = ALLTID 90+
 - En 22k kanal med exakt rätt nisch som ger tips/tutorials = 88-92

@@ -313,7 +313,7 @@ async function runPipelineInner(foretag, companyProfile, platforms, userQuery, b
   // === Fas 0: Brief ===
   console.log(`[V9] >>> Fas 0: Brief Interpreter`);
   const brief = await interpretBrief(foretag, companyProfile, userQuery);
-  console.log(`[V9] <<< Fas 0 klar: niche="${brief.primary_niche}", tier=${brief.size_tier_hint}, must_have=${(brief.must_have_signals || []).length}, exclusions=${(brief.exclusions || []).length}, hashtags=${(brief.hashtag_hints || []).length}`);
+  console.log(`[V9] <<< Fas 0 klar: niche="${brief.primary_niche}", location=${brief.location || '(ingen)'}, tier=${brief.size_tier_hint}, must_have=${(brief.must_have_signals || []).length}, exclusions=${(brief.exclusions || []).length}, hashtags=${(brief.hashtag_hints || []).length}`);
 
   // === Fas 1: Search terms ===
   console.log(`[V9] >>> Fas 1: Sökterms-generering (Sonnet ×2)`);

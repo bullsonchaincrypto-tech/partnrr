@@ -23,6 +23,7 @@ markdown-wrapping, ingen text före eller efter:
   "primary_niche": string,
   "secondary_niches": string[],
   "target_audience": string,
+  "location": string|null,
   "size_tier_hint": "nano"|"micro"|"mid-tier"|"large"|"any",
   "must_have_signals": string[],
   "exclusions": string[],
@@ -33,6 +34,11 @@ markdown-wrapping, ingen text före eller efter:
 
 Regler:
 1. primary_niche: max 3 ord, svenska, konkret. Ex: "smart hem", inte "tech".
+1b. location: Om företaget eller beskrivningen nämner en specifik svensk
+    stad, region eller kommun → fyll i stadsnamnet (t.ex. "Sundsvall",
+    "Göteborg", "Norrland"). Om ingen geografisk avgränsning antyds → null.
+    VIKTIGT: Fånga även regionala/informella namn som "Medelpad", "Norrland",
+    "Skåne" etc.
 2. size_tier_hint baseras på företagstyp:
    - B2C lifestyle/tech/hem/mode → "mid-tier"
    - B2B eller specialistprodukt → "micro"
@@ -80,6 +86,7 @@ function fallbackBrief(foretag) {
     primary_niche: foretag?.bransch || 'allmänt',
     secondary_niches: [],
     target_audience: 'svensk publik',
+    location: null,
     size_tier_hint: 'mid-tier',
     must_have_signals: [],
     exclusions: [],
@@ -103,6 +110,7 @@ function validateBrief(raw, foretag) {
       secondary_niches: Array.isArray(b.secondary_niches) ? b.secondary_niches.slice(0, 4) : [],
       target_audience: typeof b.target_audience === 'string' && b.target_audience.trim()
         ? b.target_audience : 'svensk publik',
+      location: typeof b.location === 'string' && b.location.trim() ? b.location.trim() : null,
       size_tier_hint: ['nano', 'micro', 'mid-tier', 'large', 'any'].includes(b.size_tier_hint)
         ? b.size_tier_hint : 'mid-tier',
       must_have_signals: Array.isArray(b.must_have_signals) ? b.must_have_signals.slice(0, 5) : [],
@@ -145,8 +153,8 @@ export async function interpretBrief(foretag, companyProfile = {}, userQuery) {
     const brief = validateBrief(raw, foretag);
     console.log(
       `[Brief] Done in ${Date.now() - t0}ms — niche="${brief.primary_niche}", ` +
-      `tier=${brief.size_tier_hint}, seeds=${brief.lookalike_seeds.length}, ` +
-      `hashtags=${brief.hashtag_hints.length}`
+      `location=${brief.location || '(ingen)'}, tier=${brief.size_tier_hint}, ` +
+      `seeds=${brief.lookalike_seeds.length}, hashtags=${brief.hashtag_hints.length}`
     );
     return brief;
   } catch (err) {

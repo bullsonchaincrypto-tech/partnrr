@@ -51,11 +51,17 @@ Regler för terms (8 st):
 6. Inkludera minst 2 termer med personliga verb (jag-form):
    "jag testar", "jag installerar", "min upplevelse", "mitt hem" etc.
    Dessa hittar PERSONER snarare än företag.
+7. PLATS-REGEL: Om user-prompten anger en LOCATION (stad/region) →
+   inkludera stadsnamnet i MINST 2 av de 8 termerna.
+   Exempel (location=Sundsvall, nisch=renovering):
+     "renovering Sundsvall", "hantverkare Sundsvall"
+   Om INGEN location anges → ignorera denna regel helt.
 
 Regler för long_tail_terms (3 st):
 - Biasade mot nano/micro-kreatörer. Inkludera nischade kombinationer
   som hittar mindre kanaler, t.ex. specifika underkategorier eller
   användningsscenarier inom <PRIMARY_NICHE>.
+- Om LOCATION finns → inkludera den i minst 1 long_tail_term.
 
 negative_terms (3-5): ord/fraser som starkt indikerar brand snarare än creator.`;
 
@@ -167,7 +173,7 @@ function parseJson(raw) {
 }
 
 function renderUserPrompt(foretag, brief) {
-  return [
+  const lines = [
     `Företag: ${foretag?.namn || ''}`,
     `Bransch: ${foretag?.bransch || ''}`,
     `Beskrivning: ${foretag?.beskrivning || ''}`,
@@ -177,7 +183,11 @@ function renderUserPrompt(foretag, brief) {
     `Size tier hint: ${brief.size_tier_hint}`,
     `Must-have signals: ${(brief.must_have_signals || []).join('; ')}`,
     `Exclusions: ${(brief.exclusions || []).join(', ')}`,
-  ].join('\n');
+  ];
+  if (brief.location) {
+    lines.push(`LOCATION: ${brief.location}`);
+  }
+  return lines.join('\n');
 }
 
 // ============================================================

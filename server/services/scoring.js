@@ -144,20 +144,11 @@ function calculateFollowerScore(influencer) {
 }
 
 /**
- * Hård cap baserat på följarantal — oavsett AI-bedömning och nisch-matchning
- * kan en profil med 0 followers aldrig få hög score.
+ * Follower cap BORTTAGEN — Sonnet hanterar följarantal som en del av sin
+ * bedömning via poängskalan i prompten. Ingen hård cap behövs.
  */
-function applyFollowerCap(score, influencer) {
-  const followers = influencer.followers || influencer.foljare_exakt || 0;
-
-  // YouTube-profiler med verifierad data från API har alltid subscribers
-  // Men IG/TT profiler kan ha null followers om enrichment misslyckades
-  if (followers === 0 || followers == null) return Math.min(score, 15);
-  if (followers < 50) return Math.min(score, 20);
-  if (followers < 100) return Math.min(score, 30);
-  if (followers < 500) return Math.min(score, 45);
-
-  return score; // 500+ followers → ingen cap
+function applyFollowerCap(score, _influencer) {
+  return score;
 }
 
 /**
@@ -381,19 +372,25 @@ Fråga dig: "Skapar denna person content som företagets kunder tittar på?"
 - Om influencerns bio/handle/topics är EXAKT rätt nisch → 85+
 - Om influencern dessutom gör recensioner/tester/tips i nischen → 90+
 
-SEKUNDÄRT — STORLEK (20% av bedömningen):
-- 1K+ följare med rätt nisch = fullt värdefull
-- Nano (1K–10K) med rätt nisch är LIKA BRA som mikro — de har ofta bättre konvertering
-- Under 500 följare → dra av 15-20 poäng
-- Under 100 eller 0 → max score 25
+SEKUNDÄRT — FÖLJARANTAL (20% av bedömningen):
+Använd denna poängskala som GUIDE (inte hård cap) — justera ±5 beroende på kontext:
+  0 följare / null data:    –40 poäng (opålitlig profil)
+  1–100 följare:            –30 poäng (mycket liten)
+  100–500 följare:          –20 poäng (liten men kan ha potential)
+  500–1000 följare:         –10 poäng (liten kanal)
+  1000–3000 följare:        –5 poäng (nano, bra för konvertering)
+  3000–10000 följare:       ±0 poäng (nano/mikro, bra ROI)
+  10000–50000 följare:      +3 poäng (mikro, utmärkt balans)
+  50000+ följare:           +5 poäng (stor räckvidd)
 
-SCORING-REFERENS (kalibrering):
-95: Exakt nisch + recenserar/testar produkter i nischen + 1K+ följare
-85: Exakt nisch + skapar content i nischen + 1K+ följare
+SCORING-REFERENS (kalibrering — nisch-score PLUS följar-justering):
+95: Exakt nisch + recenserar/testar produkter + 3K+ följare
+90: Exakt nisch + skapar content i nischen + 3K+ följare
+85: Exakt nisch + 1K+ följare
 75: Relaterad nisch + content överlappar delvis
 60: Lös koppling — nisch angränsar men inte direkt match
 40: Svag koppling — bred kanal där nischen bara nämns ibland
-25: Fel nisch eller för få följare för att vara användbar
+25: Fel nisch helt
 
 VIKTIGT: Var INTE för konservativ. En kanal som heter "SmartaHem" och gör
 hemautomation-videos ÄR en 85-95 match för ett smart hem-företag.

@@ -265,7 +265,7 @@ export default function Step2HittaInfluencers({ foretag, outreachType, influence
             min_followers: 1000,
             min_engagement: briefAnswers.min_engagement || null,
             max_price: briefAnswers.budget ? parseInt(briefAnswers.budget) : null,
-          }, excludeHandles.length > 0 ? excludeHandles : undefined)
+          }, excludeHandles.length > 0 ? excludeHandles : undefined, append)
 
           if (searchResult.results?.length > 0) {
             const results = searchResult.results.map(inf => ({

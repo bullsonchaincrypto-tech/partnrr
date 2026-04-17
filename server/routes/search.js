@@ -26,7 +26,7 @@ const router = Router();
  */
 router.post('/influencers', async (req, res) => {
   try {
-    const { company_profile_id, platforms, filters, exclude_handles, bust_cache } = req.body;
+    const { company_profile_id, platforms, filters, exclude_handles, bust_cache, append } = req.body;
     const bustCache = bust_cache === true || req.query.bust_cache === '1' || req.query.bust_cache === 'true';
 
     const foretag = await queryOne('SELECT * FROM foretag WHERE id = ?', [Number(company_profile_id)]);
@@ -58,6 +58,8 @@ router.post('/influencers', async (req, res) => {
           platforms: platforms || ['youtube', 'instagram', 'tiktok'],
           userQuery: req.body.user_query || null,
           bust_cache: bustCache,
+          exclude_handles: Array.isArray(exclude_handles) ? exclude_handles : [],
+          append: !!append,
         });
 
         // Fire-and-forget cost-guard (non-blocking för response)
@@ -518,7 +520,9 @@ router.post('/influencers', async (req, res) => {
     // ============================================================
     // FAS 8: Spara till DB
     // ============================================================
-    await runSql('DELETE FROM influencers WHERE foretag_id = ?', [foretag.id]);
+    if (!append) {
+      await runSql('DELETE FROM influencers WHERE foretag_id = ?', [foretag.id]);
+    }
 
     for (const inf of finalResults) {
       const referralKod = ((inf.handle || inf.kanalnamn || 'UNKNOWN')).toUpperCase().replace(/[^A-Z0-9]/g, '').slice(0, 10);

@@ -8,7 +8,7 @@
 // Returnerar: { results, cost_usd, duration_ms, metrics, cached }
 
 import crypto from 'node:crypto';
-import { runSql, queryOne } from '../db/schema.js';
+import { runSql, queryOne, queryAll } from '../db/schema.js';
 
 import { interpretBrief } from './brief-interpreter.js';
 import { generateAllSearchTerms } from './ai-search-v9.js';
@@ -132,10 +132,21 @@ export function finalCut(scored, reservePool, {
 // === FAS 10: PERSISTENS ======================================
 // ============================================================
 
-async function persistResults(foretag_id, final, brief, metrics) {
+async function persistResults(foretag_id, final, brief, metrics, { append = false } = {}) {
   // 1. Radera tidigare sökresultat för detta företag
-  // (V1-pipen använder samma tabell; vi rensar alla rader för foretag_id)
-  await runSql('DELETE FROM influencers WHERE foretag_id = $1', [foretag_id]);
+  //    I append-läge: behåll befintliga, filtrera dubbletter innan insert
+  if (append) {
+    const existing = await queryAll(
+      'SELECT LOWER(kanalnamn) as handle FROM influencers WHERE foretag_id = $1',
+      [foretag_id]
+    );
+    const existingSet = new Set(existing.map(r => r.handle));
+    const before = final.length;
+    final = final.filter(c => !existingSet.has((c.handle || '').toLowerCase()));
+    console.log(`[Persist] APPEND mode: ${before} → ${final.length} nya (${before - final.length} dubbletter filtrerade)`);
+  } else {
+    await runSql('DELETE FROM influencers WHERE foretag_id = $1', [foretag_id]);
+  }
 
   // 2. Insert final-set — enbart kolumner som finns i V1-schemat.
   //    Rich V9-metadata (match_score, obscurity, etc) sparas i search_metrics.
@@ -249,6 +260,8 @@ export async function runV9Pipeline({
   platforms = ['youtube', 'instagram', 'tiktok'],
   userQuery = null,
   bust_cache = false,
+  exclude_handles = [],
+  append = false,
 }) {
   const t0 = Date.now();
   const foretag_id = foretag?.id;
@@ -269,7 +282,7 @@ export async function runV9Pipeline({
       setTimeout(() => reject(new Error('V9 pipeline timeout (420s)')), GLOBAL_TIMEOUT_MS)
     );
     return await Promise.race([
-      runPipelineInner(foretag, companyProfile, platforms, userQuery, bust_cache, metrics, t0),
+      runPipelineInner(foretag, companyProfile, platforms, userQuery, bust_cache, metrics, t0, exclude_handles, append),
       timeoutPromise,
     ]);
   } catch (err) {
@@ -288,7 +301,11 @@ export async function runV9Pipeline({
   }
 }
 
-async function runPipelineInner(foretag, companyProfile, platforms, userQuery, bust_cache, metrics, t0) {
+async function runPipelineInner(foretag, companyProfile, platforms, userQuery, bust_cache, metrics, t0, exclude_handles = [], append = false) {
+  const excludeSet = new Set((exclude_handles || []).map(h => h.toLowerCase().replace(/^@/, '')));
+  if (excludeSet.size > 0) {
+    console.log(`[V9] APPEND MODE: exkluderar ${excludeSet.size} befintliga handles`);
+  }
   console.log(`[V9] ==================== PIPELINE START foretag_id=${foretag.id} ====================`);
   console.log(`[V9] Company: "${foretag.namn}" bransch="${foretag.bransch || '(tom)'}" beskrivning="${(foretag.beskrivning || '').slice(0, 100)}"`);
   console.log(`[V9] Platforms: ${platforms.join(', ')}, user_query: ${userQuery || '(ingen)'}`);
@@ -319,6 +336,14 @@ async function runPipelineInner(foretag, companyProfile, platforms, userQuery, b
   candidates = mergeCrossPlatform(candidates);
   const multiPlat = candidates.filter(c => c.is_multi_platform).length;
   console.log(`[V9] <<< Fas 2.5 klar. ${candidates.length} unika entiteter (${multiPlat} multi-plattform)`);
+
+  // === Fas 2.5b: Exclude already-found handles (append mode) ===
+  if (excludeSet.size > 0) {
+    const before = candidates.length;
+    candidates = candidates.filter(c => !excludeSet.has((c.handle || '').toLowerCase()));
+    const removed = before - candidates.length;
+    console.log(`[V9] Exclude filter: ${removed} redan-hittade borttagna, ${candidates.length} kvar`);
+  }
 
   // === Fas 2.6: Comment discovery (additive) ===
   console.log(`[V9] >>> Fas 2.6: Comment Discovery (${process.env.USE_COMMENT_DISCOVERY === 'true' ? 'AKTIV' : 'SKIPPAD'})`);
@@ -440,7 +465,7 @@ async function runPipelineInner(foretag, companyProfile, platforms, userQuery, b
   // === Fas 10: Persistens ===
   console.log(`[V9] >>> Fas 10: Persistens`);
   metrics.duration_ms = Date.now() - t0;
-  await persistResults(foretag.id, final, brief, metrics);
+  await persistResults(foretag.id, final, brief, metrics, { append });
   console.log(`[V9] <<< Fas 10 klar. ${final.length} sparade i DB.`);
 
   console.log(`[V9] ==================== PIPELINE END ${metrics.duration_ms}ms — ${final.length} resultat (${emailHits} med e-post) ====================`);

@@ -116,8 +116,7 @@ async function haikuProvisional(candidates, brief, companyProfile) {
 // === SONNET DEEP (Fas 7b) ====================================
 // ============================================================
 
-const SONNET_SYSTEM = (companyProfile, brief) => `Du är SparkCollab's influencer-matchnings-expert. Du scorar svenska kreatörer
-mot ett brand.
+const SONNET_SYSTEM = (companyProfile, brief) => `Du bedömer hur väl svenska influencers matchar ett företag för samarbete.
 
 Företag: ${companyProfile?.namn || ''}
 Bransch: ${companyProfile?.bransch || ''}
@@ -125,60 +124,38 @@ Beskrivning: ${companyProfile?.beskrivning || ''}
 Nisch: ${brief.primary_niche}
 Sekundära nischer: ${(brief.secondary_niches || []).join(', ')}
 Målgrupp: ${brief.target_audience}
-Must-have signals: ${(brief.must_have_signals || []).join('; ')}
-Exclusions: ${(brief.exclusions || []).join(', ')}
-Size tier hint: ${brief.size_tier_hint}
 
-Scora varje profil på FYRA dimensioner (var och en 0-100):
+GE VARJE INFLUENCER match_score (0-100) och motivation (max 90 tecken).
 
-1. NISCHFIT (40% vikt) — Hur exakt matchar content-nischen företagets bransch?
-   Kolla bio, sample captions/titlar, business category. Must-have signals
-   måste speglas för hög nischfit.
+STEG 1 — NISCH-SCORE (bas-poäng, viktigast):
+Fråga: "Skapar denna person content som företagets kunder tittar på?"
+  90-95 bas: Exakt nisch + recenserar/testar/tipsar i nischen
+  85-89 bas: Exakt nisch + skapar content i nischen
+  75-84 bas: Relaterad nisch, content överlappar
+  60-74 bas: Angränsande nisch, viss koppling
+  40-59 bas: Svag koppling, bred kanal
+  Under 40: Fel nisch
 
-2. AUDIENCE-FIT (20% vikt) — Matchar deras publik företagets målgrupp?
-   Bedöm från content-ton, ämnesval, språknivå.
+STEG 2 — FÖLJAR-JUSTERING (lägg till/dra av från bas):
+  0 eller null:     −40
+  1–100:            −30
+  100–500:          −20
+  500–1000:         −10
+  1000–3000:        −5
+  3000–10000:       ±0
+  10000–50000:      +3
+  50000+:           +5
 
-3. OBSCURITY / NON-OBVIOUS VALUE (25% vikt) — KRITISKT.
-   En brand kan redan Googla "svensk teknikbloggare" och hitta topp-5. Straffa
-   hårt profiler som är uppenbara toppsök-träffar.
-
-   Belöna:
-   - Mid-tier creators (5K-100K followers)
-   - Nischade specialister hellre än breda generalister
-   - multi_platform = true → +5 bonus
-   - discovery_source = "comment" → +5 (community-engagerad)
-   - discovery_source = "lookalike" → +3 (peer-validerad)
-   - discovery_source = "lookalike_fof" → +4 (djup-peer-validerad)
-   - discovery_source = "hashtag" → +3
-   - discovery_source = "bio_harvest" → +2
-   - discovery_source = "long_tail" → +4
-
-   Straffa:
-   - discovery_source = "list" → -3 (finns redan på publicerade listor)
-   - Mega-influencers (>500K) som alla redan känner
-   - Generalister som täcker många nischer ytligt
-   - Standard-bios med bara "influencer", "creator" utan content-detaljer
-
-4. AUTENTICITET (15% vikt) — Datakvalitet:
-   - Riktig bio, extern URL, postar nyligen → hög
-   - Tom bio, inget externt → låg
-   - Saknar followers-data (null) → autenticitet max 40 (okänt ≠ dåligt)
-   - Har bio/caption men saknar followers → autenticitet max 50
-   - comment_depth >= 2 → +10 authenticity
-   - platform_count >= 3 → +5 authenticity
-
-match_score = round(nischfit*0.40 + audience_fit*0.20 + obscurity*0.25 + authenticity*0.15)
-
-Hårda capar på match_score:
-- < 1000 followers → cap 40
-- < 500 followers → cap 25
-- < 100 followers (bekräftat) → cap 10
-- followers = null (okänt, data saknas) → cap 50 (straffa INTE okänt lika hårt som noll)
-- Inget must-have-signal speglat i bio/captions → nischfit cap 60
+REGLER:
+- En 466k mega-influencer i EXAKT rätt nisch = ALLTID 90+
+- En 22k kanal med exakt rätt nisch som ger tips/tutorials = 88-92
+- Ge ALDRIG under 80 till exakt nisch + 1K+ följare
+- Profilerna har redan filtrerats — de flesta BÖR få 70+
+- Var INTE konservativ — använd hela 0-100-skalan
 
 Returnera STRIKT JSON-array:
-[{"index": N, "match_score": 0-100, "nischfit": N, "audience_fit": N,
-  "obscurity": N, "authenticity": N, "motivation": "max 90 tecken, BARA fakta från datan ovan — hitta INTE PÅ siffror"}]`;
+[{"index": N, "match_score": 0-100, "motivation": "max 90 tecken"}]
+Motivation: nämn INTE namn/följarantal. Fokusera på VARFÖR.`;
 
 function renderDeepPrompt(profiles) {
   const lines = ['Profiler att djup-scora:'];
@@ -225,54 +202,48 @@ export function parseScoredWithTruncation(raw) {
   }
 }
 
+/** Follower cap BORTTAGEN — Sonnet hanterar följarantal i sin poängskala. */
 export function applyFollowerCap(c) {
-  const raw = c.followers ?? c.total_reach;
-  let cap = 100;
-  if (raw == null) {
-    // Okänt antal följare (t.ex. SC nere) — straffa INTE hårt.
-    // Cap 50 = kan fortfarande rankas men inte slå ut berikade profiler.
-    cap = 50;
-  } else if (raw === 0 || raw < 100) {
-    cap = 10;
-  } else if (raw < 500) {
-    cap = 25;
-  } else if (raw < 1000) {
-    cap = 40;
-  }
-  return Math.min(c.match_score || 0, cap);
+  return c.match_score || 0;
 }
 
-async function sonnetDeep(top50, brief, companyProfile) {
+const DEEP_BATCH_SIZE = 25;
+
+async function sonnetDeepBatch(batch, brief, companyProfile) {
   const raw = await callModel(
     SONNET,
     SONNET_SYSTEM(companyProfile, brief),
-    renderDeepPrompt(top50),
-    5000,
+    renderDeepPrompt(batch),
+    4000,
     0.2
   );
   const parsed = parseScoredWithTruncation(raw);
   let scored = 0;
-  let capped = 0;
-  for (let i = 0; i < top50.length; i++) {
+  for (let i = 0; i < batch.length; i++) {
     const r = parsed.find(x => x.index === i);
     if (!r) continue;
-    top50[i].match_score = Math.max(0, Math.min(100, Number(r.match_score || 0)));
-    top50[i].nischfit = Number(r.nischfit || 0);
-    top50[i].audience_fit = Number(r.audience_fit || 0);
-    top50[i].obscurity = Number(r.obscurity || 0);
-    top50[i].authenticity = Number(r.authenticity || 0);
-    top50[i].motivation = String(r.motivation || '').slice(0, 120);
-    top50[i].provisional = false;
+    batch[i].match_score = Math.max(0, Math.min(100, Number(r.match_score || 0)));
+    batch[i].motivation = String(r.motivation || '').slice(0, 120);
+    batch[i].provisional = false;
     scored++;
-    const beforeCap = top50[i].match_score;
-    top50[i].match_score = applyFollowerCap(top50[i]);
-    if (top50[i].match_score < beforeCap) {
-      capped++;
-      console.log(`[Scoring v9] Cap @${top50[i].handle}: ${beforeCap}→${top50[i].match_score} (followers=${top50[i].followers}, total_reach=${top50[i].total_reach})`);
+  }
+  return { scored, total: batch.length, parsed: parsed.length };
+}
+
+async function sonnetDeep(profiles, brief, companyProfile) {
+  let totalScored = 0;
+  const batches = Math.ceil(profiles.length / DEEP_BATCH_SIZE);
+  for (let b = 0; b < batches; b++) {
+    const batch = profiles.slice(b * DEEP_BATCH_SIZE, (b + 1) * DEEP_BATCH_SIZE);
+    try {
+      const { scored, total, parsed } = await sonnetDeepBatch(batch, brief, companyProfile);
+      totalScored += scored;
+      console.log(`[Scoring v9] Fas 7b batch ${b + 1}/${batches}: ${scored}/${total} scored (parsed ${parsed} objects)`);
+    } catch (err) {
+      console.warn(`[Scoring v9] Fas 7b batch ${b + 1}/${batches} failed: ${err.message}`);
     }
   }
-  console.log(`[Scoring v9] Fas 7b parsed ${scored}/${top50.length} complete objects (truncation: ${parsed.length < top50.length ? 'yes' : 'no'})`);
-  console.log(`[Scoring v9] Follower caps applied: ${capped}`);
+  console.log(`[Scoring v9] Fas 7b total: ${totalScored}/${profiles.length} deep scored`);
 }
 
 // ============================================================
@@ -290,13 +261,12 @@ export async function scoreCandidates(candidates, brief, companyProfile) {
   const t0 = Date.now();
   if (candidates.length === 0) return [];
 
-  // 7a: Haiku provisional för alla
+  // 7a: Haiku provisional för alla (snabb sortering)
   await haikuProvisional(candidates, brief, companyProfile);
 
-  // 7b: Top 50 → Sonnet deep
+  // 7b: Sonnet deep för ALLA — batchar i grupper om 25
   const sorted = [...candidates].sort((a, b) => (b.provisional_score || 0) - (a.provisional_score || 0));
-  const top50 = sorted.slice(0, 50);
-  await sonnetDeep(top50, brief, companyProfile);
+  await sonnetDeep(sorted, brief, companyProfile);
 
   console.log(`[Scoring v9] Done in ${Date.now() - t0}ms`);
   return candidates;

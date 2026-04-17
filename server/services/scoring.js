@@ -297,9 +297,9 @@ export async function generateMatchMotivation(influencer, companyProfile, scoreR
  * och ge varje en match_score (0-100) + motivation.
  * Detta ger mycket bättre resultat eftersom Claude kan tolka kontext.
  */
-// Maxbatch-storlek innan vi delar upp anropet. 80 profiler ≈ 3,200 output tokens
-// (välunder max_tokens=8000) → säker marginal mot trunkering.
-const SCORING_BATCH_SIZE = 80;
+// Maxbatch-storlek. Med 500-char bio per profil behöver vi mindre batchar.
+// 30 profiler × ~50 output tokens = ~1500 tokens, säker marginal vid max_tokens=4096.
+const SCORING_BATCH_SIZE = 30;
 
 async function scoreWithClaude(influencers, companyProfile, nischLabels = []) {
   const apiKey = process.env.ANTHROPIC_API_KEY;
@@ -366,40 +366,41 @@ GE VARJE INFLUENCER:
 1. match_score (0-100)
 2. motivation (MAX 90 tecken, svenska)
 
-VIKTIGASTE KRITERIET — NISCH-RELEVANS (80% av bedömningen):
-Fråga dig: "Skapar denna person content som företagets kunder tittar på?"
-- Om influencerns bio/handle/topics handlar om SAMMA ämne som företaget → 75+
-- Om influencerns bio/handle/topics är EXAKT rätt nisch → 85+
-- Om influencern dessutom gör recensioner/tester/tips i nischen → 90+
+STEG 1 — NISCH-SCORE (bas-poäng):
+Fråga: "Skapar denna person content som företagets kunder tittar på?"
+  90-95 bas: Exakt nisch + recenserar/testar/tipsar i nischen
+  85-89 bas: Exakt nisch + skapar content i nischen
+  75-84 bas: Relaterad nisch, content överlappar
+  60-74 bas: Angränsande nisch, viss koppling
+  40-59 bas: Svag koppling, bred kanal
+  Under 40: Fel nisch
 
-SEKUNDÄRT — FÖLJARANTAL (20% av bedömningen):
-Använd denna poängskala som GUIDE (inte hård cap) — justera ±5 beroende på kontext:
-  0 följare / null data:    –40 poäng (opålitlig profil)
-  1–100 följare:            –30 poäng (mycket liten)
-  100–500 följare:          –20 poäng (liten men kan ha potential)
-  500–1000 följare:         –10 poäng (liten kanal)
-  1000–3000 följare:        –5 poäng (nano, bra för konvertering)
-  3000–10000 följare:       ±0 poäng (nano/mikro, bra ROI)
-  10000–50000 följare:      +3 poäng (mikro, utmärkt balans)
-  50000+ följare:           +5 poäng (stor räckvidd)
+STEG 2 — FÖLJAR-JUSTERING (lägg till/dra av från bas):
+  0 eller null:     −40
+  1–100:            −30
+  100–500:          −20
+  500–1000:         −10
+  1000–3000:        −5
+  3000–10000:       ±0
+  10000–50000:      +3
+  50000+:           +5
 
-SCORING-REFERENS (kalibrering — nisch-score PLUS följar-justering):
-95: Exakt nisch + recenserar/testar produkter + 3K+ följare
-90: Exakt nisch + skapar content i nischen + 3K+ följare
-85: Exakt nisch + 1K+ följare
-75: Relaterad nisch + content överlappar delvis
-60: Lös koppling — nisch angränsar men inte direkt match
-40: Svag koppling — bred kanal där nischen bara nämns ibland
-25: Fel nisch helt
+KALIBRERINGS-EXEMPEL (företag säljer smink/skönhet):
+• Sminkkanal, 466k följare, "tips & sanningen om hudvård" → 95
+• Hudvårds-kanal, 22k följare, "tips och tricks för hudvårdsrutin" → 92
+• Makeupkanal, 48k följare, "smink-videos, storytime" → 88
+• Skönhets-kanal, 8k följare, ren smink-nisch → 85
+• Beauty+mode-kanal, 14k följare, mode dominerar → 72
+• Bred livsstils-kanal, 50k, nämner smink ibland → 55
 
-VIKTIGT: Var INTE för konservativ. En kanal som heter "SmartaHem" och gör
-hemautomation-videos ÄR en 85-95 match för ett smart hem-företag.
-En tech-recensent som testar smarta prylar ÄR en 75-85 match.
-Använd hela skalan — de flesta profiler som passerat vår pipeline har
-redan filtrerats för relevans, så 70+ borde vara vanligt.
+REGLER:
+- Profilerna har redan filtrerats för relevans. De flesta BÖR få 70+.
+- En 466k mega-influencer i EXAKT rätt nisch är ALLTID 90+.
+- Ge ALDRIG under 80 till en profil som har exakt rätt nisch och 1K+ följare.
+- Var INTE konservativ — använd hela 0-100-skalan.
 
-Svara med ENBART JSON-array: [{ "index": 0, "match_score": 85, "motivation": "text" }]
-MOTIVATION: Max 90 tecken. Nämn INTE namn eller följarantal (syns i UI). Fokusera på WHY.`;
+Svara ENBART JSON-array: [{"index":0,"match_score":85,"motivation":"text max 90 tecken"}]
+Motivation: nämn INTE namn/följarantal (syns i UI). Fokusera på VARFÖR.`;
 
   const userMessage = `${companyContext}
 

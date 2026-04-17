@@ -152,13 +152,12 @@ function applyFollowerCap(score, influencer) {
 
   // YouTube-profiler med verifierad data från API har alltid subscribers
   // Men IG/TT profiler kan ha null followers om enrichment misslyckades
-  if (followers === 0 || followers == null) return Math.min(score, 10);
-  if (followers < 50) return Math.min(score, 15);
-  if (followers < 100) return Math.min(score, 25);
-  if (followers < 500) return Math.min(score, 35);
-  if (followers < 1000) return Math.min(score, 40);
+  if (followers === 0 || followers == null) return Math.min(score, 15);
+  if (followers < 50) return Math.min(score, 20);
+  if (followers < 100) return Math.min(score, 30);
+  if (followers < 500) return Math.min(score, 45);
 
-  return score; // 1000+ followers → ingen cap
+  return score; // 500+ followers → ingen cap
 }
 
 /**
@@ -356,9 +355,10 @@ async function scoreWithClaudeSingleBatch(influencers, companyProfile, nischLabe
     plattform: inf.platform || inf.plattform || '',
     foljare: inf.followers || inf.foljare_exakt || null,
     nisch: (inf.niches || []).join(', ') || inf.nisch || '',
-    bio: (inf.bio || inf.beskrivning || '').slice(0, 100),
+    bio: (inf.bio || inf.beskrivning || '').slice(0, 500),
+    yt_topics: inf.topic_categories || [],
+    business_category: inf.business_category || '',
     datakalla: inf.datakalla || '',
-    ai_score_prev: inf.ai_score || null,
   }));
 
   const companyContext = [
@@ -369,42 +369,40 @@ async function scoreWithClaudeSingleBatch(influencers, companyProfile, nischLabe
     nischLabels.length > 0 ? `AI-identifierade nischer för detta företag: ${nischLabels.join(', ')}` : '',
   ].filter(Boolean).join('\n');
 
-  const systemPrompt = `Du är en expert på influencer-marknadsföring i Sverige. Du ska bedöma hur väl varje influencer matchar ett företag.
+  const systemPrompt = `Du bedömer hur väl svenska influencers matchar ett företag för samarbete.
 
 GE VARJE INFLUENCER:
-1. match_score (0-100): Hur väl matchar influencern företagets nisch, publik och mål
-2. motivation (MAX 90 tecken, en kort mening på svenska): Förklara VARFÖR profilen matchar eller inte matchar företaget — fokusera på nisch-relevans och passform
+1. match_score (0-100)
+2. motivation (MAX 90 tecken, svenska)
 
-BEDÖMNINGSKRITERIER:
-- Nisch-relevans (viktigast): Matchar influencerns innehåll företagets bransch och AI-identifierade nischer?
-- Plattforms-passform: Rätt plattform för företagets målgrupp?
-- Autenticitet: Har profilen riktig data (followers, bio) eller bara AI-uppskattning?
-- Storlek — bedöm utifrån kategori:
-    Nano (1K–10K): Hög engagemang, nischad publik — bra för konvertering
-    Mikro (10K–50K): Bra balans mellan räckvidd och engagemang — ofta bäst ROI
-    Mellanstor (50K–200K): Bred räckvidd med bibehållen relevans
-    Stor (200K–500K): Hög räckvidd, bra för varumärkeskännedom
-    Mega (500K+): Massiv räckvidd men lägre engagemang
-    Under 1K: STRAFFAS HÅRT. Troligen ny, inaktiv eller felaktigt konto. Max score 30.
-    Under 50 följare: STRAFFAS EXTREMT. Max score 15. Dessa konton är i princip värdelösa.
-    0 följare eller null: Max score 10. Profilen kunde inte verifieras.
-- Svenska profiler som riktar sig till svensk publik → bonus
+VIKTIGASTE KRITERIET — NISCH-RELEVANS (80% av bedömningen):
+Fråga dig: "Skapar denna person content som företagets kunder tittar på?"
+- Om influencerns bio/handle/topics handlar om SAMMA ämne som företaget → 75+
+- Om influencerns bio/handle/topics är EXAKT rätt nisch → 85+
+- Om influencern dessutom gör recensioner/tester/tips i nischen → 90+
 
-SCORING-GUIDE:
-90-100: Perfekt match — exakt rätt nisch, verifierad profil (1K+ följare), rätt storlek
-80-89:  Mycket bra — rätt nisch, bra storlek (1K+ följare)
-70-79:  Bra match — relaterad nisch, bra potential
-60-69:  OK match — delvis relevant, kräver mer utredning
-50-59:  Svag match — lös koppling till branschen
-30-49:  Dålig match — inte relevant ELLER under 1K följare
-Under 30: Värdelös — fel nisch och/eller inga följare
+SEKUNDÄRT — STORLEK (20% av bedömningen):
+- 1K+ följare med rätt nisch = fullt värdefull
+- Nano (1K–10K) med rätt nisch är LIKA BRA som mikro — de har ofta bättre konvertering
+- Under 500 följare → dra av 15-20 poäng
+- Under 100 eller 0 → max score 25
 
-Svara med ENBART en JSON-array. Varje element: { "index": 0, "match_score": 85, "motivation": "kort text max 90 tecken" }
-REGLER FÖR MOTIVATION:
-- MAX 90 tecken. Skriv kort och kärnfullt.
-- Börja ALDRIG med influencerns namn eller kontonamn — det syns redan i UI:t.
-- Nämn ALDRIG antal följare — det syns redan i UI:t.
-- Fokusera ENBART på WHY: nisch-matchning, innehållstyp, publikpassform.`;
+SCORING-REFERENS (kalibrering):
+95: Exakt nisch + recenserar/testar produkter i nischen + 1K+ följare
+85: Exakt nisch + skapar content i nischen + 1K+ följare
+75: Relaterad nisch + content överlappar delvis
+60: Lös koppling — nisch angränsar men inte direkt match
+40: Svag koppling — bred kanal där nischen bara nämns ibland
+25: Fel nisch eller för få följare för att vara användbar
+
+VIKTIGT: Var INTE för konservativ. En kanal som heter "SmartaHem" och gör
+hemautomation-videos ÄR en 85-95 match för ett smart hem-företag.
+En tech-recensent som testar smarta prylar ÄR en 75-85 match.
+Använd hela skalan — de flesta profiler som passerat vår pipeline har
+redan filtrerats för relevans, så 70+ borde vara vanligt.
+
+Svara med ENBART JSON-array: [{ "index": 0, "match_score": 85, "motivation": "text" }]
+MOTIVATION: Max 90 tecken. Nämn INTE namn eller följarantal (syns i UI). Fokusera på WHY.`;
 
   const userMessage = `${companyContext}
 

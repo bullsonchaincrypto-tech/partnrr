@@ -137,27 +137,36 @@ Fråga: "Skapar denna person content som företagets kunder tittar på?"
   Under 40: Fel nisch
 
 STEG 2 — FÖLJAR-JUSTERING (lägg till/dra av från bas):
-  0 eller null:     −40
-  1–100:            −30
+  0 eller null:     −50  (ingen data = opålitlig)
+  1–50:             −45  (oetablerad, nästan ingen publik)
+  50–100:           −35
   100–500:          −20
   500–1000:         −10
-  1000–3000:        −5
+  1000–3000:        −3
   3000–10000:       ±0
-  10000–50000:      +3
-  50000+:           +5
+  10000–50000:      +5
+  50000–200000:     +8
+  200000+:          +10
+
+STEG 3 — SPRÅK-CHECK:
+  Om influencerns bio/content är på ENGELSKA, TYSKA eller annat icke-svenskt
+  språk → −20 (dessa borde inte vara med, men om de sluppit igenom vill vi
+  inte att de rankas högt).
 ${brief.location ? `
-STEG 3 — PLATS-BONUS (om PLATS-KRAV finns):
+STEG 4 — PLATS-BONUS (om PLATS-KRAV finns):
   Om influencerns bio, kanalnamn eller content nämner "${brief.location}"
   eller närliggande region → +5 bonus.
   Om influencern tydligt INTE är i rätt region → −5.
   Om oklart/ej nämnt → ±0 (straffa INTE om plats inte framgår).
 ` : ''}
-REGLER:
-- En 466k mega-influencer i EXAKT rätt nisch = ALLTID 90+
-- En 22k kanal med exakt rätt nisch som ger tips/tutorials = 88-92
-- Ge ALDRIG under 80 till exakt nisch + 1K+ följare
-- Profilerna har redan filtrerats — de flesta BÖR få 70+
-- Var INTE konservativ — använd hela 0-100-skalan
+HÅRDA REGLER (bryt ALDRIG dessa):
+- Konto med under 50 följare → ALDRIG över 50 match_score, oavsett nisch
+- Konto med under 500 följare → ALDRIG över 65 match_score
+- Konto med 1000+ följare i EXAKT rätt nisch → ALDRIG under 75
+- Konto med 10000+ följare i RELATERAD nisch → minst 65
+- Konto med 50000+ följare i RELATERAD nisch → minst 70
+- Icke-svenskt content → ALDRIG över 40
+- Använd HELA 0-100-skalan — sprid ut poängen
 
 Returnera STRIKT JSON-array:
 [{"index": N, "match_score": 0-100, "motivation": "max 90 tecken"}]
@@ -208,9 +217,25 @@ export function parseScoredWithTruncation(raw) {
   }
 }
 
-/** Follower cap BORTTAGEN — Sonnet hanterar följarantal i sin poängskala. */
+/**
+ * Programmatisk follower-cap som backup — säkerställer att Sonnet-scores
+ * respekterar hårda gränser även om LLM:en inte följer prompten perfekt.
+ */
 export function applyFollowerCap(c) {
-  return c.match_score || 0;
+  let score = c.match_score || 0;
+  const followers = c.total_reach ?? c.followers ?? null;
+
+  if (followers != null) {
+    if (followers < 50 && score > 50) {
+      console.log(`[FollowerCap] @${c.handle}: ${score} → 50 (under 50 följare)`);
+      score = 50;
+    } else if (followers < 500 && score > 65) {
+      console.log(`[FollowerCap] @${c.handle}: ${score} → 65 (under 500 följare)`);
+      score = 65;
+    }
+  }
+
+  return score;
 }
 
 const DEEP_BATCH_SIZE = 25;

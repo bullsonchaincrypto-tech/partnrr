@@ -735,11 +735,17 @@ export default function Step2HittaInfluencers({ foretag, outreachType, influence
                       </div>
                     )}
 
-                    {/* Följare — bara för influencers */}
+                    {/* Följare + aktivitet — bara för influencers */}
                     {!inf._isSponsor && (
-                      <div className="text-right w-16">
+                      <div className="text-right w-24">
                         <div className="text-xs font-medium text-white leading-tight">{inf.foljare}</div>
                         <div className="text-[9px] text-gray-500 leading-tight">{(inf.plattform || '').toLowerCase().includes('youtube') ? 'pren.' : 'följare'}</div>
+                        {inf.last_activity_date && (() => {
+                          const days = Math.floor((Date.now() - new Date(inf.last_activity_date).getTime()) / 86400000)
+                          const label = days === 0 ? 'Aktiv idag' : days === 1 ? 'Aktiv igår' : `Aktiv ${days}d sen`
+                          const color = days <= 7 ? 'text-green-400' : days <= 30 ? 'text-yellow-400' : days <= 90 ? 'text-orange-400' : 'text-red-400'
+                          return <div className={`text-[9px] ${color} leading-tight mt-0.5`}>{label}</div>
+                        })()}
                       </div>
                     )}
 

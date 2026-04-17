@@ -127,6 +127,8 @@ router.post('/influencers', async (req, res) => {
             swedish_confidence: cand.swedish_confidence,
             brand_score: cand.brand_score ?? null,
             obscurity_validated: !!cand.obscurity_validated,
+            last_activity_date: cand.last_activity_date || null,
+            last_activity_type: cand.last_activity_type || null,
           };
         }).sort((a, b) => (b.match_score || 0) - (a.match_score || 0));
 

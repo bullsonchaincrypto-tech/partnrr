@@ -120,6 +120,44 @@ async function batchChannelsList(channelIds) {
   return results;
 }
 
+// 2.4b activities — senaste aktivitet per kanal (1 quota per kanal)
+async function batchActivities(channelIds) {
+  const activityMap = new Map(); // channelId → { date, type }
+  // Kör parallellt i grupper om 10 för att undvika rate-limit
+  const PARALLEL = 10;
+  for (let i = 0; i < channelIds.length; i += PARALLEL) {
+    const batch = channelIds.slice(i, i + PARALLEL);
+    const promises = batch.map(async (chId) => {
+      try {
+        const url = new URL('https://www.googleapis.com/youtube/v3/activities');
+        url.searchParams.set('channelId', chId);
+        url.searchParams.set('part', 'snippet');
+        url.searchParams.set('maxResults', '1');
+        url.searchParams.set('key', process.env.YOUTUBE_API_KEY);
+        const ac = new AbortController();
+        const timer = setTimeout(() => ac.abort(), 8000);
+        try {
+          const r = await fetch(url, { signal: ac.signal });
+          if (!r.ok) return;
+          const data = await r.json();
+          const item = data.items?.[0];
+          if (item?.snippet?.publishedAt) {
+            activityMap.set(chId, {
+              date: item.snippet.publishedAt,
+              type: item.snippet.type || 'unknown',
+            });
+          }
+        } finally {
+          clearTimeout(timer);
+        }
+      } catch {}
+    });
+    await Promise.all(promises);
+  }
+  console.log(`[Discovery][YT] Activities: ${activityMap.size}/${channelIds.length} kanaler med aktivitetsdata`);
+  return activityMap;
+}
+
 function normalizeYTChannel(ch, query) {
   const s = ch.snippet || {};
   const stats = ch.statistics || {};
@@ -160,8 +198,22 @@ async function discoverYT(queries) {
   const channelIds = await gatherYTChannelIds(queries);
   console.log(`[Discovery][YT] ${channelIds.length} unika channelIds funna`);
   if (channelIds.length === 0) return [];
-  const channels = await batchChannelsList(channelIds);
-  return channels.map(c => normalizeYTChannel(c, queries.yt_terms[0] || ''));
+
+  // Kör channels.list och activities parallellt
+  const [channels, activityMap] = await Promise.all([
+    batchChannelsList(channelIds),
+    batchActivities(channelIds),
+  ]);
+
+  return channels.map(c => {
+    const normalized = normalizeYTChannel(c, queries.yt_terms[0] || '');
+    const activity = activityMap.get(c.id);
+    if (activity) {
+      normalized.last_activity_date = activity.date;
+      normalized.last_activity_type = activity.type;
+    }
+    return normalized;
+  });
 }
 
 // ============================================================
